@@ -5,21 +5,18 @@ local M = {}
 ---@class OccurrencyConfig
 local DEFAULT_CONFIG = {
   ---@type string keymap to modify a pending operation to target occurrences of word under cursor. Default is 'o'.
-  word_modifier = "o",
-  ---@type string keymap to modify a pending operation to target occurrences of subword under cursor. Default is 'O'.
-  subword_modifier = "O",
+  operator_modifier = "o",
   ---@type string keymap to mark occurrences of the word under cursor to be targeted by the next operation. Default is 'go'.
-  word_operator = "go",
-  ---@type string keymap to mark occurrences of the subword under cursor to be targeted by the next operation. Default is 'gO'.
-  subword_operator = "gO",
+  normal_operator = "go",
+  ---@type string keymap to mark occurrences of the visually selected subword to be targeted by the next operation. Default is 'go'.
+  visual_operator = "go",
 }
 
 ---Options for configuring occurrency.
 ---@class OccurrencyOptions: OccurrencyConfig
----@field word_modifier? string
----@field subword_modifier? string
----@field word_operator? string
----@field subword_operator? string
+---@field operator_modifier? string
+---@field normal_operator? string
+---@field visual_operator? string
 
 ---Validate the given options.
 ---@param opts OccurrencyOptions
