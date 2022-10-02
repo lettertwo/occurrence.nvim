@@ -25,8 +25,8 @@ end
 --- Sets the current log level.
 ---@param level number One of `vim.log.levels`
 function log.set_level(level)
-  assert(type(level) == "number", "level must be a number or string")
-  assert(LEVELS[level], string.format("Invalid log level: %d", level))
+  assert(type(level) == "number", "level must be a number")
+  assert(vim.tbl_contains(vim.tbl_values(LEVELS), level), string.format("Invalid log level: %d", level))
   current_level = level
 end
 
