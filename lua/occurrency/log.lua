@@ -9,9 +9,18 @@
 ---@field error_once function
 local log = {}
 
-local LEVELS = vim.log.levels
+---@enum LogLevel
+local LEVELS = {
+  TRACE = 0,
+  DEBUG = 1,
+  INFO = 2,
+  WARN = 3,
+  ERROR = 4,
+  OFF = 5,
+}
 
 -- Default log level is WARN.
+---@type LogLevel
 local current_level = LEVELS.WARN
 
 local PREFIX = "[Occurrency] "
@@ -23,9 +32,8 @@ function log.to_message(...)
 end
 
 --- Sets the current log level.
----@param level number One of `vim.log.levels`
+---@param level LogLevel One of `vim.log.levels`
 function log.set_level(level)
-  assert(type(level) == "number", "level must be a number")
   assert(vim.tbl_contains(vim.tbl_values(LEVELS), level), string.format("Invalid log level: %d", level))
   current_level = level
 end
