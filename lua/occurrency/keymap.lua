@@ -1,5 +1,5 @@
 local create_action = require("occurrency.action").create_action
-local mark = require("occurrency.mark")
+local mark = require("occurrency.actions.mark")
 local log = require("occurrency.log")
 
 ---@enum OccurrencyKeymapMode

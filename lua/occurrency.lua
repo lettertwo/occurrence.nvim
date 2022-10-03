@@ -8,8 +8,8 @@ end
 function M.setup(opts)
   local config = require("occurrency.config").parse(opts)
   local keymap = require("occurrency.keymap")
-  local mark = require("occurrency.mark")
-  local operation = require("occurrency.operation")
+  local mark = require("occurrency.actions.mark")
+  local operation = require("occurrency.actions.operation")
 
   keymap.n(config.normal_operator, mark.word + keymap.activate("n", config), "Occurrences of word under cursor")
   keymap.x(
