@@ -6,8 +6,10 @@ function M.setup(opts)
   if opts == nil then
     opts = prev_opts
   end
+  local log = require("occurrency.log")
+  log.set_level(log.levels.DEBUG)
   prev_opts = opts
-  print("occurrency.dev.setup(" .. vim.inspect(opts) .. ")")
+  log.debug("occurrency.dev.setup(" .. vim.inspect(opts) .. ")")
   require("occurrency").setup(opts)
 end
 
@@ -16,9 +18,11 @@ function M.reload()
   ---@diagnostic disable-next-line: undefined-field
   local luacache = (_G.__luacache or {}).cache -- impatient.nvim cache
   local module_name_pattern = vim.pesc("occurrency")
+  local log = require("occurrency.log")
   for pack, _ in pairs(package.loaded) do
     if string.find(pack, "^" .. module_name_pattern) then
-      print("unloading " .. pack)
+      log.set_level(log.levels.DEBUG)
+      log.debug("unloading " .. pack)
       package.loaded[pack] = nil
       if luacache then
         luacache[pack] = nil

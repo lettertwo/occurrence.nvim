@@ -7,6 +7,7 @@
 ---@field warn_once function
 ---@field error function
 ---@field error_once function
+---@operator call:string
 local log = {}
 
 ---@enum LogLevel
@@ -19,9 +20,11 @@ local LEVELS = {
   OFF = 5,
 }
 
--- Default log level is WARN.
+log.levels = LEVELS
+
+-- Default log level is INFO.
 ---@type LogLevel
-local current_level = LEVELS.WARN
+local current_level = LEVELS.INFO
 
 local PREFIX = "[Occurrency] "
 local NOTIFY_OPTIONS = { title = "Occurrency" }
@@ -32,7 +35,7 @@ function log.to_message(...)
 end
 
 --- Sets the current log level.
----@param level LogLevel One of `vim.log.levels`
+---@param level LogLevel One of `log.levels`
 function log.set_level(level)
   assert(vim.tbl_contains(vim.tbl_values(LEVELS), level), string.format("Invalid log level: %d", level))
   current_level = level
@@ -60,5 +63,11 @@ do
     end
   end
 end
+
+setmetatable(log, {
+  __call = function(_, ...)
+    log.info(...)
+  end,
+})
 
 return log
