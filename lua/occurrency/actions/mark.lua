@@ -1,4 +1,4 @@
-local create_actions = require("occurrency.action").create_actions
+local Action = require("occurrency.Action")
 local log = require("occurrency.log")
 
 local NS = vim.api.nvim_create_namespace("Occurrency")
@@ -88,4 +88,4 @@ function M.visual(bufnr)
   mark_occurrences(bufnr, get_visual_text(bufnr))
 end
 
-return create_actions(M)
+return Action:map(M)

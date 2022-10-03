@@ -1,5 +1,5 @@
 local Keymap = require("occurrency.Keymap")
-local create_action = require("occurrency.action").create_action
+local Action = require("occurrency.Action")
 local log = require("occurrency.log")
 local mark = require("occurrency.actions.mark")
 
@@ -11,7 +11,7 @@ local M = {}
 ---@return OccurrencyAction
 function M.activate(mode, config)
   Keymap.validate_mode(mode)
-  return create_action(
+  return Action:new(
     -- Activate keybindings for the given buffer.
     -- If no buffer is given, the current buffer is used.
     ---@param buffer? integer
@@ -32,7 +32,7 @@ end
 -- Creates an action to deactivate the given keymap.
 ---@param keymap BufferKeymap
 function M.deactivate(keymap)
-  return create_action(function()
+  return Action:new(function()
     keymap:reset()
     log.debug("Deactivated keybindings for buffer", keymap.buffer)
   end)

@@ -1,4 +1,4 @@
-local create_actions = require("occurrency.action").create_actions
+local Action = require("occurrency.Action")
 
 local M = {}
 
@@ -6,4 +6,4 @@ function M.run()
   print("operation.run")
 end
 
-return create_actions(M)
+return Action:map(M)
