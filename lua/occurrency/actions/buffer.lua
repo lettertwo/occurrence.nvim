@@ -12,13 +12,11 @@ local M = {}
 function M.activate(mode, config)
   Keymap.validate_mode(mode)
   return Action:new(
-    -- Activate keybindings for the given buffer.
-    -- If no buffer is given, the current buffer is used.
-    ---@param buffer? integer
-    function(buffer)
-      buffer = buffer or vim.api.nvim_get_current_buf()
-      log.debug("Activating keybindings for buffer", buffer, "and mode", mode)
-      local keymap = Keymap:bind(buffer)
+    -- Activate keybindings for the given occurrence buffer.
+    ---@param occurrence Occurrence
+    function(occurrence)
+      log.debug("Activating keybindings for buffer", occurrence.buffer, "and mode", mode)
+      local keymap = Keymap:bind(occurrence.buffer)
       -- TODO: mode-specific bindings
 
       -- Bind these regardless of the mode we're activating.
@@ -30,7 +28,6 @@ function M.activate(mode, config)
 end
 
 -- Creates an action to deactivate the given keymap.
----@param keymap BufferKeymap
 function M.deactivate(keymap)
   return Action:new(function()
     keymap:reset()

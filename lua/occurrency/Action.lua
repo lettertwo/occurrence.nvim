@@ -1,12 +1,16 @@
 local ACTION = "__ACTION__"
+local Occurrence = require("occurrency.Occurrence")
 
----A callable type that can be used as a keymap callback.
----It can be sequenced with other actions via the `+` operator.
+-- A callable type that can be used as a keymap callback.
+-- It can be sequenced with other actions via the `+` operator.
+-- The callback will receive the Occurrence for the current buffer as its first argument.
+-- If the action is sequenced with other actions, the callback will receive the results
+-- of the previous action as additional arguments.
 ---@class OccurrencyAction
----@operator add((fun(...): nil)|OccurrencyAction): OccurrencyAction
----@operator call(...): nil
+---@operator add(OccurrencyAction | fun(occurrence: Occurrence, ...): any): OccurrencyAction
+---@operator call(...): any
 ---@field type `ACTION`
----@field callback fun(...): nil
+---@field callback fun(occurrence: Occurrence, ...): any
 local Action = {}
 
 ---@param candidate any
@@ -15,18 +19,19 @@ function Action.is_action(candidate)
   return type(candidate) == "table" and candidate.type == ACTION
 end
 
+---@param other OccurrencyAction | fun(occurrence: Occurrence, ...): any
 function Action:add(other)
   if type(other) == "function" or self.is_action(other) then
-    return self:new(function()
-      self()
-      other()
+    return self:new(function(occurrence, ...)
+      return other(occurrence, unpack({ self(occurrence, ...) }))
     end)
   end
   error("When combining actions, the other must be a function or action")
 end
 
-function Action:call(...)
-  self.callback(...)
+---@param occurrence? Occurrence
+function Action:call(occurrence, ...)
+  return self.callback(occurrence or Occurrence:new(), ...)
 end
 
 -- Convert a function into an action.
