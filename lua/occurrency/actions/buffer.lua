@@ -16,7 +16,7 @@ function M.activate(mode, config)
     ---@param occurrence Occurrence
     function(occurrence)
       log.debug("Activating keybindings for buffer", occurrence.buffer, "and mode", mode)
-      local keymap = Keymap:bind(occurrence.buffer)
+      local keymap = Keymap:new(occurrence.buffer)
       -- TODO: mode-specific bindings
 
       -- Bind these regardless of the mode we're activating.

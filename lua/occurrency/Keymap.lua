@@ -41,7 +41,7 @@ local Keymap = {
 -- Creates a new keymap bound to a buffer.
 ---@param buffer integer The buffer to bind to.
 ---@return BufferKeymap
-function Keymap:bind(buffer)
+function Keymap:new(buffer)
   ---@type BufferKeymap
   local bound_keymap = {
     buffer = buffer,
