@@ -22,14 +22,20 @@ function M.activate(mode, config)
       log.debug("Activating keybindings for buffer", occurrence.buffer, "and mode", mode)
       local keymap = Keymap:new(occurrence.buffer)
       -- TODO: mode-specific bindings
-      keymap:n("n", M.next:bind(occurrence), "Next occurrence")
-      keymap:n("N", M.previous:bind(occurrence), "Previous occurrence")
+      keymap:n("n", mark.next:bind(occurrence), "Next marked occurrence")
+      keymap:n("N", mark.previous:bind(occurrence), "Previous marked occurrence")
+      keymap:n("gn", M.next:bind(occurrence), "Next occurrence")
+      keymap:n("gN", M.previous:bind(occurrence), "Previous occurrence")
       keymap:n("a", mark.add:bind(occurrence), "Mark occurrence")
       keymap:n("x", mark.del:bind(occurrence), "Unmark occurrence")
 
       -- Bind these regardless of the mode we're activating.
       -- TODO: Make this configurable.
-      keymap:n("<Esc>", mark.clear + M.deactivate(keymap):bind(occurrence), "Clear marks and deactivate keybindings")
+      keymap:n(
+        "<Esc>",
+        mark.clear:bind(occurrence) + M.deactivate(keymap):bind(occurrence),
+        "Clear marks and deactivate keybindings"
+      )
     end
   )
 end
@@ -43,13 +49,19 @@ function M.deactivate(keymap)
 end
 
 -- Go to the next occurrence.
-M.next = Action:new(function(occurrence)
-  occurrence:next({ nearest = true, move = true })
-end)
+M.next = Action:new(
+  ---@param occurrence Occurrence
+  function(occurrence)
+    occurrence:match({ nearest = true, move = true })
+  end
+)
 
 -- Go to the previous occurrence.
-M.previous = Action:new(function(occurrence)
-  occurrence:previous({ nearest = true, move = true })
-end)
+M.previous = Action:new(
+  ---@param occurrence Occurrence
+  function(occurrence)
+    occurrence:match({ reverse = true, nearest = true, move = true })
+  end
+)
 
 return M
