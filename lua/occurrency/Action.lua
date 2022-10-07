@@ -14,6 +14,18 @@ local log = require("occurrency.log")
 ---@field callback fun(occurrence: Occurrence, ...): any
 local Action = {}
 
+---@class PartialOccurrencyAction: OccurrencyAction
+---@operator add(OccurrencyAction | fun(occurrence: Occurrence, ...): any): OccurrencyAction
+---@operator call(...): any
+---@field type `ACTION`
+---@field callback fun(...): any
+
+---@class BoundOccurrencyAction: OccurrencyAction
+---@operator add(OccurrencyAction | fun(occurrence: Occurrence, ...): any): OccurrencyAction
+---@operator call(...): any
+---@field type `ACTION`
+---@field callback fun(occurrence: Occurrence): any
+
 ---@param candidate any
 ---@return boolean
 function Action.is_action(candidate)
@@ -25,7 +37,7 @@ end
 -- If the `callback` is an action, the new action will extend it.
 -- If the `callback` is `nil`, the new action will extend the current action. This only works
 -- for existing actions.
----@param callback? (fun(...): nil) | OccurrencyAction
+---@param callback? (fun(occurrence: Occurrence, ...): nil) | OccurrencyAction
 ---@return OccurrencyAction
 function Action:new(callback)
   local action = { type = ACTION }
@@ -45,17 +57,31 @@ function Action:new(callback)
   return setmetatable(action, { __index = meta, __add = meta.add, __call = meta.call })
 end
 
--- Binds an existing action to the given arguments.
--- The first argument is expected to be an `Occurrence`.
+-- Binds an existing action to the given occurrence.
 -- This is useful for creating actions within actions,
 -- e.g., adding keymaps to perform additional actions with an occurrence.
 ---@param occurrence Occurrence
+---@return PartialOccurrencyAction
+function Action:with(occurrence)
+  local partial = self:new()
+  function partial:call(...)
+    return self.callback(occurrence, ...)
+  end
+  getmetatable(partial).__call = partial.call
+  ---@cast partial PartialOccurrencyAction
+  return partial
+end
+
+-- Binds an action to some parameters, e.g., config.
+-- The first argument to an action is always expected to be an `Occurrence`,
+-- so this method is useful for providing additional arguments for an action ahead of time.
+-- Note that this differs from `Action.with()` in that it does not bind the occurrence.
 ---@param ... any
----@return OccurrencyAction
-function Action:bind(occurrence, ...)
+---@return BoundOccurrencyAction
+function Action:bind(...)
   local args = select("#", ...) > 0 and { ... } or nil
   local bound = self:new()
-  function bound:call(...)
+  function bound:call(occurrence, ...)
     if args then
       return self.callback(occurrence, unpack(args), ...)
     else
@@ -63,6 +89,7 @@ function Action:bind(occurrence, ...)
     end
   end
   getmetatable(bound).__call = bound.call
+  ---@cast bound BoundOccurrencyAction
   return bound
 end
 
@@ -79,23 +106,6 @@ end
 ---@param occurrence? Occurrence
 function Action:call(occurrence, ...)
   return self.callback(occurrence or Occurrence:new(), ...)
-end
-
--- Convert a table of functions into a table of actions.
----@param module table<string, fun(...): nil>
----@return table<string, OccurrencyAction>
-function Action:map(module)
-  if type(module) ~= "table" then
-    error("module must be a table")
-  end
-  local result = vim.deepcopy(module)
-
-  for key, value in pairs(module) do
-    if type(value) == "function" then
-      result[key] = self:new(value)
-    end
-  end
-  return result
 end
 
 return Action
