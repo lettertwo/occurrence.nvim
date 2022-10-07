@@ -6,7 +6,7 @@ end
 
 ---@param opts OccurrencyOptions
 function M.setup(opts)
-  local config = require("occurrency.config").parse(opts)
+  local config = require("occurrency.Config"):new(opts)
   local Keymap = require("occurrency.Keymap")
   local buffer = require("occurrency.actions.buffer")
   local mark = require("occurrency.actions.mark")
@@ -14,16 +14,15 @@ function M.setup(opts)
   local find = require("occurrency.actions.find")
 
   Keymap:n(
-    config.normal_operator,
+    config.normal,
     find.cursor_word + mark.all + buffer.activate("n", config),
     "Occurrences of word under cursor"
   )
   Keymap:x(
-    config.visual_operator,
+    config.visual,
     find.visual_subword + mark.all + buffer.activate("x", config),
     "Occurrences of visually selected subword"
   )
-  Keymap:o(config.operator_modifier, find.cursor_word + mark.all + operation.run, "Occurrences of word under cursor")
 end
 
 return M

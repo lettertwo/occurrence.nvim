@@ -1,15 +1,11 @@
 local log = require("occurrency.log")
 
-local M = {}
-
 ---@class OccurrencyConfig
-local DEFAULT_CONFIG = {
-  ---@type string keymap to modify a pending operation to target occurrences of word under cursor. Default is 'o'.
-  operator_modifier = "o",
+local Config = {
   ---@type string keymap to mark occurrences of the word under cursor to be targeted by the next operation. Default is 'go'.
-  normal_operator = "go",
+  normal = "go",
   ---@type string keymap to mark occurrences of the visually selected subword to be targeted by the next operation. Default is 'go'.
-  visual_operator = "go",
+  visual = "go",
 }
 
 ---Options for configuring occurrency.
@@ -21,16 +17,16 @@ local DEFAULT_CONFIG = {
 ---Validate the given options.
 ---@param opts OccurrencyOptions
 ---@return nil error if the options represent an invalid configuration.
-function M.validate(opts)
+function Config:validate(opts)
   if type(opts) ~= "table" then
     error("opts must be a table")
   end
   for k, v in pairs(opts) do
-    if DEFAULT_CONFIG[k] == nil then
+    if self[k] == nil then
       error("invalid option: " .. k)
     end
-    if type(v) ~= type(DEFAULT_CONFIG[v]) then
-      error("option " .. k .. " must be a " .. type(DEFAULT_CONFIG[v]))
+    if type(v) ~= type(self[v]) then
+      error("option " .. k .. " must be a " .. type(self[v]))
     end
   end
 end
@@ -38,16 +34,22 @@ end
 ---Validate and parse the given options.
 ---@param opts? OccurrencyOptions
 ---@return OccurrencyConfig config The configuration parsed from the given options, with defaults applied.
-function M.parse(opts)
-  if opts == nil then
-    return DEFAULT_CONFIG
+function Config:new(opts)
+  local meta = {
+    __index = self,
+    __newindex = function()
+      error("cannot modify config")
+    end,
+  }
+  if opts ~= nil then
+    local ok, err = pcall(self.validate, self, opts)
+    if ok then
+      meta.__index = vim.tbl_extend("force", self, opts)
+    else
+      log.warn_once(err)
+    end
   end
-  local ok, err = pcall(M.validate, opts)
-  if not ok then
-    log.warn_once(err)
-    return DEFAULT_CONFIG
-  end
-  return vim.tbl_extend("force", DEFAULT_CONFIG, opts)
+  return setmetatable({}, meta)
 end
 
-return M
+return Config
