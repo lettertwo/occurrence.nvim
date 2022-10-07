@@ -6,6 +6,10 @@ local Config = {
   normal = "go",
   ---@type string keymap to mark occurrences of the visually selected subword to be targeted by the next operation. Default is 'go'.
   visual = "go",
+  ---@type string keymap to change occurrences of the word under cursor. Default is 'co'.
+  change = "co",
+  ---@type string keymap to delete occurrences of the word under cursor. Default is 'do'.
+  delete = "do",
 }
 
 ---Options for configuring occurrency.

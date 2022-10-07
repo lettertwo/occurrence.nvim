@@ -18,6 +18,16 @@ function M.setup(opts)
     find.cursor_word + mark.all + buffer.activate("n", config),
     "Occurrences of word under cursor"
   )
+  Keymap:n(
+    config.change,
+    find.cursor_word + mark.all + buffer.activate("o", config) + operation.change,
+    { expr = true, desc = "Occurrences of word under cursor" }
+  )
+  Keymap:n(
+    config.delete,
+    find.cursor_word + mark.all + buffer.activate("o", config) + operation.delete,
+    { expr = true, desc = "Occurrences of word under cursor" }
+  )
   Keymap:x(
     config.visual,
     find.visual_subword + mark.all + buffer.activate("x", config),
