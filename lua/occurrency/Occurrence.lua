@@ -7,11 +7,21 @@ local OCCURRENCE_HL_GROUP = "Underlined" -- "Occurrence"
 
 -- A weak-key map of Occurrence instances to their internal state stores.
 ---@type table<Occurrence, OccurrenceState>
-local STATE_CACHE = setmetatable({}, { __mode = "k" })
+local STATE_CACHE = setmetatable({}, {
+  __mode = "k",
+  __index = function()
+    error("Occurrence has not been initialized")
+  end,
+})
 
 -- A weak-key map of Occurrence instances to their marks.
 ---@type table<Occurrence, Marks>
-local MARKS_CACHE = setmetatable({}, { __mode = "k" })
+local MARKS_CACHE = setmetatable({}, {
+  __mode = "k",
+  __index = function()
+    error("Occurrence has not been initialized")
+  end,
+})
 
 -- The internal state store for an Occurrence.
 ---@class OccurrenceState
@@ -51,6 +61,7 @@ end
 ---@param state OccurrenceState
 ---@return boolean Whether a mark was added.
 function Marks:add(state)
+  assert(state.has_match, "Occurrence has no match")
   local key = mark_key(state)
   if key and self[key] == nil then
     self[key] = vim.api.nvim_buf_set_extmark(state.buffer, NS, state.line, state.col, {
@@ -67,6 +78,7 @@ end
 ---@param state OccurrenceState
 ---@return boolean Whether a mark was removed.
 function Marks:del(state)
+  assert(state.has_match, "Occurrence has no match")
   local key = mark_key(state)
   if key and self[key] ~= nil then
     vim.api.nvim_buf_del_extmark(state.buffer, NS, self[key])
@@ -88,7 +100,6 @@ local OCCURRENCE_META = {
       return Occurrence[key]
     else
       local state = STATE_CACHE[self]
-      assert(state, "Occurrence has not been initialized")
       if state[key] ~= nil then
         return state[key]
       elseif key == "has_match" then -- If the occurrence doesn't have match yet, try to find one.
@@ -99,7 +110,6 @@ local OCCURRENCE_META = {
   end,
   __newindex = function(self, key, value)
     local state = STATE_CACHE[self]
-    assert(state, "Occurrence has not been initialized")
     if rawget(self, key) == nil and state[key] ~= nil then
       error("Cannot set readonly field " .. key)
     else
@@ -134,7 +144,6 @@ function Occurrence:match(opts)
     opts or {}
   )
   local state = STATE_CACHE[self]
-  assert(state, "Occurrence has not been initialized")
   local pattern = state.pattern
   assert(pattern, "Occurrence has not been initialized with a pattern")
   local buffer = state.buffer
@@ -161,7 +170,6 @@ function Occurrence:match(opts)
   -- If searching for marked occurrences, keep searching until we find one.
   if next_match and opts.marked then
     local marks = MARKS_CACHE[self]
-    assert(marks, "Occurrence has not been initialized")
     if not marks:has_pos(next_match) then
       local start_match = next_match
       repeat
@@ -190,10 +198,7 @@ end
 -- Mark the current occurrence.
 function Occurrence:mark()
   local state = STATE_CACHE[self]
-  assert(state and state.has_match, "Occurrence has not been initialized")
-  local marks = MARKS_CACHE[self]
-  assert(marks, "Occurrence has not been initialized")
-  if marks:add(state) then
+  if MARKS_CACHE[self]:add(state) then
     state.marked = true
   end
 end
@@ -201,10 +206,7 @@ end
 -- Unmark the current occurrence.
 function Occurrence:unmark()
   local state = STATE_CACHE[self]
-  assert(state and state.has_match, "Occurrence has not been initialized")
-  local marks = MARKS_CACHE[self]
-  assert(marks, "Occurrence has not been initialized")
-  if marks:del(state) then
+  if MARKS_CACHE[self]:del(state) then
     state.marked = false
   end
 end
@@ -215,7 +217,6 @@ end
 ---@param opts? { is_word: boolean }
 function Occurrence:set(text, opts)
   local state = STATE_CACHE[self]
-  assert(state, "Occurrence has not been initialized")
 
   -- Clear all marks and highlights.
   MARKS_CACHE[self] = Marks:new()
