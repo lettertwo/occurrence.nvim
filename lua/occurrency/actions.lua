@@ -63,39 +63,37 @@ end)
 
 -- Add a mark and highlight for the current match of the given occurrence.
 M.mark = Action:new(function(occurrence)
-  if occurrence.has_match then
+  if occurrence.range then
     occurrence:mark()
   end
 end)
 
 -- Remove a mark and highlight for the current match of the given occurrence.
 M.unmark = Action:new(function(occurrence)
-  if occurrence.has_match then
+  if occurrence.range then
     occurrence:unmark()
   end
 end)
 
 -- Add marks and highlights for all matches of the given occurrence.
 M.mark_all = Action:new(function(occurrence)
-  if occurrence.has_match then
-    local start_line = occurrence.line
-    local start_col = occurrence.col
+  local start = occurrence.range
+  if start then
     repeat
       occurrence:mark()
       occurrence:match()
-    until occurrence.line == start_line and occurrence.col == start_col
+    until occurrence.range == start
   end
 end)
 
 -- Clear all marks and highlights for the given occcurrence.
 M.unmark_all = Action:new(function(occurrence)
-  if occurrence.has_match then
-    local start_line = occurrence.line
-    local start_col = occurrence.col
+  local start = occurrence.range
+  if start then
     repeat
       occurrence:unmark()
       occurrence:match()
-    until occurrence.line == start_line and occurrence.col == start_col
+    until occurrence.range == start
   end
 end)
 
@@ -118,8 +116,8 @@ end)
 ---@param config OccurrencyConfig
 M.activate_keymap = Action:new(function(occurrence, mode, config)
   Keymap.validate_mode(mode)
-  if not occurrence.has_match then
-    log.debug("No match for occurrence; skipping activation")
+  if not occurrence.range then
+    log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")
     return
   end
   log.debug("Activating keybindings for buffer", occurrence.buffer, "and mode", mode)

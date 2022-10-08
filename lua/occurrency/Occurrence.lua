@@ -1,3 +1,5 @@
+local Location = require("occurrency.Location")
+local Range = require("occurrency.Range")
 local log = require("occurrency.log")
 
 local NS = vim.api.nvim_create_namespace("Occurrency")
@@ -23,21 +25,26 @@ local MARKS_CACHE = setmetatable({}, {
   end,
 })
 
+---@param buffer integer
+---@param location Location
+local function move_cursor(buffer, location)
+  -- TODO: figure out if we can use nvim api instead?
+  -- Currently not doing so because it appears to always scroll the window.
+  -- vim.api.nvim_win_set_cursor(0, location:to_markpos())
+  vim.fn.setpos(".", vim.tbl_flatten({ buffer, location:to_searchpos(), 0 }))
+end
+
 -- The internal state store for an Occurrence.
 ---@class OccurrenceState
 ---@field buffer integer The buffer in which the occurrence was found.
 ---@field span integer The number of bytes in the occurrence.
----@field has_match boolean Whether the occurrence has a match.
 ---@field pattern? string The pattern that was used to find the occurrence.
----@field line? integer The line on which the occurrence starts. 0-indexed.
----@field col? integer The column on which the occurrence starts. 0-indexed.
+---@field range? Range The range of the occurrence.
 
--- Get a string key for the occurrence state.
----@param state OccurrenceState
-local function mark_key(state)
-  if state.has_match then
-    return state.line .. state.col
-  end
+-- Get a string key for the occurrence location.
+---@param location Location
+local function mark_key(location)
+  return tostring(location)
 end
 
 ---@class Marks
@@ -47,27 +54,25 @@ function Marks:new()
   return setmetatable({}, { __index = self })
 end
 
--- Check if there is a mark at the given position.
----@param pos integer[] A position as returned by `vim.fn.searchpos()`.
-function Marks:has_pos(pos)
-  return self[mark_key({
-    has_match = true,
-    line = pos[1] - 1,
-    col = pos[2] - 1,
-  })] ~= nil
+-- Check if there is a mark at the given location.
+---@param location? Location
+function Marks:has_pos(location)
+  return location and self[mark_key(location)] ~= nil
 end
 
 -- Add a mark and highlight for the current occurrence.
 ---@param state OccurrenceState
 ---@return boolean Whether a mark was added.
 function Marks:add(state)
-  assert(state.has_match, "Occurrence has no match")
-  local key = mark_key(state)
+  assert(state.range, "Occurrence has no match")
+  local key = mark_key(state.range.start)
+
   if key and self[key] == nil then
-    self[key] = vim.api.nvim_buf_set_extmark(state.buffer, NS, state.line, state.col, {
-      end_line = state.line,
-      end_col = state.col + state.span,
+    self[key] = vim.api.nvim_buf_set_extmark(state.buffer, NS, state.range.start.line, state.range.start.col, {
+      end_row = state.range.stop.line,
+      end_col = state.range.stop.col,
       hl_group = OCCURRENCE_HL_GROUP,
+      hl_mode = "combine",
     })
     return true
   end
@@ -78,8 +83,8 @@ end
 ---@param state OccurrenceState
 ---@return boolean Whether a mark was removed.
 function Marks:del(state)
-  assert(state.has_match, "Occurrence has no match")
-  local key = mark_key(state)
+  assert(state.range, "Occurrence has no match")
+  local key = mark_key(state.range.start)
   if key and self[key] ~= nil then
     vim.api.nvim_buf_del_extmark(state.buffer, NS, self[key])
     self[key] = nil
@@ -102,9 +107,6 @@ local OCCURRENCE_META = {
       local state = STATE_CACHE[self]
       if state[key] ~= nil then
         return state[key]
-      elseif key == "has_match" then -- If the occurrence doesn't have match yet, try to find one.
-        self:match()
-        return state[key] or false
       end
     end
   end,
@@ -148,24 +150,25 @@ function Occurrence:match(opts)
   assert(pattern, "Occurrence has not been initialized with a pattern")
   local buffer = state.buffer
   assert(buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
-  local cursorpos = vim.fn.getcurpos() -- store cursor position before searching.
+  local cursorpos = Location:of_cursor() -- store cursor position before searching.
+  assert(cursorpos, "Cursor is not in the buffer")
 
   local flags = opts.reverse and "b" or ""
   flags = flags .. (opts.move and "" or "n")
   flags = flags .. (opts.wrap and "w" or "")
-  flags = flags .. (state.has_match and "" or "c")
+  flags = flags .. (state.range and "" or "c")
 
   if not opts.nearest then
-    if state.has_match then
+    if state.range then
       -- Move cursor to current occurrence.
-      vim.fn.setpos(".", { buffer, state.line + 1, state.col + 1, 0 })
+      move_cursor(buffer, state.range.start)
     else
       -- On first match, move cursor to the start of the buffer.
-      vim.fn.setpos(".", { buffer, 1, 1, 0 })
+      move_cursor(buffer, Location:new(0, 0))
     end
   end
 
-  local next_match = vim.fn.searchpos(pattern, flags)
+  local next_match = Location:from_searchpos(vim.fn.searchpos(pattern, flags))
 
   -- If searching for marked occurrences, keep searching until we find one.
   if next_match and opts.marked then
@@ -173,24 +176,20 @@ function Occurrence:match(opts)
     if not marks:has_pos(next_match) then
       local start_match = next_match
       repeat
-        next_match = vim.fn.searchpos(pattern, flags)
-      until not next_match
-        or marks:has_pos(next_match)
-        or (start_match[1] == next_match[1] and start_match[2] == next_match[2])
+        next_match = Location:from_searchpos(vim.fn.searchpos(pattern, flags))
+      until not next_match or marks:has_pos(next_match) or next_match == start_match
     end
   end
 
   if next_match then
-    state.has_match = true
-    state.line = next_match[1] - 1
-    state.col = next_match[2] - 1
+    state.range = Range:new(next_match, next_match + state.span)
     if not opts.move then
-      vim.fn.setpos(".", cursorpos) -- restore cursor position after search.
+      move_cursor(buffer, cursorpos) -- restore cursor position.
     end
     return true
   else
     log.debug("No matches found for pattern:", pattern, "Restoring cursor position")
-    vim.fn.setpos(".", cursorpos) -- restore cursor position after failed search.
+    move_cursor(buffer, cursorpos) -- restore cursor position after failed search.
     return false
   end
 end
@@ -229,9 +228,7 @@ function Occurrence:set(text, opts)
     state.pattern = opts and opts.is_word and string.format([[\V\<%s\>]], text) or string.format([[\V%s]], text)
     state.span = #text
   end
-  state.line = nil
-  state.col = nil
-  state.has_match = nil
+  state.range = nil
 
   -- If we have a pattern to search, find the first occurrence.
   if state.pattern then
