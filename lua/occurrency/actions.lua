@@ -1,5 +1,6 @@
 local Keymap = require("occurrency.Keymap")
 local Action = require("occurrency.Action")
+local Range = require("occurrency.Range")
 local log = require("occurrency.log")
 
 -- A map of Buffer ids to their active keymaps.
@@ -77,6 +78,38 @@ M.unmark = Action:new(function(occurrence)
   end
 end)
 
+-- Add marks and highlights for matches of the given occurrence within the current selection.
+M.mark_selection = Action:new(function(occurrence)
+  local start = occurrence.range
+  if start then
+    local selection_range = Range:of_selection()
+    if selection_range then
+      repeat
+        if selection_range:contains(occurrence.range) then
+          occurrence:mark()
+        end
+        occurrence:match()
+      until occurrence.range == start
+    end
+  end
+end)
+
+-- Clear marks and highlights for matches of the given occurrence within the current selection.
+M.unmark_selection = Action:new(function(occurrence)
+  local start = occurrence.range
+  if start then
+    local selection_range = Range:of_selection()
+    if selection_range then
+      repeat
+        if selection_range:contains(occurrence.range) then
+          occurrence:unmark()
+        end
+        occurrence:match()
+      until occurrence.range == start
+    end
+  end
+end)
+
 -- Add marks and highlights for all matches of the given occurrence.
 M.mark_all = Action:new(function(occurrence)
   local start = occurrence.range
@@ -137,6 +170,10 @@ M.activate_keymap = Action:new(function(occurrence, mode, config)
     keymap:n("gN", M.goto_previous:with(occurrence), "Previous occurrence")
     keymap:n("a", M.mark:with(occurrence), "Mark occurrence")
     keymap:n("x", M.unmark:with(occurrence), "Unmark occurrence")
+
+    -- Use visual/select to narrow an active occurrence.
+    keymap:x("a", M.mark_selection:with(occurrence), "Mark occurrences")
+    keymap:x("x", M.unmark_selection:with(occurrence), "Unmark occurrences")
 
     -- Deactivate occurrence operator.
     keymap:n("<Esc>", (M.unmark_all + M.deactivate_keymap):with(occurrence), "Clear marks and deactivate keywithings")

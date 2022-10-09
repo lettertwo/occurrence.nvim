@@ -46,11 +46,33 @@ function Range:new(start, stop)
   })
 end
 
--- Get the range of the most recent selection.
+-- Get the range of the active visual selection.
+-- Returns `nil` if there is no active selection, or the selection is blockwise.
 function Range:of_selection()
-  local start = Location:of_mark("'<")
-  local stop = Location:of_mark("'>")
+  local mode = vim.api.nvim_get_mode().mode
+  if mode ~= "v" and mode ~= "V" then
+    return nil
+  end
+  -- Turns out that finding the active selection range is not straightfoward.
+  -- The `'<,'>` mark pair refers to the _previous_ selection (after leaving visual mode),
+  -- so is of no help for finding the current selection.
+  -- Two possible solutions:
+  -- 1. forceably leave visual mode, grab the range using the `'<,'>` mark pair,
+  --    then re-enter visual mode using `gv`.
+  -- 2. Use `vim.fn.getpos('v') to get the start of the current selection range,
+  --    then use the cursor position as the end of the range.
+  -- The second option is what we do here, but it does feel fragile.
+  local start = Location:from_pos(vim.fn.getpos("v"))
+  local stop = Location:of_cursor()
+  log("mode", vim.inspect(mode))
   if start and stop then
+    if mode == "V" then
+      start = Location:new(start.line, 0)
+      stop = Location:new(stop.line, math.huge)
+    end
+    if stop < start then
+      start, stop = stop, start
+    end
     return self:new(start, stop)
   end
 end
