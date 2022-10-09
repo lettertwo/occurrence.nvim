@@ -72,23 +72,42 @@ function Location:of_cursor()
 end
 
 -- Get the location of a mark.
--- Mark names are prefixed with a single quote, e.g., `'a`.
+-- Note: Mark names are not prefixed with a quote.
 ---@param mark string
 function Location:of_mark(mark)
   return self:from_markpos(vim.api.nvim_buf_get_mark(0, mark))
 end
 
--- Creates a new `Location` from the given 'search-like' position.
--- A 'search-like' position has 1-based lines, and 1-based columns.
--- If the position is invalid, returns `nil`.
----@param pos integer[] A 1-indexed position tuple.
-function Location:from_searchpos(pos)
-  local line = pos and pos[1]
-  local col = pos and pos[2]
+-- Get a new `Location` from a position tuple.
+-- This could be a 2-tuple of `{line, col}`
+-- or a 3+-tuple of, e.g., `{buffer, line, col, ...}`.
+--
+-- The tuple positions are expected to 'search-like',
+-- as returned by functions like `vim.fn.getpos()` or `vim.fn.searchpos()`.
+---@param pos integer[]
+function Location:from_pos(pos)
+  if not pos or #pos < 2 then
+    return nil
+  end
+  local line = pos[1]
+  local col = pos[2]
+  if #pos > 2 then
+    line = pos[2]
+    col = pos[3]
+  end
   if line < 1 or col < 1 then
     return nil
   end
   return self:new(line - 1, col - 1)
+end
+
+-- Creates a new `Location` from the given 'search-like' position.
+-- A 'search-like' position has 1-based lines, and 1-based columns.
+--
+-- If the position is invalid, returns `nil`.
+---@param pos integer[] A 1-indexed position tuple.
+function Location:from_searchpos(pos)
+  return self:from_pos(pos)
 end
 
 -- Returns a 'search-like' position for the given `Location`.
