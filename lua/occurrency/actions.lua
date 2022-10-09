@@ -135,23 +135,15 @@ M.activate_keymap = Action:new(function(occurrence, mode, config)
     keymap:n("gN", M.goto_previous:with(occurrence), "Previous occurrence")
     keymap:n("a", M.mark:with(occurrence), "Mark occurrence")
     keymap:n("x", M.unmark:with(occurrence), "Unmark occurrence")
-    keymap:n(
-      "<Esc>",
-      M.unmark_all:with(occurrence) + M.deactivate_keymap:with(occurrence),
-      "Clear marks and deactivate keywithings"
-    )
+
+    -- Deactivate occurrence operator.
+    keymap:n("<Esc>", (M.unmark_all + M.deactivate_keymap):with(occurrence), "Clear marks and deactivate keywithings")
   elseif mode == "x" then
-    keymap:n(
-      "<Esc>",
-      M.unmark_all:with(occurrence) + M.deactivate_keymap:with(occurrence),
-      "Clear marks and deactivate keywithings"
-    )
+    -- Deactivate occurrence operator.
+    keymap:n("<Esc>", (M.unmark_all + M.deactivate_keymap):with(occurrence), "Clear marks and deactivate keywithings")
   elseif mode == "o" then
-    keymap:o(
-      "<Esc>",
-      M.unmark_all:with(occurrence) + M.deactivate_keymap:with(occurrence),
-      "Clear marks and deactivate keywithings"
-    )
+    -- Deactivate occurrence operator.
+    keymap:o("<Esc>", (M.unmark_all + M.deactivate_keymap):with(occurrence), "Clear marks and deactivate keywithings")
   end
 end)
 
