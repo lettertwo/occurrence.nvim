@@ -31,7 +31,8 @@ local NOTIFY_OPTIONS = { title = "Occurrency" }
 
 ---Prefix and concatenate arguments to a log function.
 function log.to_message(...)
-  return PREFIX .. table.concat(vim.tbl_flatten({ ... }), " ")
+  return PREFIX .. table.concat(vim.tbl_map(tostring, { ... }), " ")
+  -- return PREFIX .. table.concat(vim.tbl_flatten({ ... }), " ")
 end
 
 --- Sets the current log level.
