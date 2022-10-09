@@ -117,6 +117,14 @@ function Location:to_searchpos()
   return { self.line + 1, self.col + 1 }
 end
 
+--- Returns the distance between this `Location` and another `Location`.
+---@param other Location
+function Location:distance(other)
+  local a = math.abs(self.line - other.line)
+  local b = math.abs(self.col - other.col)
+  return math.sqrt(a * a + b * b)
+end
+
 -- Add an offset to a `Location` to get a new `Location`.
 -- A single integer argument is interpreted as a column offset.
 -- Two integer arguments are interpreted as line and column offsets.

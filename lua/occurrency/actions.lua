@@ -63,6 +63,7 @@ end)
 
 -- Add a mark and highlight for the current match of the given occurrence.
 M.mark = Action:new(function(occurrence)
+  occurrence:match_cursor()
   if occurrence.range then
     occurrence:mark()
   end
@@ -70,6 +71,7 @@ end)
 
 -- Remove a mark and highlight for the current match of the given occurrence.
 M.unmark = Action:new(function(occurrence)
+  occurrence:match_cursor()
   if occurrence.range then
     occurrence:unmark()
   end

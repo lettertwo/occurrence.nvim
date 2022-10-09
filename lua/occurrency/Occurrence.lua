@@ -133,6 +133,7 @@ function Occurrence:new(buffer, text, opts)
 end
 
 -- Find the next occurrence in the buffer.
+--
 -- If `reverse` is `true` (default is `false`), the search will proceed backwards.
 -- If `wrap` is `true` (default is `true`), the search will wrap around the end of the buffer.
 -- If `nearest` is `true` (default is `false`), the search will move to next occurrence relative to the cursor.
@@ -192,6 +193,69 @@ function Occurrence:match(opts)
     move_cursor(buffer, cursorpos) -- restore cursor position after failed search.
     return false
   end
+end
+
+-- Find the nearest occurrence to the cursor.
+-- Has a bias toward the current line, but if the nearest occurrence
+-- in absolute terms is behind the cursor, it will be matched.
+--
+-- If `move` is `true` (default is `false`), the cursor will be moved to the nearest occurrence.
+-- If `marked` is `true` (default is `false`), the search will only consider occurrences that have been marked.
+---@param opts? { move?: boolean, marked?: boolean }
+function Occurrence:match_cursor(opts)
+  opts = vim.tbl_extend("force", { move = false, marked = false }, opts or {})
+  local state = STATE_CACHE[self]
+  local pattern = state.pattern
+  assert(pattern, "Occurrence has not been initialized with a pattern")
+  local buffer = state.buffer
+  assert(buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
+  local cursorpos = Location:of_cursor() -- store cursor position before searching.
+  assert(cursorpos, "Cursor is not in the buffer")
+
+  local next_match = Location:from_searchpos(vim.fn.searchpos(pattern, "c"))
+  local prev_match = Location:from_searchpos(vim.fn.searchpos(pattern, "bc"))
+
+  -- If searching for marked occurrences, keep searching until we find one in each direction.
+  if opts.marked then
+    local marks = MARKS_CACHE[self]
+    if next_match then
+      if not marks:has_pos(next_match) then
+        repeat
+          next_match = Location:from_searchpos(vim.fn.searchpos(pattern))
+        until not next_match or marks:has_pos(next_match)
+      end
+    end
+    if prev_match then
+      if not marks:has_pos(prev_match) then
+        repeat
+          prev_match = Location:from_searchpos(vim.fn.searchpos(pattern, "b"))
+        until not prev_match or marks:has_pos(prev_match)
+      end
+    end
+  end
+
+  if not next_match and not prev_match then
+    log.debug("No matches found for pattern:", pattern, "Restoring cursor position")
+    move_cursor(buffer, cursorpos) -- restore cursor position after failed search.
+    return false
+  elseif next_match and prev_match then
+    if next_match == prev_match then
+      state.range = Range:new(next_match, next_match + state.span)
+    elseif cursorpos:distance(prev_match) < cursorpos:distance(next_match) then
+      state.range = Range:new(prev_match, prev_match + state.span)
+    else
+      state.range = Range:new(next_match, next_match + state.span)
+    end
+  elseif next_match then
+    state.range = Range:new(next_match, next_match + state.span)
+  elseif prev_match then
+    state.range = Range:new(prev_match, prev_match + state.span)
+  end
+
+  if not opts.move then
+    move_cursor(buffer, cursorpos) -- restore cursor position.
+  end
+  return true
 end
 
 -- Mark the current occurrence.
