@@ -124,7 +124,8 @@ M.activate_keymap = Action:new(function(occurrence, mode, config)
   end
   log.debug("Activating keybindings for buffer", occurrence.buffer, "and mode", mode)
   if KEYMAP_CACHE[occurrence.buffer] then
-    error("Keymap is already active!")
+    log.error("Keymap is already active!")
+    KEYMAP_CACHE[occurrence.buffer]:reset()
   end
   local keymap = Keymap:new(occurrence.buffer)
   KEYMAP_CACHE[occurrence.buffer] = keymap
