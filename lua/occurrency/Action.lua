@@ -83,7 +83,7 @@ function Action:bind(...)
   local bound = self:new()
   function bound:call(occurrence, ...)
     if args then
-      return self.callback(occurrence, unpack(args), ...)
+      return self.callback(occurrence, unpack(vim.tbl_flatten({ args, ... })))
     else
       return self.callback(occurrence, ...)
     end
