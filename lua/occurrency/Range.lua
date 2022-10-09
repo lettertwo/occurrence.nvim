@@ -64,15 +64,26 @@ function Range:of_motion()
   end
 end
 
--- Compare the given location to the range boundaries.
--- A location is considered to be within the range if it is greater than
+-- Compare the given `Location` or `Range` to this `Range`.
+--
+-- A `Location` is considered to be contained if it is greater than
 -- or equal to the start location, and less than the stop location.
----@param location Location
----@return boolean `true` if the location is within the range, `false` otherwise.
-function Range:contains(location)
-  return self.start <= location and location < self.stop
+--
+-- A `Range` is considered to be contained if its start location
+-- is greater than or equal to the start location, and its stop location
+-- is less than or equal to the stop location.
+---@param other Range | Location
+---@return boolean
+function Range:contains(other)
+  if other.start and other.stop then
+    return self.start <= other.start and other.stop <= self.stop
+  else
+    return self.start <= other and other < self.stop
+  end
 end
 
+-- Compare the given `Range` to this `Range`.
+-- Ranges are considered equal if their start and stop locations are equal.
 ---@param other Range
 function Range:eq(other)
   return self.start == other.start and self.stop == other.stop
