@@ -54,7 +54,7 @@ end
 
 -- Add a mark and highlight for the current occurrence.
 ---@param state OccurrenceState
----@return boolean Whether a mark was added.
+---@return boolean added Whether a mark was added.
 function Marks:add(state)
   assert(state.range, "Occurrence has no match")
   local key = mark_key(state.range.start)
@@ -73,7 +73,7 @@ end
 
 -- Remove a mark and highlight for the current occurrence.
 ---@param state OccurrenceState
----@return boolean Whether a mark was removed.
+---@return boolean deleted Whether a mark was removed.
 function Marks:del(state)
   assert(state.range, "Occurrence has no match")
   local key = mark_key(state.range.start)
@@ -249,19 +249,17 @@ function Occurrence:match_cursor(opts)
 end
 
 -- Mark the current occurrence.
+---@return boolean marked Whether the occurrence was marked.
 function Occurrence:mark()
   local state = STATE_CACHE[self]
-  if MARKS_CACHE[self]:add(state) then
-    state.marked = true
-  end
+  return MARKS_CACHE[self]:add(state)
 end
 
 -- Unmark the current occurrence.
+---@return boolean unmarked Whether the occurrence was unmarked.
 function Occurrence:unmark()
   local state = STATE_CACHE[self]
-  if MARKS_CACHE[self]:del(state) then
-    state.marked = false
-  end
+  return MARKS_CACHE[self]:del(state)
 end
 
 -- Set the text to search for.

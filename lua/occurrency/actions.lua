@@ -78,6 +78,16 @@ M.unmark = Action:new(function(occurrence)
   end
 end)
 
+-- Toggle a mark and highlight for the current match of the given occurrence.
+M.toggle_mark = Action:new(function(occurrence)
+  occurrence:match_cursor()
+  if occurrence.range then
+    if not occurrence:mark() then
+      occurrence:unmark()
+    end
+  end
+end)
+
 -- Add marks and highlights for matches of the given occurrence within the current selection.
 M.mark_selection = Action:new(function(occurrence)
   local start = occurrence.range
@@ -103,6 +113,24 @@ M.unmark_selection = Action:new(function(occurrence)
       repeat
         if selection_range:contains(occurrence.range) then
           occurrence:unmark()
+        end
+        occurrence:match()
+      until occurrence.range == start
+    end
+  end
+end)
+
+-- Toggle marks and highlights for matches of the given occurrence within the current selection.
+M.toggle_mark_selection = Action:new(function(occurrence)
+  local start = occurrence.range
+  if start then
+    local selection_range = Range:of_selection()
+    if selection_range then
+      repeat
+        if selection_range:contains(occurrence.range) then
+          if not occurrence:mark() then
+            occurrence:unmark()
+          end
         end
         occurrence:match()
       until occurrence.range == start
@@ -168,12 +196,14 @@ M.activate_keymap = Action:new(function(occurrence, mode, config)
     keymap:n("N", M.goto_previous_mark:with(occurrence), "Previous marked occurrence")
     keymap:n("gn", M.goto_next:with(occurrence), "Next occurrence")
     keymap:n("gN", M.goto_previous:with(occurrence), "Previous occurrence")
-    keymap:n("a", M.mark:with(occurrence), "Mark occurrence")
-    keymap:n("x", M.unmark:with(occurrence), "Unmark occurrence")
+    keymap:n("go", M.toggle_mark:with(occurrence), "Toggle occurrence mark")
+    keymap:n("ga", M.mark:with(occurrence), "Mark occurrence")
+    keymap:n("gx", M.unmark:with(occurrence), "Unmark occurrence")
 
     -- Use visual/select to narrow an active occurrence.
-    keymap:x("a", M.mark_selection:with(occurrence), "Mark occurrences")
-    keymap:x("x", M.unmark_selection:with(occurrence), "Unmark occurrences")
+    keymap:x("go", M.toggle_mark_selection:with(occurrence), "Toggle occurrence marks")
+    keymap:x("ga", M.mark_selection:with(occurrence), "Mark occurrences")
+    keymap:x("gx", M.unmark_selection:with(occurrence), "Unmark occurrences")
 
     -- Deactivate occurrence operator.
     keymap:n("<Esc>", (M.unmark_all + M.deactivate_keymap):with(occurrence), "Clear marks and deactivate keywithings")
