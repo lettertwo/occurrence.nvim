@@ -85,6 +85,27 @@ function Marks:del(state)
   return false
 end
 
+-- Remove all marks and highlights within the given `Range`.
+--
+-- Note that this is different from `Marks:del()` in that it can
+-- remove multiple marks within the given range.
+function Marks:del_within(buffer, range)
+  -- Try the exact match delete first.
+  if self:del(buffer, range) then
+    return true
+  end
+
+  local success = false
+  for key, mark in pairs(self) do
+    if range:contains(Range:deserialize(key)) then
+      vim.api.nvim_buf_del_extmark(buffer, NS, mark)
+      self[key] = nil
+      success = true
+    end
+  end
+  return success
+end
+
 -- A stateful representation of an occurrence of a pattern in a buffer.
 ---@class Occurrence: OccurrenceState
 local Occurrence = {}

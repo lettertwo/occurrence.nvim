@@ -46,6 +46,21 @@ function Location:new(line, col)
   })
 end
 
+-- Serializes the `Location` to a string.
+-- For a pretty-printed representation, use `tostring(Location)`.
+---@return string
+function Location:serialize()
+  return table.concat(self, ":")
+end
+
+-- Create a new `Location` from a `Location:serialize()` string.
+---@param str string
+---@return Location
+function Location:deserialize(str)
+  local line, col = str:match("^(%d+):(%d+)$")
+  return self:new(tonumber(line), tonumber(col))
+end
+
 -- Creates a new `Location` from the given 'mark-like' position.
 -- A 'mark-like' position has 1-based lines, and 0-based columns.
 -- If the position is invalid, returns `nil`.

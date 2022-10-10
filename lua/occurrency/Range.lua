@@ -46,6 +46,21 @@ function Range:new(start, stop)
   })
 end
 
+-- Serializes the `Range` to a string.
+-- For a pretty-printed representation, use `tostring(Range)`.
+---@return string
+function Range:serialize()
+  return table.concat({ self.start:serialize(), self.stop:serialize() }, "::")
+end
+
+-- Create a new `Range` from a `Range:serialize()` string.
+---@param str string
+---@return Range
+function Range:deserialize(str)
+  local start, stop = str:match("^(.+)%:%:(.+)$")
+  return self:new(Location:deserialize(start), Location:deserialize(stop))
+end
+
 -- Get the range of the active visual selection.
 -- Returns `nil` if there is no active selection, or the selection is blockwise.
 function Range:of_selection()
