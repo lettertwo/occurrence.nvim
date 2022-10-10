@@ -101,6 +101,15 @@ function Range:of_motion()
   end
 end
 
+-- Transpose this range to a new location.
+---@param start Location
+---@return Range
+function Range:move(start)
+  local line_diff = start.line - self.start.line
+  local col_diff = start.col - self.start.col
+  return self:new(start, self.stop:add(line_diff, col_diff))
+end
+
 -- Compare the given `Location` or `Range` to this `Range`.
 --
 -- A `Location` is considered to be contained if it is greater than

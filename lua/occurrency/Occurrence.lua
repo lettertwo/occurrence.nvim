@@ -78,6 +78,21 @@ function Marks:add(buffer, range)
   return false
 end
 
+-- Get the current `Range` for the mark originally added at the given `Range`.
+-- This is useful for, e.g., cascading edits to the buffer at marked occurrences.
+---@param buffer integer
+---@param range Range
+---@return Range | nil
+function Marks:get(buffer, range)
+  local id = self[range:serialize()]
+  if id ~= nil then
+    local loc = vim.api.nvim_buf_get_extmark_by_id(buffer, NS, id, {})
+    if next(loc) then
+      return range:move(Location:new(unpack(loc)))
+    end
+  end
+end
+
 -- Remove a mark and highlight for the given `Range`.
 --
 -- Note that this is different from `Marks:del_within()` in that it will
