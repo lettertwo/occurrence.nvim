@@ -1,4 +1,5 @@
 local Location = require("occurrency.Location")
+local Cursor = require("occurrency.Cursor")
 local Range = require("occurrency.Range")
 local log = require("occurrency.log")
 
@@ -24,15 +25,6 @@ local MARKS_CACHE = setmetatable({}, {
     error("Occurrence has not been initialized")
   end,
 })
-
----@param buffer integer
----@param location Location
-local function move_cursor(buffer, location)
-  -- TODO: figure out if we can use nvim api instead?
-  -- Currently not doing so because it appears to always scroll the window.
-  -- vim.api.nvim_win_set_cursor(0, location:to_markpos())
-  vim.fn.setpos(".", vim.tbl_flatten({ buffer, location:to_searchpos(), 0 }))
-end
 
 -- The internal state store for an Occurrence.
 ---@class OccurrenceState
@@ -151,8 +143,7 @@ function Occurrence:match(opts)
   assert(pattern, "Occurrence has not been initialized with a pattern")
   local buffer = state.buffer
   assert(buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
-  local cursorpos = Location:of_cursor() -- store cursor position before searching.
-  assert(cursorpos, "Cursor is not in the buffer")
+  local cursor = Cursor:save() -- store cursor position before searching.
 
   local flags = opts.reverse and "b" or ""
   flags = flags .. (opts.move and "" or "n")
@@ -162,10 +153,10 @@ function Occurrence:match(opts)
   if not opts.nearest then
     if state.range then
       -- Move cursor to current occurrence.
-      move_cursor(buffer, state.range.start)
+      cursor:move(state.range.start)
     else
       -- On first match, move cursor to the start of the buffer.
-      move_cursor(buffer, Location:new(0, 0))
+      cursor:move(Location:new(0, 0))
     end
   end
 
@@ -185,12 +176,12 @@ function Occurrence:match(opts)
   if next_match then
     state.range = Range:new(next_match, next_match + state.span)
     if not opts.move then
-      move_cursor(buffer, cursorpos) -- restore cursor position.
+      cursor:restore() -- restore cursor position.
     end
     return true
   else
     log.debug("No matches found for pattern:", pattern, "Restoring cursor position")
-    move_cursor(buffer, cursorpos) -- restore cursor position after failed search.
+    cursor:restore() -- restore cursor position after failed search.
     return false
   end
 end
@@ -209,8 +200,7 @@ function Occurrence:match_cursor(opts)
   assert(pattern, "Occurrence has not been initialized with a pattern")
   local buffer = state.buffer
   assert(buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
-  local cursorpos = Location:of_cursor() -- store cursor position before searching.
-  assert(cursorpos, "Cursor is not in the buffer")
+  local cursor = Cursor:save() -- store cursor position before searching.
 
   local next_match = Location:from_searchpos(vim.fn.searchpos(pattern, "c"))
   local prev_match = Location:from_searchpos(vim.fn.searchpos(pattern, "bc"))
@@ -236,12 +226,12 @@ function Occurrence:match_cursor(opts)
 
   if not next_match and not prev_match then
     log.debug("No matches found for pattern:", pattern, "Restoring cursor position")
-    move_cursor(buffer, cursorpos) -- restore cursor position after failed search.
+    cursor:restore() -- restore cursor position after failed search.
     return false
   elseif next_match and prev_match then
     if next_match == prev_match then
       state.range = Range:new(next_match, next_match + state.span)
-    elseif cursorpos:distance(prev_match) < cursorpos:distance(next_match) then
+    elseif cursor.location:distance(prev_match) < cursor.location:distance(next_match) then
       state.range = Range:new(prev_match, prev_match + state.span)
     else
       state.range = Range:new(next_match, next_match + state.span)
@@ -253,7 +243,7 @@ function Occurrence:match_cursor(opts)
   end
 
   if not opts.move then
-    move_cursor(buffer, cursorpos) -- restore cursor position.
+    cursor:restore() -- restore cursor position.
   end
   return true
 end
