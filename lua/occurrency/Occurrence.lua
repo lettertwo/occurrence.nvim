@@ -26,6 +26,18 @@ local MARKS_CACHE = setmetatable({}, {
   end,
 })
 
+---@param state OccurrenceState
+---@param flags string
+---@return Range | nil
+local function search(state, flags)
+  if state.pattern then
+    local start = Location:from_searchpos(vim.fn.searchpos(state.pattern, flags))
+    if start then
+      return Range:new(start, start + state.span)
+    end
+  end
+end
+
 -- The internal state store for an Occurrence.
 ---@class OccurrenceState
 ---@field buffer integer The buffer in which the occurrence was found.
@@ -33,12 +45,7 @@ local MARKS_CACHE = setmetatable({}, {
 ---@field pattern? string The pattern that was used to find the occurrence.
 ---@field range? Range The range of the occurrence.
 
--- Get a string key for the occurrence location.
----@param location Location
-local function mark_key(location)
-  return tostring(location)
-end
-
+-- A map of `Range` objects to extmark ids.
 ---@class Marks
 local Marks = {}
 
@@ -46,23 +53,23 @@ function Marks:new()
   return setmetatable({}, { __index = self })
 end
 
--- Check if there is a mark at the given location.
----@param location? Location
-function Marks:has_pos(location)
-  return location and self[mark_key(location)] ~= nil
+-- Check if there is a mark for the given range.
+---@param range? Range
+function Marks:has(range)
+  return range and self[range:serialize()] ~= nil
 end
 
--- Add a mark and highlight for the current occurrence.
----@param state OccurrenceState
+-- Add a mark and highlight for the given `Range`.
+---@param buffer integer
+--@param range Range
 ---@return boolean added Whether a mark was added.
-function Marks:add(state)
-  assert(state.range, "Occurrence has no match")
-  local key = mark_key(state.range.start)
+function Marks:add(buffer, range)
+  local key = range:serialize()
 
   if key and self[key] == nil then
-    self[key] = vim.api.nvim_buf_set_extmark(state.buffer, NS, state.range.start.line, state.range.start.col, {
-      end_row = state.range.stop.line,
-      end_col = state.range.stop.col,
+    self[key] = vim.api.nvim_buf_set_extmark(buffer, NS, range.start.line, range.start.col, {
+      end_row = range.stop.line,
+      end_col = range.stop.col,
       hl_group = OCCURRENCE_HL_GROUP,
       hl_mode = "combine",
     })
@@ -71,14 +78,17 @@ function Marks:add(state)
   return false
 end
 
--- Remove a mark and highlight for the current occurrence.
----@param state OccurrenceState
+-- Remove a mark and highlight for the given `Range`.
+--
+-- Note that this is different from `Marks:del_within()` in that it will
+-- only remove a mark that exactly matches the given range.
+---@param buffer integer
+---@param range Range
 ---@return boolean deleted Whether a mark was removed.
-function Marks:del(state)
-  assert(state.range, "Occurrence has no match")
-  local key = mark_key(state.range.start)
+function Marks:del(buffer, range)
+  local key = range:serialize()
   if key and self[key] ~= nil then
-    vim.api.nvim_buf_del_extmark(state.buffer, NS, self[key])
+    vim.api.nvim_buf_del_extmark(buffer, NS, self[key])
     self[key] = nil
     return true
   end
@@ -160,10 +170,8 @@ function Occurrence:match(opts)
     opts or {}
   )
   local state = STATE_CACHE[self]
-  local pattern = state.pattern
-  assert(pattern, "Occurrence has not been initialized with a pattern")
-  local buffer = state.buffer
-  assert(buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
+  assert(state.pattern, "Occurrence has not been initialized with a pattern")
+  assert(state.buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
   local cursor = Cursor:save() -- store cursor position before searching.
 
   local flags = opts.reverse and "b" or ""
@@ -181,27 +189,28 @@ function Occurrence:match(opts)
     end
   end
 
-  local next_match = Location:from_searchpos(vim.fn.searchpos(pattern, flags))
+  local next_match = search(state, flags)
 
   -- If searching for marked occurrences, keep searching until we find one.
   if next_match and opts.marked then
     local marks = MARKS_CACHE[self]
-    if not marks:has_pos(next_match) then
+    if not marks:has(next_match) then
       local start_match = next_match
       repeat
-        next_match = Location:from_searchpos(vim.fn.searchpos(pattern, flags))
-      until not next_match or marks:has_pos(next_match) or next_match == start_match
+        next_match = search(state, flags)
+      until not next_match or marks:has(next_match) or next_match == start_match
     end
   end
 
   if next_match then
-    state.range = Range:new(next_match, next_match + state.span)
+    state.range = next_match
     if not opts.move then
       cursor:restore() -- restore cursor position.
     end
     return true
   else
-    log.debug("No matches found for pattern:", pattern, "Restoring cursor position")
+    log.debug("No matches found for pattern:", state.pattern, "Restoring cursor position")
+    state.range = nil
     cursor:restore() -- restore cursor position after failed search.
     return false
   end
@@ -217,50 +226,50 @@ end
 function Occurrence:match_cursor(opts)
   opts = vim.tbl_extend("force", { move = false, marked = false }, opts or {})
   local state = STATE_CACHE[self]
-  local pattern = state.pattern
-  assert(pattern, "Occurrence has not been initialized with a pattern")
-  local buffer = state.buffer
-  assert(buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
+  assert(state.pattern, "Occurrence has not been initialized with a pattern")
+  assert(state.buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
   local cursor = Cursor:save() -- store cursor position before searching.
 
-  local next_match = Location:from_searchpos(vim.fn.searchpos(pattern, "c"))
-  local prev_match = Location:from_searchpos(vim.fn.searchpos(pattern, "bc"))
+  local next_match = search(state, "c")
+  local prev_match = search(state, "bc")
 
   -- If searching for marked occurrences, keep searching until we find one in each direction.
   if opts.marked then
     local marks = MARKS_CACHE[self]
     if next_match then
-      if not marks:has_pos(next_match) then
+      if not marks:has(next_match) then
         repeat
-          next_match = Location:from_searchpos(vim.fn.searchpos(pattern))
-        until not next_match or marks:has_pos(next_match)
+          next_match = search(state, "W")
+        until not next_match or marks:has(next_match)
       end
     end
     if prev_match then
-      if not marks:has_pos(prev_match) then
+      if not marks:has(prev_match) then
         repeat
-          prev_match = Location:from_searchpos(vim.fn.searchpos(pattern, "b"))
-        until not prev_match or marks:has_pos(prev_match)
+          prev_match = search(state, "bW")
+        until not prev_match or marks:has(prev_match)
       end
     end
   end
 
   if not next_match and not prev_match then
-    log.debug("No matches found for pattern:", pattern, "Restoring cursor position")
+    log.debug("No matches found for pattern:", state.pattern, "Restoring cursor position")
+    state.range = nil
     cursor:restore() -- restore cursor position after failed search.
     return false
   elseif next_match and prev_match then
     if next_match == prev_match then
-      state.range = Range:new(next_match, next_match + state.span)
-    elseif cursor.location:distance(prev_match) < cursor.location:distance(next_match) then
-      state.range = Range:new(prev_match, prev_match + state.span)
+      state.range = next_match
+      -- TODO: Maybe compare the distance between the cursor and the start _and_ end of the matches?
+    elseif cursor.location:distance(prev_match.start) < cursor.location:distance(next_match.start) then
+      state.range = prev_match
     else
-      state.range = Range:new(next_match, next_match + state.span)
+      state.range = next_match
     end
   elseif next_match then
-    state.range = Range:new(next_match, next_match + state.span)
+    state.range = next_match
   elseif prev_match then
-    state.range = Range:new(prev_match, prev_match + state.span)
+    state.range = prev_match
   end
 
   if not opts.move then
@@ -270,17 +279,31 @@ function Occurrence:match_cursor(opts)
 end
 
 -- Mark the current occurrence.
+-- If `range` is provided, mark the occurrences contained within the given `Range` instead.
+---@param range? Range
 ---@return boolean marked Whether the occurrence was marked.
-function Occurrence:mark()
+function Occurrence:mark(range)
   local state = STATE_CACHE[self]
-  return MARKS_CACHE[self]:add(state)
+  if range then
+    local success = false
+    for _, match in ipairs(self:matches(range)) do
+      if MARKS_CACHE[self]:add(state.buffer, match) then
+        success = true
+      end
+    end
+    return success
+  else
+    return MARKS_CACHE[self]:add(state.buffer, state.range)
+  end
 end
 
 -- Unmark the current occurrence.
+-- If `range` is provided, unmark the occurrences contained within the given `Range` instead.
+---@param range? Range
 ---@return boolean unmarked Whether the occurrence was unmarked.
-function Occurrence:unmark()
+function Occurrence:unmark(range)
   local state = STATE_CACHE[self]
-  return MARKS_CACHE[self]:del(state)
+  return MARKS_CACHE[self]:del_within(state.buffer, range or state.range)
 end
 
 -- Set the text to search for.
