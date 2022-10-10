@@ -301,7 +301,7 @@ function Occurrence:mark(range)
   local state = STATE_CACHE[self]
   if range then
     local success = false
-    for _, match in ipairs(self:matches(range)) do
+    for match in self:matches(range) do
       if MARKS_CACHE[self]:add(state.buffer, match) then
         success = true
       end
@@ -319,6 +319,59 @@ end
 function Occurrence:unmark(range)
   local state = STATE_CACHE[self]
   return MARKS_CACHE[self]:del_within(state.buffer, range or state.range)
+end
+
+-- Get an iterator of matching occurrence ranges.
+-- If `range` is provided, only yields the occurrences contained within the given `Range`.
+---@param range? Range
+---@return fun(): Range next_match
+function Occurrence:matches(range)
+  local state = STATE_CACHE[self]
+  local location = range and range.start or Location:new(0, 0)
+  local match
+  local function next_match()
+    local cursor = Cursor:save()
+    cursor:move(location)
+    match = search(state, match and "W" or "cW")
+    cursor:restore()
+    if match and (not range or range:contains(match)) then
+      location = match.start
+      return match
+    end
+  end
+  return next_match
+end
+
+-- Get an iterator of the marked occurrence ranges.
+-- If `range` is provided, only yields the marked occurrences contained within the given `Range`.
+--
+-- The iterator yields two `Range` values for each mark:
+-- - The orginal range of the marked occurrence.
+--   This can be used to unmark the occurrence, e.g., `occurrence:unmark(original_range)`.
+-- - The current 'live' range of the marked occurrence.
+--   This can be used to make edits to the buffer, e.g., with `vim.api.nvim_buf_set_text(...)`.
+---@param range? Range
+---@return fun(): Range, Range next_mark
+function Occurrence:marks(range)
+  local state = STATE_CACHE[self]
+  local marks = MARKS_CACHE[self]
+  local key
+  local function next_mark()
+    key = next(marks, key)
+    if key ~= nil then
+      local marked_range = Range:deserialize(key)
+      local current_range = marks:get(state.buffer, marked_range)
+      assert(current_range, "Marked range not found in buffer")
+      if range and range:contains(marked_range) then
+        return marked_range, current_range
+      elseif range then
+        return next_mark()
+      else
+        return marked_range, current_range
+      end
+    end
+  end
+  return next_mark
 end
 
 -- Set the text to search for.

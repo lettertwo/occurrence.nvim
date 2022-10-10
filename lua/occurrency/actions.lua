@@ -90,73 +90,47 @@ end)
 
 -- Add marks and highlights for matches of the given occurrence within the current selection.
 M.mark_selection = Action:new(function(occurrence)
-  local start = occurrence.range
-  if start then
-    local selection_range = Range:of_selection()
-    if selection_range then
-      repeat
-        if selection_range:contains(occurrence.range) then
-          occurrence:mark()
-        end
-        occurrence:match()
-      until occurrence.range == start
+  local selection_range = Range:of_selection()
+  if selection_range then
+    for range in occurrence:matches(selection_range) do
+      occurrence:mark(range)
     end
   end
 end)
 
 -- Clear marks and highlights for matches of the given occurrence within the current selection.
 M.unmark_selection = Action:new(function(occurrence)
-  local start = occurrence.range
-  if start then
-    local selection_range = Range:of_selection()
-    if selection_range then
-      repeat
-        if selection_range:contains(occurrence.range) then
-          occurrence:unmark()
-        end
-        occurrence:match()
-      until occurrence.range == start
+  local selection_range = Range:of_selection()
+  if selection_range then
+    for range in occurrence:marks(selection_range) do
+      occurrence:unmark(range)
     end
   end
 end)
 
 -- Toggle marks and highlights for matches of the given occurrence within the current selection.
 M.toggle_mark_selection = Action:new(function(occurrence)
-  local start = occurrence.range
-  if start then
-    local selection_range = Range:of_selection()
-    if selection_range then
-      repeat
-        if selection_range:contains(occurrence.range) then
-          if not occurrence:mark() then
-            occurrence:unmark()
-          end
-        end
-        occurrence:match()
-      until occurrence.range == start
+  local selection_range = Range:of_selection()
+  if selection_range then
+    for range in occurrence:matches(selection_range) do
+      if not occurrence:mark(range) then
+        occurrence:unmark(range)
+      end
     end
   end
 end)
 
 -- Add marks and highlights for all matches of the given occurrence.
 M.mark_all = Action:new(function(occurrence)
-  local start = occurrence.range
-  if start then
-    repeat
-      occurrence:mark()
-      occurrence:match()
-    until occurrence.range == start
+  for range in occurrence:matches() do
+    occurrence:mark(range)
   end
 end)
 
 -- Clear all marks and highlights for the given occcurrence.
 M.unmark_all = Action:new(function(occurrence)
-  local start = occurrence.range
-  if start then
-    repeat
-      occurrence:unmark()
-      occurrence:match()
-    until occurrence.range == start
+  for range in occurrence:marks() do
+    occurrence:unmark(range)
   end
 end)
 
