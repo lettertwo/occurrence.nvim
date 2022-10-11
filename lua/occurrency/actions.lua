@@ -44,46 +44,47 @@ end)
 
 -- Go to the next occurrence.
 M.goto_next = Action:new(function(occurrence)
-  occurrence:match({ nearest = true, move = true })
+  occurrence:match_cursor({ direction = "forward", wrap = true })
 end)
 
 -- Go to the previous occurrence.
 M.goto_previous = Action:new(function(occurrence)
-  occurrence:match({ reverse = true, nearest = true, move = true })
+  occurrence:match_cursor({ direction = "backward", wrap = true })
 end)
 
 -- Go to the next mark.
 M.goto_next_mark = Action:new(function(occurrence)
-  occurrence:match({ nearest = true, move = true, marked = true })
+  occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
 end)
 
 -- Go to the previous mark.
 M.goto_previous_mark = Action:new(function(occurrence)
-  occurrence:match({ reverse = true, nearest = true, move = true, marked = true })
+  occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
 end)
 
 -- Add a mark and highlight for the current match of the given occurrence.
 M.mark = Action:new(function(occurrence)
-  occurrence:match_cursor()
-  if occurrence.range then
-    occurrence:mark()
+  local range = occurrence:match_cursor()
+  if range then
+    occurrence:mark(range)
   end
 end)
 
 -- Remove a mark and highlight for the current match of the given occurrence.
 M.unmark = Action:new(function(occurrence)
-  occurrence:match_cursor()
-  if occurrence.range then
-    occurrence:unmark()
+  local range = occurrence:match_cursor()
+  if range then
+    occurrence:unmark(range)
   end
 end)
 
 -- Toggle a mark and highlight for the current match of the given occurrence.
 M.toggle_mark = Action:new(function(occurrence)
-  occurrence:match_cursor()
-  if occurrence.range then
-    if not occurrence:mark() then
-      occurrence:unmark()
+  local range = occurrence:match_cursor()
+  log("toggle_mark", range)
+  if range then
+    if not occurrence:mark(range) then
+      occurrence:unmark(range)
     end
   end
 end)
@@ -173,7 +174,7 @@ end)
 ---@param config OccurrencyConfig
 M.activate_keymap = Action:new(function(occurrence, mode, config)
   Keymap.validate_mode(mode)
-  if not occurrence.range then
+  if not occurrence:has_matches() then
     log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")
     return
   end

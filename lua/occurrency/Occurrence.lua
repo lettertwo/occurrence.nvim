@@ -43,7 +43,6 @@ end
 ---@field buffer integer The buffer in which the occurrence was found.
 ---@field span integer The number of bytes in the occurrence.
 ---@field pattern? string The pattern that was used to find the occurrence.
----@field range? Range The range of the occurrence.
 
 -- A map of `Range` objects to extmark ids.
 ---@class Marks
@@ -170,155 +169,113 @@ function Occurrence:new(buffer, text, opts)
   return setmetatable(occurrence, OCCURRENCE_META)
 end
 
--- Find the next occurrence in the buffer.
+-- Move the cursor to the nearest occurrence.
 --
--- If `reverse` is `true` (default is `false`), the search will proceed backwards.
--- If `wrap` is `true` (default is `true`), the search will wrap around the end of the buffer.
--- If `nearest` is `true` (default is `false`), the search will move to next occurrence relative to the cursor.
--- If `move` is `true` (default is `false`), the cursor will be moved to the next occurrence.
--- If `marked` is `true` (default is `false`), the search will only consider occurrences that have been marked.
----@param opts? { reverse?: boolean, wrap?: boolean, nearest?: boolean, move?: boolean, marked?: boolean }
-function Occurrence:match(opts)
-  opts = vim.tbl_extend(
-    "force",
-    { reverse = false, wrap = true, nearest = false, move = false, marked = false },
-    opts or {}
-  )
-  local state = STATE_CACHE[self]
-  assert(state.pattern, "Occurrence has not been initialized with a pattern")
-  assert(state.buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
-  local cursor = Cursor:save() -- store cursor position before searching.
-
-  local flags = opts.reverse and "b" or ""
-  flags = flags .. (opts.move and "" or "n")
-  flags = flags .. (opts.wrap and "w" or "")
-  flags = flags .. (state.range and "" or "c")
-
-  if not opts.nearest then
-    if state.range then
-      -- Move cursor to current occurrence.
-      cursor:move(state.range.start)
-    else
-      -- On first match, move cursor to the start of the buffer.
-      cursor:move(Location:new(0, 0))
-    end
-  end
-
-  local next_match = search(state, flags)
-
-  -- If searching for marked occurrences, keep searching until we find one.
-  if next_match and opts.marked then
-    local marks = MARKS_CACHE[self]
-    if not marks:has(next_match) then
-      local start_match = next_match
-      repeat
-        next_match = search(state, flags)
-      until not next_match or marks:has(next_match) or next_match == start_match
-    end
-  end
-
-  if next_match then
-    state.range = next_match
-    if not opts.move then
-      cursor:restore() -- restore cursor position.
-    end
-    return true
-  else
-    log.debug("No matches found for pattern:", state.pattern, "Restoring cursor position")
-    state.range = nil
-    cursor:restore() -- restore cursor position after failed search.
-    return false
-  end
-end
-
--- Find the nearest occurrence to the cursor.
--- Has a bias toward the current line, but if the nearest occurrence
--- in absolute terms is behind the cursor, it will be matched.
+-- By default the nearest occurrence in absolute terms will be matched,
+-- including an occurrence at the cursor position, or an occurrence behind the cursor,
+-- if it is aboslutely closer than the next occurrence after the cursor.
 --
--- If `move` is `true` (default is `false`), the cursor will be moved to the nearest occurrence.
 -- If `marked` is `true` (default is `false`), the search will only consider occurrences that have been marked.
----@param opts? { move?: boolean, marked?: boolean }
+-- If `wrap` is `true` (default is `false`), the search will wrap around the buffer.
+-- If `direction` is 'forward', then the search will proceed to the nearest occurrence after the cursor position.
+-- If `direction` is 'backward', then the search will scan back to the nearest occurrence before the cursor position.
+-- For both directions, a match directly at the cursor position will be ignored.
+---@param opts? { direction?: 'forward' | 'backward', marked?: boolean, wrap?: boolean }
+---@return Range | nil
 function Occurrence:match_cursor(opts)
-  opts = vim.tbl_extend("force", { move = false, marked = false }, opts or {})
+  opts = vim.tbl_extend("force", { direction = nil, marked = false, wrap = false }, opts or {})
   local state = STATE_CACHE[self]
   assert(state.pattern, "Occurrence has not been initialized with a pattern")
   assert(state.buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
   local cursor = Cursor:save() -- store cursor position before searching.
 
-  local next_match = search(state, "c")
-  local prev_match = search(state, "bc")
+  local flags = opts.wrap and "nw" or "nW"
 
-  -- If searching for marked occurrences, keep searching until we find one in each direction.
+  local next_match
+  local prev_match
+
+  if opts.direction == "forward" then
+    next_match = search(state, flags)
+  elseif opts.direction == "backward" then
+    prev_match = search(state, "b" .. flags)
+  else
+    next_match = search(state, "c" .. flags)
+    prev_match = search(state, "b" .. flags)
+  end
+
+  -- If `marked` is `true`, keep searching until
+  -- we find a marked occurrence in each direction.
   if opts.marked then
     local marks = MARKS_CACHE[self]
-    if next_match then
-      if not marks:has(next_match) then
-        repeat
-          next_match = search(state, "W")
-        until not next_match or marks:has(next_match)
-      end
+    if next_match and not marks:has(next_match) then
+      local start = next_match
+      repeat
+        cursor:move(next_match.start)
+        next_match = search(state, flags)
+      until not next_match or marks:has(next_match) or next_match == start
     end
-    if prev_match then
-      if not marks:has(prev_match) then
-        repeat
-          prev_match = search(state, "bW")
-        until not prev_match or marks:has(prev_match)
-      end
+    if prev_match and not marks:has(prev_match) then
+      local start = prev_match
+      repeat
+        cursor:move(prev_match.start)
+        prev_match = search(state, "b" .. flags)
+      until not prev_match or marks:has(prev_match) or prev_match == start
     end
   end
 
-  if not next_match and not prev_match then
-    log.debug("No matches found for pattern:", state.pattern, "Restoring cursor position")
-    state.range = nil
-    cursor:restore() -- restore cursor position after failed search.
-    return false
-  elseif next_match and prev_match then
-    if next_match == prev_match then
-      state.range = next_match
-      -- TODO: Maybe compare the distance between the cursor and the start _and_ end of the matches?
-    elseif cursor.location:distance(prev_match.start) < cursor.location:distance(next_match.start) then
-      state.range = prev_match
+  local match = next_match or prev_match
+
+  -- If we found matches in both directions, choose the closest match,
+  -- with a bias toward matches that contain the cursor.
+  if next_match and prev_match and next_match ~= prev_match then
+    if next_match:contains(cursor.location) then
+      match = next_match
+    elseif prev_match:contains(cursor.location) then
+      match = prev_match
     else
-      state.range = next_match
+      local prev_dist = math.min(cursor.location:distance(prev_match.start), cursor.location:distance(prev_match.stop))
+      local next_dist = math.min(cursor.location:distance(next_match.start), cursor.location:distance(next_match.stop))
+      match = prev_dist < next_dist and prev_match or next_match
     end
-  elseif next_match then
-    state.range = next_match
-  elseif prev_match then
-    state.range = prev_match
   end
 
-  if not opts.move then
-    cursor:restore() -- restore cursor position.
+  if not match then
+    cursor:restore() -- restore cursor position if no match was found.
+  else
+    cursor:move(match.start)
+    return match
   end
-  return true
 end
 
--- Mark the current occurrence.
--- If `range` is provided, mark the occurrences contained within the given `Range` instead.
----@param range? Range
----@return boolean marked Whether the occurrence was marked.
+-- Mark the occurrences contained within the given `Range`.
+---@param range Range
+---@return boolean marked Whether occurrences were marked.
 function Occurrence:mark(range)
   local state = STATE_CACHE[self]
-  if range then
-    local success = false
-    for match in self:matches(range) do
-      if MARKS_CACHE[self]:add(state.buffer, match) then
-        success = true
-      end
+  local success = false
+  for match in self:matches(range) do
+    if MARKS_CACHE[self]:add(state.buffer, match) then
+      success = true
     end
-    return success
-  else
-    return MARKS_CACHE[self]:add(state.buffer, state.range)
   end
+  return success
 end
 
--- Unmark the current occurrence.
--- If `range` is provided, unmark the occurrences contained within the given `Range` instead.
----@param range? Range
----@return boolean unmarked Whether the occurrence was unmarked.
+-- Unmark the occurrences contained within the given `Range`.
+---@param range Range
+---@return boolean unmarked Whether occurrences were unmarked.
 function Occurrence:unmark(range)
   local state = STATE_CACHE[self]
-  return MARKS_CACHE[self]:del_within(state.buffer, range or state.range)
+  return MARKS_CACHE[self]:del_within(state.buffer, range)
+end
+
+-- Whether or not the buffer contains at least one match for the occurrence.
+function Occurrence:has_matches()
+  local state = STATE_CACHE[self]
+  if not state.pattern then
+    return false
+  end
+  return vim.fn.search(state.pattern, "ncw") ~= 0
 end
 
 -- Get an iterator of matching occurrence ranges.
@@ -391,12 +348,6 @@ function Occurrence:set(text, opts)
   else
     state.pattern = opts and opts.is_word and string.format([[\V\<%s\>]], text) or string.format([[\V%s]], text)
     state.span = #text
-  end
-  state.range = nil
-
-  -- If we have a pattern to search, find the first occurrence.
-  if state.pattern then
-    self:match()
   end
 end
 
