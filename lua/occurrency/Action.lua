@@ -12,6 +12,7 @@ local log = require("occurrency.log")
 ---@operator call(...): any
 ---@field type `ACTION`
 ---@field callback fun(occurrence: Occurrence, ...): any
+---@field args? any
 local Action = {}
 
 ---@class PartialOccurrencyAction: OccurrencyAction
@@ -19,12 +20,7 @@ local Action = {}
 ---@operator call(...): any
 ---@field type `ACTION`
 ---@field callback fun(...): any
-
----@class BoundOccurrencyAction: OccurrencyAction
----@operator add(OccurrencyAction | fun(occurrence: Occurrence, ...): any): OccurrencyAction
----@operator call(...): any
----@field type `ACTION`
----@field callback fun(occurrence: Occurrence): any
+---@field args? any
 
 ---@param candidate any
 ---@return boolean
@@ -77,19 +73,30 @@ end
 -- so this method is useful for providing additional arguments for an action ahead of time.
 -- Note that this differs from `Action.with()` in that it does not bind the occurrence.
 ---@param ... any
----@return BoundOccurrencyAction
+---@return OccurrencyAction
 function Action:bind(...)
-  local args = select("#", ...) > 0 and { ... } or nil
-  local bound = self:new()
-  function bound:call(occurrence, ...)
+  local args
+  if self.args then
+    args = { unpack(self.args) } ---@diagnostic disable-line: deprecated
+  end
+  local args_to_bind = select("#", ...) > 0 and { ... } or nil
+  if args_to_bind then
     if args then
-      return self.callback(occurrence, unpack(vim.tbl_flatten({ args, ... })))
+      args = vim.list_extend(args, args_to_bind)
     else
-      return self.callback(occurrence, ...)
+      args = args_to_bind
     end
   end
-  getmetatable(bound).__call = bound.call
-  ---@cast bound BoundOccurrencyAction
+
+  local bound = self:new()
+  bound.args = args
+
+  if args then
+    function bound:call(occurrence, ...)
+      return self.callback(occurrence, unpack(vim.tbl_flatten({ args, ... }))) ---@diagnostic disable-line: deprecated
+    end
+    getmetatable(bound).__call = bound.call
+  end
   return bound
 end
 
@@ -97,7 +104,7 @@ end
 function Action:add(other)
   if type(other) == "function" or self.is_action(other) then
     return self:new(function(occurrence, ...)
-      return other(occurrence, unpack({ self(occurrence, ...) }))
+      return other(occurrence, unpack({ self(occurrence, ...) })) ---@diagnostic disable-line: deprecated
     end)
   end
   error("When combining actions, the other must be a function or action")
