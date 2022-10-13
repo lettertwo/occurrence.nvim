@@ -94,14 +94,14 @@ end
 
 -- Get the range of the most recent motion.
 function Range:of_motion()
-  local start = Location:of_mark("'[")
-  local stop = Location:of_mark("']")
+  local start = Location:of_mark("[")
+  local stop = Location:of_mark("]")
   if start and stop then
     return self:new(start, stop)
   end
 end
 
--- Transpose this range to a new location.
+-- Transpose this range to a new starting location.
 ---@param start Location
 ---@return Range
 function Range:move(start)
