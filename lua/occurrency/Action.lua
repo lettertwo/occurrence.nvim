@@ -68,6 +68,21 @@ function Action:with(occurrence)
   return partial
 end
 
+local function concat(...)
+  local args = { ... }
+  local result = {}
+  for _, arg in ipairs(args) do
+    if type(arg) == "table" then
+      for _, value in ipairs(arg) do
+        table.insert(result, value)
+      end
+    else
+      table.insert(result, arg)
+    end
+  end
+  return result
+end
+
 -- Binds an action to some parameters, e.g., config.
 -- The first argument to an action is always expected to be an `Occurrence`,
 -- so this method is useful for providing additional arguments for an action ahead of time.
@@ -75,25 +90,16 @@ end
 ---@param ... any
 ---@return OccurrencyAction
 function Action:bind(...)
-  local args
-  if self.args then
-    args = { unpack(self.args) } ---@diagnostic disable-line: deprecated
-  end
-  local args_to_bind = select("#", ...) > 0 and { ... } or nil
-  if args_to_bind then
-    if args then
-      args = vim.list_extend(args, args_to_bind)
-    else
-      args = args_to_bind
-    end
+  local args = select("#", ...) > 0 and { ... } or nil
+  if args and self.args then
+    args = concat(self.args, args)
   end
 
   local bound = self:new()
-  bound.args = args
-
   if args then
+    bound.args = args
     function bound:call(occurrence, ...)
-      return self.callback(occurrence, unpack(vim.tbl_flatten({ args, ... }))) ---@diagnostic disable-line: deprecated
+      return self.callback(occurrence, unpack(concat(args, ...))) ---@diagnostic disable-line: deprecated
     end
     getmetatable(bound).__call = bound.call
   end
