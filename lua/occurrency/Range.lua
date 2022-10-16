@@ -97,6 +97,12 @@ function Range:of_motion()
   local start = Location:of_mark("[")
   local stop = Location:of_mark("]")
   if start and stop then
+    if stop < start then
+      start, stop = stop, start
+    end
+    if stop.line > start.line then
+      stop = Location:new(stop.line, math.huge)
+    end
     return self:new(start, stop)
   end
 end
