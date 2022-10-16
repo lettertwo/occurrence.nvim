@@ -8,16 +8,31 @@ local log = require("occurrency.log")
 local KEYMAP_CACHE = {}
 
 local function opfunc(callback)
-  -- FIXME: This is a hack around pending support for lua functions in this position.
-  -- See https://github.com/neovim/neovim/pull/20187
-  _G.OccurrencyOpfunc = function(...)
-    callback(...)
-    -- FIXME: This opfunc attempts to clean up after itself,
-    -- but if the opeation is cancelled, the opfunc won't be called..
-    _G.OccurrencyOpfunc = nil
+  return function()
+    -- FIXME: This is a hack around pending support for lua functions in this position.
+    -- See https://github.com/neovim/neovim/pull/20187
+    _G.OccurrencyOpfunc = function(...)
+      callback(...)
+      -- FIXME: This opfunc attempts to clean up after itself,
+      -- but if the opeation is cancelled, the opfunc won't be called..
+      _G.OccurrencyOpfunc = nil
+    end
+    vim.api.nvim_set_option("operatorfunc", "v:lua.OccurrencyOpfunc")
+    return "g@"
   end
-  vim.api.nvim_set_option("operatorfunc", "v:lua.OccurrencyOpfunc")
-  return "g@"
+end
+
+---@param mode string
+local function setmode(mode)
+  if mode == vim.api.nvim_get_mode().mode then
+    return true
+  end
+  if mode == "n" then
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
+  else
+    error("Unsupported mode: " .. mode)
+  end
+  return mode == vim.api.nvim_get_mode().mode
 end
 
 local M = {}
@@ -40,6 +55,7 @@ M.find_visual_subword = Action:new(function(occurrence)
   local text = table.concat(vim.api.nvim_buf_get_text(0, pos1[2] - 1, pos1[3] - 1, pos2[2] - 1, pos2[3], {}))
   assert(text ~= "", "no text selected")
   occurrence:set(text)
+  setmode("n")
 end)
 
 -- Go to the next occurrence.
@@ -135,50 +151,54 @@ M.unmark_all = Action:new(function(occurrence)
   end
 end)
 
--- Clear all marks and highlights for matches excluded by the active selection.
-M.unmark_excluded = Action:new(function(occurrence)
-  local selection = Range:of_selection()
-  if selection then
-    for range in occurrence:marks() do
-      if not selection:contains(range) then
-        occurrence:unmark(range)
-      end
-    end
+-- Change all marked occurrences.
+---@param occurrence Occurrence
+---@param selection? Range
+M.change_marked = Action:new(function(occurrence, selection)
+  for mark, range in occurrence:marks(selection) do
+    log.debug("change_marked", occurrence.pattern, range)
   end
 end)
 
--- Change all marked occurrences.
-M.change = Action:new(function(occurrence)
-  return opfunc(function(type)
-    log.debug("change", type, occurrence.pattern)
-  end)
+M.change_selection = Action:new(function(occurrence)
+  M.change_marked(occurrence, Range:of_selection())
+end)
+
+M.change_motion = Action:new(function(occurrence)
+  M.change_marked(occurrence, Range:of_motion())
 end)
 
 -- Delete all marked occurrences.
-M.delete_marked = Action:new(function(occurrence)
-  for mark, range in occurrence:marks() do
+---@param occurrence Occurrence
+---@param selection? Range
+M.delete_marked = Action:new(function(occurrence, selection)
+  for mark, range in occurrence:marks(selection) do
     occurrence:unmark(mark)
-    local start_line, start_col, stop_line, stop_col = unpack(range)
+    local start_line, start_col, stop_line, stop_col = unpack(range) ---@diagnostic disable-line: deprecated
     vim.api.nvim_buf_set_text(0, start_line, start_col, stop_line, stop_col, {})
   end
 end)
 
-M.delete = Action:new(function(occurrence)
-  return opfunc(function(type)
-    log.debug("delete", type, occurrence.pattern)
-  end)
+M.delete_selection = Action:new(function(occurrence)
+  M.delete_marked(occurrence, Range:of_selection())
+  setmode("n")
 end)
 
--- Creates an action to activate keybindings for the given configuration and mode.
----@param mode OccurrencyKeymapMode
+M.delete_motion = Action:new(function(occurrence)
+  -- TODO: offset cursor position to account for deleted text...
+  M.delete_marked(occurrence, Range:of_motion())
+end)
+
+-- Activate keybindings for the given configuration.
+-- If an operator action is given, the action will be executed in operator-pending mode.
 ---@param config OccurrencyConfig
-M.activate_keymap = Action:new(function(occurrence, mode, config)
-  Keymap.validate_mode(mode)
+---@param operator? OccurrencyAction
+M.activate = Action:new(function(occurrence, config, operator)
   if not occurrence:has_matches() then
     log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")
     return
   end
-  log.debug("Activating keybindings for buffer", occurrence.buffer, "and mode", mode)
+  log.debug("Activating keybindings for buffer", occurrence.buffer)
   if KEYMAP_CACHE[occurrence.buffer] then
     log.error("Keymap is already active!")
     KEYMAP_CACHE[occurrence.buffer]:reset()
@@ -186,7 +206,12 @@ M.activate_keymap = Action:new(function(occurrence, mode, config)
   local keymap = Keymap:new(occurrence.buffer)
   KEYMAP_CACHE[occurrence.buffer] = keymap
 
-  if mode == "n" then
+  -- Cancel the pending occurrence operation.
+  keymap:n("<Esc>", (M.unmark_all + M.deactivate):with(occurrence), "Clear occurrence")
+
+  if operator ~= nil then
+    return opfunc(operator:with(occurrence))()
+  else
     -- Navigate between occurrence matches
     keymap:n("n", M.goto_next_mark:with(occurrence), "Next marked occurrence")
     keymap:n("N", M.goto_previous_mark:with(occurrence), "Previous marked occurrence")
@@ -204,25 +229,14 @@ M.activate_keymap = Action:new(function(occurrence, mode, config)
     keymap:x("gx", M.unmark_selection:with(occurrence), "Unmark occurrences")
 
     -- Delete marked occurrences.
-    keymap:x(
-      "d",
-      (M.unmark_excluded + M.delete_marked + M.deactivate_keymap):with(occurrence),
-      "Delete marked occurrences"
-    )
-
-    -- Deactivate occurrence operator.
-    keymap:n("<Esc>", (M.unmark_all + M.deactivate_keymap):with(occurrence), "Clear marks and deactivate keywithings")
-  elseif mode == "x" then
-    -- Deactivate occurrence operator.
-    keymap:n("<Esc>", (M.unmark_all + M.deactivate_keymap):with(occurrence), "Clear marks and deactivate keywithings")
-  elseif mode == "o" then
-    -- Deactivate occurrence operator.
-    keymap:o("<Esc>", (M.unmark_all + M.deactivate_keymap):with(occurrence), "Clear marks and deactivate keywithings")
+    -- TODO: add shortcuts like "dd", "dp", etc.
+    keymap:n("d", opfunc(M.delete_motion:with(occurrence)), { expr = true, desc = "Delete marked occurrences" })
+    keymap:x("d", (M.delete_selection):with(occurrence), "Delete marked occurrences")
   end
 end)
 
 -- Deactivate the keymap for the given occurrence.
-M.deactivate_keymap = Action:new(function(occurrence)
+M.deactivate = Action:new(function(occurrence)
   local keymap = KEYMAP_CACHE[occurrence.buffer]
   if keymap then
     keymap:reset()
