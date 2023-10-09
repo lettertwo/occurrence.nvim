@@ -1,6 +1,6 @@
-local log = require("occurrency.log")
+local log = require("occurrence.log")
 
----@enum OccurrencyKeymapMode
+---@enum OccurrenceKeymapMode
 local MODE = {
   n = "n", ---Normal mode.
   o = "o", ---Operator-pending mode.
@@ -8,7 +8,7 @@ local MODE = {
 }
 
 -- A table that maps modes to active keymaps.
----@class Modemap: table<OccurrencyKeymapMode, string[]>
+---@class Modemap: table<OccurrenceKeymapMode, string[]>
 local Modemap = {
   __index = function(self, key)
     assert(MODE[key], "Invalid mode: " .. key)
@@ -51,14 +51,14 @@ function Keymap:new(buffer)
   return bound_keymap
 end
 
----@param mode OccurrencyKeymapMode
+---@param mode OccurrenceKeymapMode
 ---@return nil error if the mode is invalid.
 function Keymap.validate_mode(mode)
   assert(MODE[mode], "Invalid mode: " .. mode)
 end
 
 --- Wraps an action in a function so that it can be used as a keymap callback.
----@param action string | function | OccurrencyAction
+---@param action string | function | OccurrenceAction
 ---@return string | function
 function Keymap.wrap_action(action)
   if type(action) == "table" then
@@ -66,7 +66,7 @@ function Keymap.wrap_action(action)
       return action()
     end
   end
-  ---@cast action -OccurrencyAction
+  ---@cast action -OccurrenceAction
   return action
 end
 
@@ -82,7 +82,7 @@ end
 
 -- Register a normal mode keymap.
 ---@param lhs string
----@param rhs string | function | OccurrencyAction
+---@param rhs string | function | OccurrenceAction
 ---@param opts table | string
 function Keymap:n(lhs, rhs, opts)
   vim.keymap.set(MODE.n, lhs, self.wrap_action(rhs), self:parse_opts(opts))
@@ -91,7 +91,7 @@ end
 
 -- Register an operator-pending mode keymap.
 ---@param lhs string
----@param rhs string | function | OccurrencyAction
+---@param rhs string | function | OccurrenceAction
 ---@param opts table | string
 function Keymap:o(lhs, rhs, opts)
   vim.keymap.set(MODE.o, lhs, self.wrap_action(rhs), self:parse_opts(opts))
@@ -100,7 +100,7 @@ end
 
 -- Register a visual or select mode keymap.
 ---@param lhs string
----@param rhs string | function | OccurrencyAction
+---@param rhs string | function | OccurrenceAction
 ---@param opts table | string
 function Keymap:x(lhs, rhs, opts)
   vim.keymap.set(MODE.x, lhs, self.wrap_action(rhs), self:parse_opts(opts))

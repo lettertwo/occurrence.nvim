@@ -1,6 +1,6 @@
 -- A 0-indexed line and column pair representing a location in a buffer,
 -- e.g., the cursor position, or a mark location, or the start or end of a range.
----@see occurrency.Range
+---@see occurrence.Range
 ---@class Location
 ---@operator call: Location
 ---@operator add(integer): Location

@@ -1,7 +1,8 @@
-local Keymap = require("occurrency.Keymap")
-local Action = require("occurrency.Action")
-local Range = require("occurrency.Range")
-local log = require("occurrency.log")
+local Keymap = require("occurrence.Keymap")
+local Action = require("occurrence.Action")
+local Range = require("occurrence.Range")
+local Cursor = require("occurrence.Cursor")
+local log = require("occurrence.log")
 
 -- A map of Buffer ids to their active keymaps.
 ---@type table<integer, Keymap>
@@ -11,13 +12,13 @@ local function opfunc(callback)
   return function()
     -- FIXME: This is a hack around pending support for lua functions in this position.
     -- See https://github.com/neovim/neovim/pull/20187
-    _G.OccurrencyOpfunc = function(...)
+    _G.OccurrenceOpfunc = function(...)
       callback(...)
       -- FIXME: This opfunc attempts to clean up after itself,
       -- but if the opeation is cancelled, the opfunc won't be called..
-      _G.OccurrencyOpfunc = nil
+      _G.OccurrenceOpfunc = nil
     end
-    vim.api.nvim_set_option("operatorfunc", "v:lua.OccurrencyOpfunc")
+    vim.api.nvim_set_option("operatorfunc", "v:lua.OccurrenceOpfunc")
     return "g@"
   end
 end
@@ -191,8 +192,8 @@ end)
 
 -- Activate keybindings for the given configuration.
 -- If an operator action is given, the action will be executed in operator-pending mode.
----@param config OccurrencyConfig
----@param operator? OccurrencyAction
+---@param config OccurrenceConfig
+---@param operator? OccurrenceAction
 M.activate = Action:new(function(occurrence, config, operator)
   if not occurrence:has_matches() then
     log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")

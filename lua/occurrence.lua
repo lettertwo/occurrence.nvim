@@ -1,14 +1,14 @@
 local M = {}
 
 function M.reset()
-  require("occurrency.Keymap"):reset()
+  require("occurrence.Keymap"):reset()
 end
 
----@param opts OccurrencyOptions
+---@param opts OccurrenceOptions
 function M.setup(opts)
-  local config = require("occurrency.Config"):new(opts)
-  local Keymap = require("occurrency.Keymap")
-  local actions = require("occurrency.actions")
+  local config = require("occurrence.Config"):new(opts)
+  local Keymap = require("occurrence.Keymap")
+  local actions = require("occurrence.actions")
 
   local activate_normal = actions.activate:bind(config)
   local activate_change = activate_normal:bind(actions.change_motion + actions.unmark_all + actions.deactivate)

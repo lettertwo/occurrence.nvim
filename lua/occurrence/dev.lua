@@ -6,19 +6,19 @@ function M.setup(opts)
   if opts == nil then
     opts = prev_opts
   end
-  local log = require("occurrency.log")
+  local log = require("occurrence.log")
   log.set_level(log.levels.DEBUG)
   prev_opts = opts
-  log.debug("occurrency.dev.setup(" .. vim.inspect(opts) .. ")")
-  require("occurrency").setup(opts)
+  log.debug("occurrence.dev.setup(" .. vim.inspect(opts) .. ")")
+  require("occurrence").setup(opts)
 end
 
 function M.reload()
-  require("occurrency").reset() -- Reset twice; once before reload, and...
+  require("occurrence").reset() -- Reset twice; once before reload, and...
   ---@diagnostic disable-next-line: undefined-field
   local luacache = (_G.__luacache or {}).cache -- impatient.nvim cache
-  local module_name_pattern = vim.pesc("occurrency")
-  local log = require("occurrency.log")
+  local module_name_pattern = vim.pesc("occurrence")
+  local log = require("occurrence.log")
   for pack, _ in pairs(package.loaded) do
     if string.find(pack, "^" .. module_name_pattern) then
       log.set_level(log.levels.DEBUG)
@@ -29,19 +29,19 @@ function M.reload()
       end
     end
   end
-  require("occurrency").reset() -- ...once after reload.
+  require("occurrence").reset() -- ...once after reload.
   M.setup()
 end
 
-vim.api.nvim_create_user_command("ReloadOccurrency", M.reload, {
-  desc = "Reload the occurrency plugin and run setup again",
+vim.api.nvim_create_user_command("ReloadOccurrence", M.reload, {
+  desc = "Reload the occurrence plugin and run setup again",
   force = true,
 })
 
 vim.api.nvim_create_autocmd({ "BufWritePost" }, {
-  pattern = { "*/occurrency.nvim/lua/*.lua" },
-  command = "ReloadOccurrency",
-  group = vim.api.nvim_create_augroup("OccurrencyDev", { clear = true }),
+  pattern = { "*/occurrence.nvim/lua/*.lua" },
+  command = "ReloadOccurrence",
+  group = vim.api.nvim_create_augroup("OccurrenceDev", { clear = true }),
 })
 
 return M

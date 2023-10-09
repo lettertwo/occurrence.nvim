@@ -1,9 +1,9 @@
-local Location = require("occurrency.Location")
-local Cursor = require("occurrency.Cursor")
-local Range = require("occurrency.Range")
-local log = require("occurrency.log")
+local Location = require("occurrence.Location")
+local Cursor = require("occurrence.Cursor")
+local Range = require("occurrence.Range")
+local log = require("occurrence.log")
 
-local NS = vim.api.nvim_create_namespace("Occurrency")
+local NS = vim.api.nvim_create_namespace("Occurrence")
 
 -- TODO: make hl groups
 local OCCURRENCE_HL_GROUP = "Underlined" -- "Occurrence"

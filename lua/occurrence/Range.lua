@@ -1,5 +1,5 @@
-local Location = require("occurrency.Location")
-local log = require("occurrency.log")
+local Location = require("occurrence.Location")
+local log = require("occurrence.log")
 
 -- A 0-indexed `Location` pair representing a range of a buffer,
 -- e.g., a search match, a selection, or the boundaries of a motion.

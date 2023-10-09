@@ -1,22 +1,22 @@
 local ACTION = "__ACTION__"
-local Occurrence = require("occurrency.Occurrence")
-local log = require("occurrency.log")
+local Occurrence = require("occurrence.Occurrence")
+local log = require("occurrence.log")
 
 -- A callable type that can be used as a keymap callback.
 -- It can be sequenced with other actions via the `+` operator.
 -- The callback will receive the Occurrence for the current buffer as its first argument.
 -- If the action is sequenced with other actions, the callback will receive the results
 -- of the previous action as additional arguments.
----@class OccurrencyAction
----@operator add(OccurrencyAction | fun(occurrence: Occurrence, ...): any): OccurrencyAction
+---@class OccurrenceAction
+---@operator add(OccurrenceAction | fun(occurrence: Occurrence, ...): any): OccurrenceAction
 ---@operator call(...): any
 ---@field type `ACTION`
 ---@field callback fun(occurrence: Occurrence, ...): any
 ---@field args? any
 local Action = {}
 
----@class PartialOccurrencyAction: OccurrencyAction
----@operator add(OccurrencyAction | fun(occurrence: Occurrence, ...): any): OccurrencyAction
+---@class PartialOccurrenceAction: OccurrenceAction
+---@operator add(OccurrenceAction | fun(occurrence: Occurrence, ...): any): OccurrenceAction
 ---@operator call(...): any
 ---@field type `ACTION`
 ---@field callback fun(...): any
@@ -33,8 +33,8 @@ end
 -- If the `callback` is an action, the new action will extend it.
 -- If the `callback` is `nil`, the new action will extend the current action. This only works
 -- for existing actions.
----@param callback? (fun(occurrence: Occurrence, ...): nil) | OccurrencyAction
----@return OccurrencyAction
+---@param callback? (fun(occurrence: Occurrence, ...): nil) | OccurrenceAction
+---@return OccurrenceAction
 function Action:new(callback)
   local action = { type = ACTION }
   local meta = self
@@ -57,14 +57,14 @@ end
 -- This is useful for creating actions within actions,
 -- e.g., adding keymaps to perform additional actions with an occurrence.
 ---@param occurrence Occurrence
----@return PartialOccurrencyAction
+---@return PartialOccurrenceAction
 function Action:with(occurrence)
   local partial = self:new()
   function partial:call(...)
     return self.callback(occurrence, ...)
   end
   getmetatable(partial).__call = partial.call
-  ---@cast partial PartialOccurrencyAction
+  ---@cast partial PartialOccurrenceAction
   return partial
 end
 
@@ -88,7 +88,7 @@ end
 -- so this method is useful for providing additional arguments for an action ahead of time.
 -- Note that this differs from `Action.with()` in that it does not bind the occurrence.
 ---@param ... any
----@return OccurrencyAction
+---@return OccurrenceAction
 function Action:bind(...)
   local args = select("#", ...) > 0 and { ... } or nil
   if args and self.args then
@@ -106,7 +106,7 @@ function Action:bind(...)
   return bound
 end
 
----@param other OccurrencyAction | fun(occurrence: Occurrence, ...): any
+---@param other OccurrenceAction | fun(occurrence: Occurrence, ...): any
 function Action:add(other)
   if type(other) == "function" or self.is_action(other) then
     return self:new(function(occurrence, ...)

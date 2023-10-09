@@ -1,6 +1,6 @@
-local log = require("occurrency.log")
+local log = require("occurrence.log")
 
----@class OccurrencyConfig
+---@class OccurrenceConfig
 local Config = {
   ---@type string keymap to mark occurrences of the word under cursor to be targeted by the next operation. Default is 'go'.
   normal = "go",
@@ -12,14 +12,14 @@ local Config = {
   delete = "do",
 }
 
----Options for configuring occurrency.
----@class OccurrencyOptions: OccurrencyConfig
+---Options for configuring occurrence.
+---@class OccurrenceOptions: OccurrenceConfig
 ---@field operator_modifier? string
 ---@field normal_operator? string
 ---@field visual_operator? string
 
 ---Validate the given options.
----@param opts OccurrencyOptions
+---@param opts OccurrenceOptions
 ---@return nil error if the options represent an invalid configuration.
 function Config:validate(opts)
   if type(opts) ~= "table" then
@@ -36,8 +36,8 @@ function Config:validate(opts)
 end
 
 ---Validate and parse the given options.
----@param opts? OccurrencyOptions
----@return OccurrencyConfig config The configuration parsed from the given options, with defaults applied.
+---@param opts? OccurrenceOptions
+---@return OccurrenceConfig config The configuration parsed from the given options, with defaults applied.
 function Config:new(opts)
   local meta = {
     __index = self,

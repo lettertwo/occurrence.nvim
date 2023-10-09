@@ -26,8 +26,8 @@ log.levels = LEVELS
 ---@type LogLevel
 local current_level = LEVELS.INFO
 
-local PREFIX = "[Occurrency] "
-local NOTIFY_OPTIONS = { title = "Occurrency" }
+local PREFIX = "[Occurrence] "
+local NOTIFY_OPTIONS = { title = "Occurrence" }
 
 ---Prefix and concatenate arguments to a log function.
 function log.to_message(...)
