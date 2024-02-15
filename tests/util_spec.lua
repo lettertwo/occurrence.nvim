@@ -1,7 +1,7 @@
 local assert = require("luassert")
-local util = require("spec.util")
+local util = require("tests.util")
 
-describe("spec.util.buffer", function()
+describe("tests.util.buffer", function()
   it("creates a new buffer", function()
     local buf = util.buffer()
     assert.is_number(buf)

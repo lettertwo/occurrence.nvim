@@ -2,7 +2,7 @@ local M = {}
 
 local DEFAULT_CONTENT = {
   "this is default content that has been defaultly contented",
-  "to repeately include content by default. The content features",
+  "to repeatedly include content by default. The content features",
   "some default occurrences of content by default.",
 }
 local DEFAULT_FILETYPE = "text"
