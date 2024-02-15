@@ -13,7 +13,7 @@ local DEFAULT_FILETYPE = "text"
 ---@return number buffer
 function M.buffer(content, filetype)
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_option(buf, "filetype", filetype or DEFAULT_FILETYPE)
+  vim.api.nvim_set_option_value("filetype", filetype or DEFAULT_FILETYPE, { buf = buf })
   vim.api.nvim_command("buffer " .. buf)
   if type(content) == "string" then
     content = vim.split(content, "\n")

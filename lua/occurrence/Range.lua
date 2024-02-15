@@ -77,18 +77,21 @@ function Range:of_selection()
   -- 2. Use `vim.fn.getpos('v') to get the start of the current selection range,
   --    then use the cursor position as the end of the range.
   -- The second option is what we do here, but it does feel fragile.
-  local start = Location:from_pos(vim.fn.getpos("v"))
-  local stop = Location:of_cursor()
-  log("mode", vim.inspect(mode))
-  if start and stop then
-    if mode == "V" then
-      start = Location:new(start.line, 0)
-      stop = Location:new(stop.line, math.huge)
+  local vstart = vim.fn.getpos("v")
+  if vstart ~= nil then
+    local start = Location:from_pos(vstart)
+    local stop = Location:of_cursor()
+    log("mode", vim.inspect(mode))
+    if start and stop then
+      if mode == "V" then
+        start = Location:new(start.line, 0)
+        stop = Location:new(stop.line, math.huge)
+      end
+      if stop < start then
+        start, stop = stop, start
+      end
+      return self:new(start, stop)
     end
-    if stop < start then
-      start, stop = stop, start
-    end
-    return self:new(start, stop)
   end
 end
 
