@@ -17,9 +17,9 @@ local STATE_CACHE = setmetatable({}, {
   end,
 })
 
--- A weak-key map of Occurrence instances to their marks.
----@type table<Occurrence, Marks>
-local MARKS_CACHE = setmetatable({}, {
+-- A weak-key map of Occurrence instances to their extmarks.
+---@type table<Occurrence, Extmarks>
+local EXTMARKS_CACHE = setmetatable({}, {
   __mode = "k",
   __index = function()
     error("Occurrence has not been initialized")
@@ -45,84 +45,111 @@ end
 ---@field pattern? string The pattern that was used to find the occurrence.
 
 -- A map of `Range` objects to extmark ids.
----@class Marks
-local Marks = {}
+---@class Extmarks
+local Extmarks = {}
 
-function Marks:new()
+function Extmarks:new()
   return setmetatable({}, { __index = self })
 end
 
--- Check if there is a mark for the given range.
----@param range? Range
-function Marks:has(range)
-  return range and self[range:serialize()] ~= nil
+-- Check if there is an extmark for the given id or `Range`.
+---@param id_or_range? number | Range
+function Extmarks:has(id_or_range)
+  if id_or_range == nil then
+    return false
+  elseif type(id_or_range) == "number" then
+    return self[id_or_range] ~= nil
+  else
+    return self[id_or_range:serialize()] ~= nil
+  end
 end
 
--- Add a mark and highlight for the given `Range`.
+-- Add an extmark and highlight for the given `Range`.
 ---@param buffer integer
 --@param range Range
----@return boolean added Whether a mark was added.
-function Marks:add(buffer, range)
+---@return boolean added Whether an extmark was added.
+function Extmarks:add(buffer, range)
   local key = range:serialize()
 
   if key and self[key] == nil then
-    self[key] = vim.api.nvim_buf_set_extmark(buffer, NS, range.start.line, range.start.col, {
+    local id = vim.api.nvim_buf_set_extmark(buffer, NS, range.start.line, range.start.col, {
       end_row = range.stop.line,
       end_col = range.stop.col,
       hl_group = OCCURRENCE_HL_GROUP,
       hl_mode = "combine",
     })
+    assert(self[id] == nil, "Duplicate extmark id")
+    self[key] = id
+    self[id] = key
     return true
   end
   return false
 end
 
--- Get the current `Range` for the mark originally added at the given `Range`.
+-- Get the current `Range` for the extmark originally added at the given `Range`.
 -- This is useful for, e.g., cascading edits to the buffer at marked occurrences.
 ---@param buffer integer
----@param range Range
+---@param id_or_range number | Range
 ---@return Range | nil
-function Marks:get(buffer, range)
-  local id = self[range:serialize()]
-  if id ~= nil then
+function Extmarks:get(buffer, id_or_range)
+  local key, id
+  if type(id_or_range) == "number" then
+    key = self[id_or_range]
+    id = id_or_range
+  else
+    key = id_or_range:serialize()
+    id = self[key]
+  end
+
+  if id ~= nil and key ~= nil then
     local loc = vim.api.nvim_buf_get_extmark_by_id(buffer, NS, id, {})
-    if next(loc) then
-      return range:move(Location:new(unpack(loc)))
-    end
+    assert(next(loc), "Unexpected missing extmark")
+    return Range:deserialize(key):move(Location:new(unpack(loc)))
   end
 end
 
--- Remove a mark and highlight for the given `Range`.
+-- Remove an extmark and highlight for the given `Range` or extmark id.
 --
--- Note that this is different from `Marks:del_within()` in that it will
--- only remove a mark that exactly matches the given range.
----@param buffer integer
----@param range Range
----@return boolean deleted Whether a mark was removed.
-function Marks:del(buffer, range)
-  local key = range:serialize()
-  if key and self[key] ~= nil then
-    vim.api.nvim_buf_del_extmark(buffer, NS, self[key])
+-- Note that this is different from `Extmarks:del_within()` in that,
+-- if given a range, it will only remove an extmark that
+-- exactly matches the given range.
+--
+---@param buffer number
+---@param id_or_range number | Range
+---@return boolean deleted Whether an extmark was removed.
+function Extmarks:del(buffer, id_or_range)
+  local key, id
+  if type(id_or_range) == "number" then
+    key = self[id_or_range]
+    id = id_or_range
+  else
+    key = id_or_range:serialize()
+    id = self[key]
+  end
+  if key ~= nil and id ~= nil then
+    vim.api.nvim_buf_del_extmark(buffer, NS, id)
+    self[id] = nil
     self[key] = nil
     return true
   end
   return false
 end
 
--- Remove all marks and highlights within the given `Range`.
+-- Remove all extmarks and highlights within the given `Range`.
 --
--- Note that this is different from `Marks:del()` in that it can
--- remove multiple marks within the given range.
-function Marks:del_within(buffer, range)
+-- Note that this is different from `Extmarks:del()` in that it can
+-- remove multiple extmarks within the given range.
+function Extmarks:del_within(buffer, range)
   -- Try the exact match delete first.
   if self:del(buffer, range) then
     return true
   end
 
   local success = false
-  for key, mark in pairs(self) do
+  for key, extmark in pairs(self) do
     if range:contains(Range:deserialize(key)) then
-      vim.api.nvim_buf_del_extmark(buffer, NS, mark)
+      vim.api.nvim_buf_del_extmark(buffer, NS, extmark)
+      self[self[key]] = nil
       self[key] = nil
       success = true
     end
@@ -163,8 +190,9 @@ local OCCURRENCE_META = {
 ---@return Occurrence
 function Occurrence:new(buffer, text, opts)
   local occurrence = {}
+  ---@diagnostic disable-next-line: missing-fields
   STATE_CACHE[occurrence] = { buffer = buffer or vim.api.nvim_get_current_buf() }
-  MARKS_CACHE[occurrence] = Marks:new()
+  EXTMARKS_CACHE[occurrence] = Extmarks:new()
   self.set(occurrence, text, opts)
   return setmetatable(occurrence, OCCURRENCE_META)
 end
@@ -184,7 +212,7 @@ end
 ---@return Range | nil
 function Occurrence:match_cursor(opts)
   opts = vim.tbl_extend("force", { direction = nil, marked = false, wrap = false }, opts or {})
-  local state = STATE_CACHE[self]
+  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   assert(state.pattern, "Occurrence has not been initialized with a pattern")
   assert(state.buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
   local cursor = Cursor:save() -- store cursor position before searching.
@@ -206,20 +234,20 @@ function Occurrence:match_cursor(opts)
   -- If `marked` is `true`, keep searching until
   -- we find a marked occurrence in each direction.
   if opts.marked then
-    local marks = MARKS_CACHE[self]
-    if next_match and not marks:has(next_match) then
+    local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
+    if next_match and not extmarks:has(next_match) then
       local start = next_match
       repeat
         cursor:move(next_match.start)
         next_match = search(state, flags)
-      until not next_match or marks:has(next_match) or next_match == start
+      until not next_match or extmarks:has(next_match) or next_match == start
     end
-    if prev_match and not marks:has(prev_match) then
+    if prev_match and not extmarks:has(prev_match) then
       local start = prev_match
       repeat
         cursor:move(prev_match.start)
         prev_match = search(state, "b" .. flags)
-      until not prev_match or marks:has(prev_match) or prev_match == start
+      until not prev_match or extmarks:has(prev_match) or prev_match == start
     end
   end
 
@@ -251,10 +279,11 @@ end
 ---@param range Range
 ---@return boolean marked Whether occurrences were marked.
 function Occurrence:mark(range)
-  local state = STATE_CACHE[self]
+  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
+  local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
   local success = false
   for match in self:matches(range) do
-    if MARKS_CACHE[self]:add(state.buffer, match) then
+    if extmarks:add(state.buffer, match) then
       success = true
     end
   end
@@ -265,13 +294,14 @@ end
 ---@param range Range
 ---@return boolean unmarked Whether occurrences were unmarked.
 function Occurrence:unmark(range)
-  local state = STATE_CACHE[self]
-  return MARKS_CACHE[self]:del_within(state.buffer, range)
+  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
+  local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
+  return extmarks:del_within(state.buffer, range)
 end
 
 -- Whether or not the buffer contains at least one match for the occurrence.
 function Occurrence:has_matches()
-  local state = STATE_CACHE[self]
+  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   if not state.pattern then
     return false
   end
@@ -283,7 +313,7 @@ end
 ---@param range? Range
 ---@return fun(): Range next_match
 function Occurrence:matches(range)
-  local state = STATE_CACHE[self]
+  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local location = range and range.start or Location:new(0, 0)
   local match
   local function next_match()
@@ -302,7 +332,7 @@ end
 -- Get an iterator of the marked occurrence ranges.
 -- If `range` is provided, only yields the marked occurrences contained within the given `Range`.
 --
--- The iterator yields two `Range` values for each mark:
+-- The iterator yields two `Range` values for each marked occurrence:
 -- - The orginal range of the marked occurrence.
 --   This can be used to unmark the occurrence, e.g., `occurrence:unmark(original_range)`.
 -- - The current 'live' range of the marked occurrence.
@@ -310,8 +340,8 @@ end
 ---@param range? Range
 ---@return fun(): Range, Range next_mark
 function Occurrence:marks(range)
-  local state = STATE_CACHE[self]
-  local marks = MARKS_CACHE[self]
+  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
+  local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
   local key
   local function next_mark()
     key = next(marks, key)
@@ -336,10 +366,10 @@ end
 ---@param text? string
 ---@param opts? { is_word: boolean }
 function Occurrence:set(text, opts)
-  local state = STATE_CACHE[self]
+  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
 
-  -- Clear all marks and highlights.
-  MARKS_CACHE[self] = Marks:new()
+  -- Clear all extmarks and highlights.
+  EXTMARKS_CACHE[self] = Extmarks:new()
   vim.api.nvim_buf_clear_namespace(state.buffer, NS, 0, -1)
 
   if text == nil then
