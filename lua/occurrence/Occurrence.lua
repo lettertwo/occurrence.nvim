@@ -31,7 +31,7 @@ local MARKS_CACHE = setmetatable({}, {
 ---@return Range | nil
 local function search(state, flags)
   if state.pattern then
-    local start = Location:from_searchpos(vim.fn.searchpos(state.pattern, flags))
+    local start = Location:from_pos(vim.fn.searchpos(state.pattern, flags))
     if start then
       return Range:new(start, start + state.span)
     end

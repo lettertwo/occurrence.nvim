@@ -30,7 +30,7 @@ function Cursor:move(location)
   -- TODO: figure out if we can use nvim api instead?
   -- Currently not doing so because it appears to always scroll the window.
   -- vim.api.nvim_win_set_cursor(0, location:to_markpos())
-  vim.fn.setpos(".", vim.tbl_flatten({ 0, location:to_searchpos(), 0 }))
+  vim.fn.setpos(".", vim.tbl_flatten({ 0, location:to_pos(), 0 }))
 end
 
 return Cursor
