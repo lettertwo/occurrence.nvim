@@ -120,7 +120,7 @@ end)
 M.unmark_selection = Action:new(function(occurrence)
   local selection_range = Range:of_selection()
   if selection_range then
-    for range in occurrence:marks(selection_range) do
+    for range in occurrence:marks({ range = selection_range }) do
       occurrence:unmark(range)
     end
   end
@@ -156,9 +156,6 @@ end)
 ---@param occurrence Occurrence
 ---@param selection? Range
 M.change_marked = Action:new(function(occurrence, selection)
-  for mark, range in occurrence:marks(selection) do
-    log.debug("change_marked", occurrence.pattern, range)
-  end
 end)
 
 M.change_selection = Action:new(function(occurrence)
@@ -173,7 +170,7 @@ end)
 ---@param occurrence Occurrence
 ---@param selection? Range
 M.delete_marked = Action:new(function(occurrence, selection)
-  for mark, range in occurrence:marks(selection) do
+  for mark, range in occurrence:marks({ range = selection }) do
     occurrence:unmark(mark)
     local start_line, start_col, stop_line, stop_col = unpack(range) ---@diagnostic disable-line: deprecated
     vim.api.nvim_buf_set_text(0, start_line, start_col, stop_line, stop_col, {})

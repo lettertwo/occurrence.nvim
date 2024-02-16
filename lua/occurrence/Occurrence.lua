@@ -157,6 +157,58 @@ function Extmarks:del_within(buffer, range)
   return success
 end
 
+-- Get an iterator of the extmarks for the given `buffer` and optional `range`.
+-- If the `range` option is provided, only yields the extmarks contained within the given `Range`.
+-- If the `reverse` option is `true` (default is `false`), yields the extmarks in reverse order.
+--
+-- The iterator yields a tuple of two `Range` values for each extmark:
+-- - The orginal range of the extmark.
+-- - The current 'live' range of the extmark.
+--
+---@param buffer integer
+---@param opts? { range?: Range, reverse?: boolean }
+---@return fun(): Range?, Range? next_extmark
+function Extmarks:iter(buffer, opts)
+  local range = opts and opts.range or Range:new(Location:new(0, 0), Location:new(vim.fn.line("$"), 0))
+  ---@type Location | nil
+  local start = opts and opts.reverse and range.stop or range.start
+  local stop = opts and opts.reverse and range.start or range.stop
+
+  -- Keep track of the last start location to avoid infinite loops
+  -- when there are no more extmarks to traverse.
+  local laststart
+
+  local function next_extmark()
+    if start == nil then
+      return
+    end
+
+    -- Avoid infinite loops.
+    if laststart ~= nil and start == laststart then
+      return
+    end
+
+    --- List of (extmark_id, row, col) tuples in traversal order.
+    local extmarks = vim.api.nvim_buf_get_extmarks(buffer, NS, start:to_extmarkpos(), stop:to_extmarkpos(), {})
+
+    vim.print(tostring(start), tostring(stop))
+    vim.print(extmarks)
+    if next(extmarks) then
+      local id, row, col = unpack(extmarks[1])
+      local original_range = Range:deserialize(self[id])
+      local current_location = Location:from_extmarkpos({ row, col })
+      if original_range ~= nil and current_location ~= nil then
+        -- Update the start position for the next iteration.
+        laststart = start
+        start = original_range.stop
+        return original_range, original_range:move(current_location)
+      end
+    end
+  end
+
+  return next_extmark
+end
+
 -- A stateful representation of an occurrence of a pattern in a buffer.
 ---@class Occurrence: OccurrenceState
 local Occurrence = {}
@@ -330,35 +382,20 @@ function Occurrence:matches(range)
 end
 
 -- Get an iterator of the marked occurrence ranges.
--- If `range` is provided, only yields the marked occurrences contained within the given `Range`.
+-- If the `range` option is provided, only yields the marked occurrences contained within the given `Range`.
+-- If the `reverse` option is `true` (default is `false`), yields the marked occurrences in reverse order.
 --
 -- The iterator yields two `Range` values for each marked occurrence:
 -- - The orginal range of the marked occurrence.
 --   This can be used to unmark the occurrence, e.g., `occurrence:unmark(original_range)`.
 -- - The current 'live' range of the marked occurrence.
 --   This can be used to make edits to the buffer, e.g., with `vim.api.nvim_buf_set_text(...)`.
----@param range? Range
----@return fun(): Range, Range next_mark
-function Occurrence:marks(range)
+---@param opts? { range?: Range, reverse?: boolean }
+---@return fun(): Range?, Range? next_mark
+function Occurrence:marks(opts)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
-  local key
-  local function next_mark()
-    key = next(marks, key)
-    if key ~= nil then
-      local marked_range = Range:deserialize(key)
-      local current_range = marks:get(state.buffer, marked_range)
-      assert(current_range, "Marked range not found in buffer")
-      if range and range:contains(marked_range) then
-        return marked_range, current_range
-      elseif range then
-        return next_mark()
-      else
-        return marked_range, current_range
-      end
-    end
-  end
-  return next_mark
+  return extmarks:iter(state.buffer, opts)
 end
 
 -- Set the text to search for.
