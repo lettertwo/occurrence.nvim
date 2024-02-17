@@ -72,9 +72,8 @@ end
 
 -- Remove an extmark and highlight for the given `Range` or extmark id.
 --
--- Note that this is different from `Extmarks:del_within()` in that,
--- if given a range, it will only remove an extmark that
--- exactly matches the given range.
+-- Note that if given a range, it will only remove an extmark
+-- that exactly matches the range.
 --
 ---@param buffer number
 ---@param id_or_range number | Range
@@ -95,28 +94,6 @@ function Extmarks:del(buffer, id_or_range)
     return true
   end
   return false
-end
-
--- Remove all extmarks and highlights within the given `Range`.
---
--- Note that this is different from `Extmarks:del()` in that it can
--- remove multiple extmarks within the given range.
-function Extmarks:del_within(buffer, range)
-  -- Try the exact match delete first.
-  if self:del(buffer, range) then
-    return true
-  end
-
-  local success = false
-  for key, extmark in pairs(self) do
-    if range:contains(Range:deserialize(key)) then
-      vim.api.nvim_buf_del_extmark(buffer, NS, extmark)
-      self[self[key]] = nil
-      self[key] = nil
-      success = true
-    end
-  end
-  return success
 end
 
 -- Get an iterator of the extmarks for the given `buffer` and optional `range`.

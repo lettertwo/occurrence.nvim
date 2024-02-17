@@ -161,7 +161,8 @@ function Occurrence:match_cursor(opts)
 end
 
 -- Mark the occurrences contained within the given `Range`.
----@param range Range
+-- If no `range` is provided, the entire buffer will be marked.
+---@param range? Range
 ---@return boolean marked Whether occurrences were marked.
 function Occurrence:mark(range)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
@@ -176,12 +177,19 @@ function Occurrence:mark(range)
 end
 
 -- Unmark the occurrences contained within the given `Range`.
----@param range Range
+-- If no `range` is provided, all occurrences will be unmarked.
+---@param range? Range
 ---@return boolean unmarked Whether occurrences were unmarked.
 function Occurrence:unmark(range)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
-  return extmarks:del_within(state.buffer, range)
+  local success = false
+  for match in self:matches(range) do
+    if extmarks:del(state.buffer, match) then
+      success = true
+    end
+  end
+  return success
 end
 
 -- Whether or not the buffer contains at least one match for the occurrence.
