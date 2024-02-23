@@ -40,7 +40,7 @@ local M = {}
 
 -- Find all occurrences of the word under the cursor in the given buffer.
 -- If no buffer is given, mark occurrences in the current buffer.
-M.find_cursor_word = Action:new(function(occurrence)
+M.find_cursor_word = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
   local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
   assert(word ~= "", "no word under cursor")
@@ -49,7 +49,7 @@ end)
 
 -- Find all occurrences of the visually selected text in the given buffer.
 -- If no buffer is given, mark occurrences in the current buffer.
-M.find_visual_subword = Action:new(function(occurrence)
+M.find_visual_subword = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
   local pos1 = vim.fn.getpos("v")
   local pos2 = vim.fn.getpos(".")
@@ -60,27 +60,27 @@ M.find_visual_subword = Action:new(function(occurrence)
 end)
 
 -- Go to the next occurrence.
-M.goto_next = Action:new(function(occurrence)
+M.goto_next = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "forward", wrap = true })
 end)
 
 -- Go to the previous occurrence.
-M.goto_previous = Action:new(function(occurrence)
+M.goto_previous = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "backward", wrap = true })
 end)
 
 -- Go to the next mark.
-M.goto_next_mark = Action:new(function(occurrence)
+M.goto_next_mark = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
 end)
 
 -- Go to the previous mark.
-M.goto_previous_mark = Action:new(function(occurrence)
+M.goto_previous_mark = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
 end)
 
 -- Add a mark and highlight for the current match of the given occurrence.
-M.mark = Action:new(function(occurrence)
+M.mark = Action.new(function(occurrence)
   local range = occurrence:match_cursor()
   if range then
     occurrence:mark(range)
@@ -88,7 +88,7 @@ M.mark = Action:new(function(occurrence)
 end)
 
 -- Remove a mark and highlight for the current match of the given occurrence.
-M.unmark = Action:new(function(occurrence)
+M.unmark = Action.new(function(occurrence)
   local range = occurrence:match_cursor()
   if range then
     occurrence:unmark(range)
@@ -96,7 +96,7 @@ M.unmark = Action:new(function(occurrence)
 end)
 
 -- Toggle a mark and highlight for the current match of the given occurrence.
-M.toggle_mark = Action:new(function(occurrence)
+M.toggle_mark = Action.new(function(occurrence)
   local range = occurrence:match_cursor()
   log("toggle_mark", range)
   if range then
@@ -107,7 +107,7 @@ M.toggle_mark = Action:new(function(occurrence)
 end)
 
 -- Add marks and highlights for matches of the given occurrence within the current selection.
-M.mark_selection = Action:new(function(occurrence)
+M.mark_selection = Action.new(function(occurrence)
   local selection_range = Range:of_selection()
   if selection_range then
     for range in occurrence:matches(selection_range) do
@@ -117,7 +117,7 @@ M.mark_selection = Action:new(function(occurrence)
 end)
 
 -- Clear marks and highlights for matches of the given occurrence within the current selection.
-M.unmark_selection = Action:new(function(occurrence)
+M.unmark_selection = Action.new(function(occurrence)
   local selection_range = Range:of_selection()
   if selection_range then
     for range in occurrence:marks({ range = selection_range }) do
@@ -127,7 +127,7 @@ M.unmark_selection = Action:new(function(occurrence)
 end)
 
 -- Toggle marks and highlights for matches of the given occurrence within the current selection.
-M.toggle_mark_selection = Action:new(function(occurrence)
+M.toggle_mark_selection = Action.new(function(occurrence)
   local selection_range = Range:of_selection()
   if selection_range then
     for range in occurrence:matches(selection_range) do
@@ -139,14 +139,14 @@ M.toggle_mark_selection = Action:new(function(occurrence)
 end)
 
 -- Add marks and highlights for all matches of the given occurrence.
-M.mark_all = Action:new(function(occurrence)
+M.mark_all = Action.new(function(occurrence)
   for range in occurrence:matches() do
     occurrence:mark(range)
   end
 end)
 
 -- Clear all marks and highlights for the given occcurrence.
-M.unmark_all = Action:new(function(occurrence)
+M.unmark_all = Action.new(function(occurrence)
   for range in occurrence:marks() do
     occurrence:unmark(range)
   end
@@ -155,21 +155,21 @@ end)
 -- Change all marked occurrences.
 ---@param occurrence Occurrence
 ---@param selection? Range
-M.change_marked = Action:new(function(occurrence, selection)
+M.change_marked = Action.new(function(occurrence, selection)
 end)
 
-M.change_selection = Action:new(function(occurrence)
+M.change_selection = Action.new(function(occurrence)
   M.change_marked(occurrence, Range:of_selection())
 end)
 
-M.change_motion = Action:new(function(occurrence)
+M.change_motion = Action.new(function(occurrence)
   M.change_marked(occurrence, Range:of_motion())
 end)
 
 -- Delete all marked occurrences.
 ---@param occurrence Occurrence
 ---@param selection? Range
-M.delete_marked = Action:new(function(occurrence, selection)
+M.delete_marked = Action.new(function(occurrence, selection)
   for mark, range in occurrence:marks({ range = selection }) do
     occurrence:unmark(mark)
     local start_line, start_col, stop_line, stop_col = unpack(range) ---@diagnostic disable-line: deprecated
@@ -177,12 +177,12 @@ M.delete_marked = Action:new(function(occurrence, selection)
   end
 end)
 
-M.delete_selection = Action:new(function(occurrence)
+M.delete_selection = Action.new(function(occurrence)
   M.delete_marked(occurrence, Range:of_selection())
   setmode("n")
 end)
 
-M.delete_motion = Action:new(function(occurrence)
+M.delete_motion = Action.new(function(occurrence)
   -- TODO: offset cursor position to account for deleted text...
   M.delete_marked(occurrence, Range:of_motion())
 end)
@@ -190,8 +190,8 @@ end)
 -- Activate keybindings for the given configuration.
 -- If an operator action is given, the action will be executed in operator-pending mode.
 ---@param config OccurrenceConfig
----@param operator? OccurrenceAction
-M.activate = Action:new(function(occurrence, config, operator)
+---@param operator? Action
+M.activate = Action.new(function(occurrence, config, operator)
   if not occurrence:has_matches() then
     log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")
     return
@@ -234,7 +234,7 @@ M.activate = Action:new(function(occurrence, config, operator)
 end)
 
 -- Deactivate the keymap for the given occurrence.
-M.deactivate = Action:new(function(occurrence)
+M.deactivate = Action.new(function(occurrence)
   local keymap = KEYMAP_CACHE[occurrence.buffer]
   if keymap then
     keymap:reset()

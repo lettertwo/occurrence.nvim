@@ -58,7 +58,7 @@ function Keymap.validate_mode(mode)
 end
 
 --- Wraps an action in a function so that it can be used as a keymap callback.
----@param action string | function | OccurrenceAction
+---@param action string | function | Action
 ---@return string | function
 function Keymap.wrap_action(action)
   if type(action) == "table" then
@@ -66,7 +66,7 @@ function Keymap.wrap_action(action)
       return action()
     end
   end
-  ---@cast action -OccurrenceAction
+  ---@cast action -Action
   return action
 end
 
@@ -82,7 +82,7 @@ end
 
 -- Register a normal mode keymap.
 ---@param lhs string
----@param rhs string | function | OccurrenceAction
+---@param rhs string | function | Action
 ---@param opts table | string
 function Keymap:n(lhs, rhs, opts)
   vim.keymap.set(MODE.n, lhs, self.wrap_action(rhs), self:parse_opts(opts))
@@ -91,7 +91,7 @@ end
 
 -- Register an operator-pending mode keymap.
 ---@param lhs string
----@param rhs string | function | OccurrenceAction
+---@param rhs string | function | Action
 ---@param opts table | string
 function Keymap:o(lhs, rhs, opts)
   vim.keymap.set(MODE.o, lhs, self.wrap_action(rhs), self:parse_opts(opts))
@@ -100,7 +100,7 @@ end
 
 -- Register a visual or select mode keymap.
 ---@param lhs string
----@param rhs string | function | OccurrenceAction
+---@param rhs string | function | Action
 ---@param opts table | string
 function Keymap:x(lhs, rhs, opts)
   vim.keymap.set(MODE.x, lhs, self.wrap_action(rhs), self:parse_opts(opts))
