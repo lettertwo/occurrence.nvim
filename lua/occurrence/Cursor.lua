@@ -4,16 +4,16 @@ local log = require("occurrence.log")
 ---@class Cursor
 local Cursor = {}
 
----@class CursorMemory: Cursor
+---@class ExtCursor: Cursor
 ---@field location Location
-local CursorMemory = setmetatable({}, { __index = Cursor })
+local ExtCursor = setmetatable({}, { __index = Cursor })
 
-function CursorMemory:new(location)
+function ExtCursor:new(location)
   return setmetatable({ location = location }, { __index = self })
 end
 
 -- Restore the cursor to the previously saved position.
-function CursorMemory:restore()
+function ExtCursor:restore()
   self:move(self.location)
 end
 
@@ -21,7 +21,7 @@ end
 function Cursor:save()
   local location = Location:of_cursor()
   assert(location, "Cursor is not in current window")
-  return CursorMemory:new(location)
+  return ExtCursor:new(location)
 end
 
 --- Move the cursor to the given `Location`.
