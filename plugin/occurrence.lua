@@ -6,3 +6,5 @@ local occurrence = setmetatable({}, {
     end
   end,
 })
+
+return occurrence

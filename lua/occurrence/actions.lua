@@ -30,6 +30,8 @@ local function setmode(mode)
   end
   if mode == "n" then
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
+  elseif mode == "i" then
+    vim.cmd("startinsert")
   else
     error("Unsupported mode: " .. mode)
   end
@@ -156,6 +158,62 @@ end)
 ---@param occurrence Occurrence
 ---@param selection? Range
 M.change_marked = Action.new(function(occurrence, selection)
+  local cursor = Cursor:save()
+  local next_mark = occurrence:marks({ range = selection })
+  local mark, range = next_mark()
+  local edits = {}
+  while mark do
+    occurrence:unmark(mark)
+    local start_line, start_col, stop_line, stop_col = unpack(range) ---@diagnostic disable-line: deprecated
+    vim.api.nvim_buf_set_text(0, start_line, start_col, stop_line, stop_col, {})
+    table.insert(edits, { start_line, start_col })
+    mark, range = next_mark()
+  end
+  if #edits then
+    local input = vim.fn.input("Change to: ")
+    if input ~= "" then
+      for _, edit in ipairs(edits) do
+        local line, col = unpack(edit)
+        vim.api.nvim_buf_set_text(0, line, col, line, col, { input })
+      end
+    end
+    cursor:restore()
+    -- cursor:move(insert_at)
+    -- setmode("i")
+    -- vim.api.nvim_buf_attach(occurrence.buffer, false, {
+    --   -- • the string "bytes"
+    --   -- • buffer handle
+    --   -- • b:changedtick
+    --   -- • start row of the changed text (zero-indexed)
+    --   -- • start column of the changed text
+    --   -- • byte offset of the changed text (from the start of
+    --   --   the buffer)
+    --   -- • old end row of the changed text
+    --   -- • old end column of the changed text
+    --   -- • old end byte length of the changed text
+    --   -- • new end row of the changed text
+    --   -- • new end column of the changed text
+    --   -- • new end byte length of the changed text
+    --   on_bytes = function(
+    --     bytes,
+    --     buf,
+    --     event,
+    --     start_row,
+    --     start_col,
+    --     offset,
+    --     old_stop_row,
+    --     old_stop_col,
+    --     old_len,
+    --     stop_row,
+    --     stop_col,
+    --     len
+    --   )
+    --     log(vim.api.nvim_buf_get_text(0, start_row, start_col, stop_row, stop_col, {}))
+    --   end,
+    -- })
+  else
+    cursor:restore()
+  end
 end)
 
 M.change_selection = Action.new(function(occurrence)

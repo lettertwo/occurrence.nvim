@@ -7,8 +7,9 @@ local log = require("occurrence.log")
 -- Note that the range is end-exclusive, meaning that the `stop` location
 -- is not included in the range.
 ---@see Location
+--
 ---@class Range
----@operator call: Location
+---@overload fun(start: Location, stop: Location): Range
 ---@field start Location
 ---@field stop Location
 local Range = {}

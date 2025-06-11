@@ -1,9 +1,10 @@
 -- A 0-indexed line and column pair representing a location in a buffer,
 -- e.g., the cursor position, or a mark location, or the start or end of a range.
 ---@see occurrence.Range
+--
 ---@class Location
----@operator call: Location
 ---@operator add(integer): Location
+---@overload fun(line: number, col: number): Location
 ---@field line integer A 0-indexed line number.
 ---@field col integer A 0-indexed column number.
 local Location = {}
