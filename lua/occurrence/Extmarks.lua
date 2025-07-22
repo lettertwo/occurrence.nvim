@@ -130,8 +130,6 @@ function Extmarks:iter(buffer, opts)
     --- List of (extmark_id, row, col) tuples in traversal order.
     local extmarks = vim.api.nvim_buf_get_extmarks(buffer, NS, start:to_extmarkpos(), stop:to_extmarkpos(), {})
 
-    vim.print(tostring(start), tostring(stop))
-    vim.print(extmarks)
     if next(extmarks) then
       local id, row, col = unpack(extmarks[1])
       local original_range = Range:deserialize(self[id])

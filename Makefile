@@ -1,6 +1,3 @@
-TESTS_INIT=tests/minimal_init.lua
-TESTS_DIR=tests/
-
 PLUGIN_FILES := $(shell find plugin -type f -name '*.lua')
 
 LEMMY_HELP := $(shell command -v lemmy-help 2> /dev/null)
@@ -18,9 +15,5 @@ doc/occurrence.txt: lemmy-help $(PLUGIN_FILES)
 doc: doc/occurrence.txt
 
 .PHONY: test
-test:
-	@nvim \
-		--headless \
-		--noplugin \
-		-u ${TESTS_INIT} \
-		-c "PlenaryBustedDirectory ${TESTS_DIR} { minimal_init = '${TESTS_INIT}' }"
+test: busted
+	@busted
