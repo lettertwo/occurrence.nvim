@@ -98,11 +98,11 @@ end
 -- e.g., adding keymaps to perform additional actions with an occurrence.
 --
 -- Note that the resulting action does not expect to be called with
--- an `Occurence` argument.
+-- an `Occurrence` argument.
 --
 -- If this is action is combined with another action, it will forward
 -- the bound occurrence to the next action _unless_ that action
---  is also bound to an `Occurrence`.
+-- is also bound to an `Occurrence`.
 --
 ---@param occurrence Occurrence
 ---@return OccurrenceAction

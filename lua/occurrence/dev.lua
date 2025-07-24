@@ -39,7 +39,7 @@ vim.api.nvim_create_user_command("ReloadOccurrence", M.reload, {
 })
 
 vim.api.nvim_create_autocmd({ "BufWritePost" }, {
-  pattern = { "*/occurrence.nvim/lua/*.lua" },
+  pattern = { "*/occurrence.nvim*/lua/*.lua" },
   command = "ReloadOccurrence",
   group = vim.api.nvim_create_augroup("OccurrenceDev", { clear = true }),
 })
