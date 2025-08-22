@@ -1,26 +1,37 @@
-local Keymap = require("occurrence.Keymap")
 local Action = require("occurrence.Action")
-local Range = require("occurrence.Range")
 local Cursor = require("occurrence.Cursor")
+local Keymap = require("occurrence.Keymap")
+local Range = require("occurrence.Range")
+local O = require("occurrence.operators")
+
 local log = require("occurrence.log")
 
 -- A map of Buffer ids to their active keymaps.
 ---@type table<integer, Keymap>
 local KEYMAP_CACHE = {}
 
-local function opfunc(callback)
-  return function()
-    -- FIXME: This is a hack around pending support for lua functions in this position.
-    -- See https://github.com/neovim/neovim/pull/20187
-    _G.OccurrenceOpfunc = function(...)
-      callback(...)
-      -- FIXME: This opfunc attempts to clean up after itself,
-      -- but if the opeation is cancelled, the opfunc won't be called..
-      _G.OccurrenceOpfunc = nil
-    end
-    vim.api.nvim_set_option("operatorfunc", "v:lua.OccurrenceOpfunc")
-    return "g@"
-  end
+local OPFUNC_AUGROUP = vim.api.nvim_create_augroup("OccurrenceOpfunc", { clear = true })
+
+local original_opfunc = vim.go.operatorfunc
+
+-- Based on https://github.com/neovim/neovim/issues/14157#issuecomment-1320787927
+local _set_opfunc = vim.fn[vim.api.nvim_exec2(
+  [[
+  func s:set_opfunc(val)
+    let &opfunc = a:val
+  endfunc
+  echon get(function('s:set_opfunc'), 'name')
+]],
+  { output = true }
+).output]
+
+local set_opfunc = function(opfunc)
+  original_opfunc = vim.go.operatorfunc
+  _set_opfunc(opfunc)
+end
+
+local reset_opfunc = function()
+  _set_opfunc(original_opfunc)
 end
 
 ---@param mode string
@@ -38,11 +49,12 @@ local function setmode(mode)
   return mode == vim.api.nvim_get_mode().mode
 end
 
-local M = {}
+---@class OccurrenceActions
+local A = {}
 
 -- Find all occurrences of the word under the cursor in the given buffer.
 -- If no buffer is given, mark occurrences in the current buffer.
-M.find_cursor_word = Action.new(function(occurrence)
+A.find_cursor_word = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
   local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
   assert(word ~= "", "no word under cursor")
@@ -51,7 +63,7 @@ end)
 
 -- Find all occurrences of the visually selected text in the given buffer.
 -- If no buffer is given, mark occurrences in the current buffer.
-M.find_visual_subword = Action.new(function(occurrence)
+A.find_visual_subword = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
   local pos1 = vim.fn.getpos("v")
   local pos2 = vim.fn.getpos(".")
@@ -62,27 +74,27 @@ M.find_visual_subword = Action.new(function(occurrence)
 end)
 
 -- Go to the next occurrence.
-M.goto_next = Action.new(function(occurrence)
+A.goto_next = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "forward", wrap = true })
 end)
 
 -- Go to the previous occurrence.
-M.goto_previous = Action.new(function(occurrence)
+A.goto_previous = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "backward", wrap = true })
 end)
 
 -- Go to the next mark.
-M.goto_next_mark = Action.new(function(occurrence)
+A.goto_next_mark = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
 end)
 
 -- Go to the previous mark.
-M.goto_previous_mark = Action.new(function(occurrence)
+A.goto_previous_mark = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
 end)
 
 -- Add a mark and highlight for the current match of the given occurrence.
-M.mark = Action.new(function(occurrence)
+A.mark = Action.new(function(occurrence)
   local range = occurrence:match_cursor()
   if range then
     occurrence:mark(range)
@@ -90,7 +102,7 @@ M.mark = Action.new(function(occurrence)
 end)
 
 -- Remove a mark and highlight for the current match of the given occurrence.
-M.unmark = Action.new(function(occurrence)
+A.unmark = Action.new(function(occurrence)
   local range = occurrence:match_cursor()
   if range then
     occurrence:unmark(range)
@@ -98,7 +110,7 @@ M.unmark = Action.new(function(occurrence)
 end)
 
 -- Toggle a mark and highlight for the current match of the given occurrence.
-M.toggle_mark = Action.new(function(occurrence)
+A.toggle_mark = Action.new(function(occurrence)
   local range = occurrence:match_cursor()
   log("toggle_mark", range)
   if range then
@@ -109,7 +121,7 @@ M.toggle_mark = Action.new(function(occurrence)
 end)
 
 -- Add marks and highlights for matches of the given occurrence within the current selection.
-M.mark_selection = Action.new(function(occurrence)
+A.mark_selection = Action.new(function(occurrence)
   local selection_range = Range:of_selection()
   if selection_range then
     for range in occurrence:matches(selection_range) do
@@ -119,7 +131,7 @@ M.mark_selection = Action.new(function(occurrence)
 end)
 
 -- Clear marks and highlights for matches of the given occurrence within the current selection.
-M.unmark_selection = Action.new(function(occurrence)
+A.unmark_selection = Action.new(function(occurrence)
   local selection_range = Range:of_selection()
   if selection_range then
     for range in occurrence:marks({ range = selection_range }) do
@@ -129,7 +141,7 @@ M.unmark_selection = Action.new(function(occurrence)
 end)
 
 -- Toggle marks and highlights for matches of the given occurrence within the current selection.
-M.toggle_mark_selection = Action.new(function(occurrence)
+A.toggle_mark_selection = Action.new(function(occurrence)
   local selection_range = Range:of_selection()
   if selection_range then
     for range in occurrence:matches(selection_range) do
@@ -141,115 +153,23 @@ M.toggle_mark_selection = Action.new(function(occurrence)
 end)
 
 -- Add marks and highlights for all matches of the given occurrence.
-M.mark_all = Action.new(function(occurrence)
+A.mark_all = Action.new(function(occurrence)
   for range in occurrence:matches() do
     occurrence:mark(range)
   end
 end)
 
 -- Clear all marks and highlights for the given occcurrence.
-M.unmark_all = Action.new(function(occurrence)
+A.unmark_all = Action.new(function(occurrence)
   for range in occurrence:marks() do
     occurrence:unmark(range)
   end
 end)
 
--- Change all marked occurrences.
----@param occurrence Occurrence
----@param selection? Range
-M.change_marked = Action.new(function(occurrence, selection)
-  local cursor = Cursor:save()
-  local next_mark = occurrence:marks({ range = selection })
-  local mark, range = next_mark()
-  local edits = {}
-  while mark do
-    occurrence:unmark(mark)
-    local start_line, start_col, stop_line, stop_col = unpack(range) ---@diagnostic disable-line: deprecated
-    vim.api.nvim_buf_set_text(0, start_line, start_col, stop_line, stop_col, {})
-    table.insert(edits, { start_line, start_col })
-    mark, range = next_mark()
-  end
-  if #edits then
-    local input = vim.fn.input("Change to: ")
-    if input ~= "" then
-      for _, edit in ipairs(edits) do
-        local line, col = unpack(edit)
-        vim.api.nvim_buf_set_text(0, line, col, line, col, { input })
-      end
-    end
-    cursor:restore()
-    -- cursor:move(insert_at)
-    -- setmode("i")
-    -- vim.api.nvim_buf_attach(occurrence.buffer, false, {
-    --   -- • the string "bytes"
-    --   -- • buffer handle
-    --   -- • b:changedtick
-    --   -- • start row of the changed text (zero-indexed)
-    --   -- • start column of the changed text
-    --   -- • byte offset of the changed text (from the start of
-    --   --   the buffer)
-    --   -- • old end row of the changed text
-    --   -- • old end column of the changed text
-    --   -- • old end byte length of the changed text
-    --   -- • new end row of the changed text
-    --   -- • new end column of the changed text
-    --   -- • new end byte length of the changed text
-    --   on_bytes = function(
-    --     bytes,
-    --     buf,
-    --     event,
-    --     start_row,
-    --     start_col,
-    --     offset,
-    --     old_stop_row,
-    --     old_stop_col,
-    --     old_len,
-    --     stop_row,
-    --     stop_col,
-    --     len
-    --   )
-    --     log(vim.api.nvim_buf_get_text(0, start_row, start_col, stop_row, stop_col, {}))
-    --   end,
-    -- })
-  else
-    cursor:restore()
-  end
-end)
-
-M.change_selection = Action.new(function(occurrence)
-  M.change_marked(occurrence, Range:of_selection())
-end)
-
-M.change_motion = Action.new(function(occurrence)
-  M.change_marked(occurrence, Range:of_motion())
-end)
-
--- Delete all marked occurrences.
----@param occurrence Occurrence
----@param selection? Range
-M.delete_marked = Action.new(function(occurrence, selection)
-  for mark, range in occurrence:marks({ range = selection }) do
-    occurrence:unmark(mark)
-    local start_line, start_col, stop_line, stop_col = unpack(range) ---@diagnostic disable-line: deprecated
-    vim.api.nvim_buf_set_text(0, start_line, start_col, stop_line, stop_col, {})
-  end
-end)
-
-M.delete_selection = Action.new(function(occurrence)
-  M.delete_marked(occurrence, Range:of_selection())
-  setmode("n")
-end)
-
-M.delete_motion = Action.new(function(occurrence)
-  -- TODO: offset cursor position to account for deleted text...
-  M.delete_marked(occurrence, Range:of_motion())
-end)
-
 -- Activate keybindings for the given configuration.
--- If an operator action is given, the action will be executed in operator-pending mode.
+---@param occurrence Occurrence
 ---@param config OccurrenceConfig
----@param operator? Action
-M.activate = Action.new(function(occurrence, config, operator)
+A.activate = Action.new(function(occurrence, config)
   if not occurrence:has_matches() then
     log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")
     return
@@ -262,43 +182,138 @@ M.activate = Action.new(function(occurrence, config, operator)
   local keymap = Keymap:new(occurrence.buffer)
   KEYMAP_CACHE[occurrence.buffer] = keymap
 
+  local cancel_action = (A.unmark_all + A.deactivate):with(occurrence)
+
+  -- TODO: derive keymaps from config
+
   -- Cancel the pending occurrence operation.
-  keymap:n("<Esc>", (M.unmark_all + M.deactivate):with(occurrence), "Clear occurrence")
+  keymap:n("<Esc>", cancel_action, "Clear occurrence")
+  -- keymap:n("<C-c>", cancel_action, "Clear occurrence")
+  -- keymap:n("<C-[>", cancel_action, "Clear occurrence")
 
-  if operator ~= nil then
-    return opfunc(operator:with(occurrence))()
-  else
-    -- Navigate between occurrence matches
-    keymap:n("n", M.goto_next_mark:with(occurrence), "Next marked occurrence")
-    keymap:n("N", M.goto_previous_mark:with(occurrence), "Previous marked occurrence")
-    keymap:n("gn", M.goto_next:with(occurrence), "Next occurrence")
-    keymap:n("gN", M.goto_previous:with(occurrence), "Previous occurrence")
+  -- Navigate between occurrence matches
+  keymap:n("n", A.goto_next_mark:with(occurrence), "Next marked occurrence")
+  keymap:n("N", A.goto_previous_mark:with(occurrence), "Previous marked occurrence")
+  keymap:n("gn", A.goto_next:with(occurrence), "Next occurrence")
+  keymap:n("gN", A.goto_previous:with(occurrence), "Previous occurrence")
 
-    -- Manage occurrence marks.
-    keymap:n("go", M.toggle_mark:with(occurrence), "Toggle occurrence mark")
-    keymap:n("ga", M.mark:with(occurrence), "Mark occurrence")
-    keymap:n("gx", M.unmark:with(occurrence), "Unmark occurrence")
+  -- Manage occurrence marks.
+  keymap:n("go", A.toggle_mark:with(occurrence), "Toggle occurrence mark")
+  keymap:n("ga", A.mark:with(occurrence), "Mark occurrence")
+  keymap:n("gx", A.unmark:with(occurrence), "Unmark occurrence")
 
-    -- Use visual/select to narrow occurrence matches.
-    keymap:x("go", M.toggle_mark_selection:with(occurrence), "Toggle occurrence marks")
-    keymap:x("ga", M.mark_selection:with(occurrence), "Mark occurrences")
-    keymap:x("gx", M.unmark_selection:with(occurrence), "Unmark occurrences")
+  -- Use visual/select to narrow occurrence matches.
+  keymap:x("go", A.toggle_mark_selection:with(occurrence), "Toggle occurrence marks")
+  keymap:x("ga", A.mark_selection:with(occurrence), "Mark occurrences")
+  keymap:x("gx", A.unmark_selection:with(occurrence), "Unmark occurrences")
 
-    -- Delete marked occurrences.
-    -- TODO: add shortcuts like "dd", "dp", etc.
-    keymap:n("d", opfunc(M.delete_motion:with(occurrence)), { expr = true, desc = "Delete marked occurrences" })
-    keymap:x("d", (M.delete_selection):with(occurrence), "Delete marked occurrences")
+  --- listen for operator-pending mode to activate opfunc keybindings
+  --- FIXME: This doesn't seem very reliable?
+  vim.api.nvim_create_autocmd("ModeChanged", {
+    group = OPFUNC_AUGROUP,
+    pattern = "*:no*",
+    callback = function()
+      vim.print("ModeChanged to operator-pending, setting opfunc keybindings")
+      local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
+
+      vim.print("operator:", operator, "count:", count, "register:", register)
+
+      local operator_action = O[operator]
+
+      if not operator_action then
+        log.error("Unsupported operator for opfunc_motion:", operator)
+        return
+      end
+
+      operator_action = operator_action:with(occurrence) + cancel_action
+
+      log.debug("Activating operator-pending keybindings for buffer", occurrence.buffer)
+
+      keymap:o("<Esc>", cancel_action, "Clear occurrence")
+      keymap:o("<C-c>", cancel_action, "Clear occurrence")
+      keymap:o("<C-[>", cancel_action, "Clear occurrence")
+      keymap:o(config.operator_pending, "<cmd>normal! ^v$<cr>", "Operate on occurrences linewise")
+
+      local cursor = Cursor:save()
+
+      set_opfunc(function(type)
+        operator_action(Range:of_motion(), count, register, type)
+        cursor:restore()
+      end)
+
+      -- TODO: Figure out how to reset the opfunc without being triggered by keymap.
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-c>g@", true, false, true), "o", false)
+    end,
+  })
+
+  -- Delete marked occurrences.
+  -- TODO: add shortcuts like "dd", "dp", etc.
+  -- keymap:n("d", create_opfunc(M.delete_motion:with(occurrence)), { expr = true, desc = "Delete marked occurrences" })
+  -- keymap:x("d", (A.delete_in_selection):with(occurrence), "Delete marked occurrences")
+end)
+
+-- Activate operator-pending keybindings for the given configuration.
+---@param occurrence Occurrence
+---@param config OccurrenceConfig
+A.activate_opfunc = Action.new(function(occurrence, config)
+  if not occurrence:has_matches() then
+    log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")
+    return
   end
+
+  local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
+
+  local operator_action = O[operator]
+
+  if not operator_action then
+    -- Try generic fallback if available
+    if O.get_operator then
+      operator_action = O.get_operator(operator)
+    else
+      log.error("Unsupported operator for opfunc_motion:", operator)
+      return
+    end
+  end
+
+  local cancel_action = (A.unmark_all + A.deactivate):with(occurrence)
+
+  operator_action = operator_action:with(occurrence) + cancel_action
+
+  log.debug("Activating operator-pending keybindings for buffer", occurrence.buffer)
+  if KEYMAP_CACHE[occurrence.buffer] then
+    log.error("Keymap is already active!")
+    KEYMAP_CACHE[occurrence.buffer]:reset()
+  end
+  local keymap = Keymap:new(occurrence.buffer)
+  KEYMAP_CACHE[occurrence.buffer] = keymap
+
+  keymap:o("<Esc>", cancel_action, "Clear occurrence")
+  keymap:o("<C-c>", cancel_action, "Clear occurrence")
+  keymap:o("<C-[>", cancel_action, "Clear occurrence")
+  keymap:o(config.operator_pending, "<cmd>normal! ^v$<cr>", "Operate on occurrences linewise")
+
+  local cursor = Cursor:save()
+
+  set_opfunc(function(type)
+    operator_action(Range:of_motion(type), count, register, type)
+    cursor:restore()
+  end)
+
+  -- send ctrl-c to cancel pending op, followed by g@ to trigger custom opfunc
+  return vim.api.nvim_replace_termcodes("<C-c>g@", true, false, true)
 end)
 
 -- Deactivate the keymap for the given occurrence.
-M.deactivate = Action.new(function(occurrence)
+A.deactivate = Action.new(function(occurrence)
   local keymap = KEYMAP_CACHE[occurrence.buffer]
   if keymap then
     keymap:reset()
     KEYMAP_CACHE[occurrence.buffer] = nil
     log.debug("Deactivated keybindings for buffer", occurrence.buffer)
   end
+
+  vim.api.nvim_clear_autocmds({ group = OPFUNC_AUGROUP })
+  vim.schedule(reset_opfunc)
 end)
 
-return M
+return A

@@ -17,33 +17,27 @@ end
 
 ---@param opts OccurrenceOptions
 function M.setup(opts)
-  local config = require("occurrence.Config"):new(opts)
   local Keymap = require("occurrence.Keymap")
-  local actions = require("occurrence.actions")
 
-  local activate_normal = actions.activate:bind(config)
-  local activate_change = activate_normal:bind(actions.change_motion + actions.unmark_all + actions.deactivate)
-  local activate_delete = activate_normal:bind(actions.delete_motion + actions.unmark_all + actions.deactivate)
+  local actions = require("occurrence.actions")
+  local config = require("occurrence.Config"):new(opts)
 
   Keymap:n(
     config.normal,
-    actions.find_cursor_word + actions.mark_all + activate_normal,
-    "Occurrences of word under cursor"
+    actions.find_cursor_word + actions.mark_all + actions.activate:bind(config),
+    { expr = true, desc = "Find occurrences of word under cursor" }
   )
-  Keymap:n(
-    config.change,
-    actions.find_cursor_word + actions.mark_all + activate_change,
-    { expr = true, desc = "Occurrences of word under cursor" }
-  )
-  Keymap:n(
-    config.delete,
-    actions.find_cursor_word + actions.mark_all + activate_delete,
-    { expr = true, desc = "Occurrences of word under cursor" }
-  )
+
   Keymap:x(
     config.visual,
-    actions.find_visual_subword + actions.mark_all + activate_normal,
-    "Occurrences of visually selected subword"
+    actions.find_visual_subword + actions.mark_all + actions.activate:bind(config),
+    { expr = true, desc = "Find occurrences of selection" }
+  )
+
+  Keymap:o(
+    config.operator_pending,
+    actions.find_cursor_word + actions.mark_all + actions.activate_opfunc:bind(config),
+    { expr = true, desc = "Operate on occurrences of word under cursor" }
   )
 end
 

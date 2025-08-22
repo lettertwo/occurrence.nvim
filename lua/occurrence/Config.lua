@@ -6,36 +6,15 @@ local Config = {
   normal = "go",
   ---@type string keymap to mark occurrences of the visually selected subword to be targeted by the next operation. Default is 'go'.
   visual = "go",
-  ---@type string keymap to change occurrences of the word under cursor. Default is 'co'.
-  change = "co",
-  ---@type string keymap to change occurrences of the word under cursor in the line. Default is 'coo'.
-  change_line = "coo",
-  ---@type string keymap to delete occurrences of the word under cursor. Default is 'do'.
-  delete = "do",
-  ---@type string keymap to delete occurrences of the word under cursor in the line. Default is 'doo'.
-  delete_line = "doo",
-  -- TODO: support individual config for operators.
-  -- |y|	y	yank into register (does not change the text)
-  -- |~|	~	swap case (only if 'tildeop' is set)
-  -- |g~|	g~	swap case
-  -- |gu|	gu	make lowercase
-  -- |gU|	gU	make uppercase
-  -- |!|	!	filter through an external program
-  -- |=|	=	filter through 'equalprg' or C-indenting if empty
-  -- |gq|	gq	text formatting
-  -- |gw|	gw	text formatting with no cursor movement
-  -- |g?|	g?	ROT13 encoding
-  -- |>|	>	shift right
-  -- |<|	<	shift left
-  -- |zf|	zf	define a fold
-  -- |g@|	g@	call function set with the 'operatorfunc' option
+  ---@type string keymap to modify a pending operation to target occurrences of the word under cursor. Default is 'o'.
+  operator_pending = "o",
 }
 
 ---Options for configuring occurrence.
 ---@class OccurrenceOptions: OccurrenceConfig
----@field operator_modifier? string
----@field normal_operator? string
----@field visual_operator? string
+---@field operator_pending? string
+---@field normal? string
+---@field visual? string
 
 ---Validate the given options.
 ---@param opts OccurrenceOptions
