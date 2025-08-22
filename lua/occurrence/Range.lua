@@ -66,49 +66,64 @@ end
 -- Returns `nil` if there is no active selection, or the selection is blockwise.
 function Range:of_selection()
   local mode = vim.api.nvim_get_mode().mode
-  if mode ~= "v" and mode ~= "V" then
-    return nil
-  end
-  -- Turns out that finding the active selection range is not straightfoward.
-  -- The `'<,'>` mark pair refers to the _previous_ selection (after leaving visual mode),
-  -- so is of no help for finding the current selection.
-  -- Two possible solutions:
-  -- 1. forceably leave visual mode, grab the range using the `'<,'>` mark pair,
-  --    then re-enter visual mode using `gv`.
-  -- 2. Use `vim.fn.getpos('v') to get the start of the current selection range,
-  --    then use the cursor position as the end of the range.
-  -- The second option is what we do here, but it does feel fragile.
-  local vstart = vim.fn.getpos("v")
-  if vstart ~= nil then
-    local start = Location:from_pos(vstart)
-    local stop = Location:of_cursor()
-    log("mode", vim.inspect(mode))
-    if start and stop then
-      if mode == "V" then
-        start = Location:new(start.line, 0)
-        stop = Location:new(stop.line, math.huge)
+  if mode == "v" or mode == "V" then
+    -- Turns out that finding the active selection range is not straightfoward.
+    -- The `'<,'>` mark pair refers to the _previous_ selection (after leaving visual mode),
+    -- so is of no help for finding the current selection.
+    -- Two possible solutions:
+    -- 1. forceably leave visual mode, grab the range using the `'<,'>` mark pair,
+    --    then re-enter visual mode using `gv`.
+    -- 2. Use `vim.fn.getpos('v') to get the start of the current selection range,
+    --    then use the cursor position as the end of the range.
+    -- The second option is what we do here, but it does feel fragile.
+    local vstart = vim.fn.getpos("v")
+    if vstart ~= nil then
+      local start = Location:from_pos(vstart)
+      local stop = Location:of_cursor()
+      if start and stop then
+        if stop < start then
+          start, stop = stop, start
+        end
+        if mode == "V" then
+          start = Location:new(start.line, 0)
+          stop = Location:of_line_end(stop.line)
+        end
+        return self:new(start, stop)
       end
-      if stop < start then
-        start, stop = stop, start
-      end
-      return self:new(start, stop)
     end
   end
+  error("could not determine selection range")
 end
 
 -- Get the range of the most recent motion.
-function Range:of_motion()
+-- See `:help g@` for details on `motion_type`.
+---@param motion_type? 'char' | 'line' | 'block' (default: 'char')
+function Range:of_motion(motion_type)
+  if motion_type == "block" then
+    error("blockwise motions are not yet supported")
+  end
   local start = Location:of_mark("[")
   local stop = Location:of_mark("]")
   if start and stop then
     if stop < start then
       start, stop = stop, start
     end
-    if stop.line > start.line then
-      stop = Location:new(stop.line, math.huge)
+    if motion_type == "line" then
+      start = Location:new(start.line, 0)
+      stop = Location:of_line_end(stop.line)
     end
     return self:new(start, stop)
   end
+  error("could not determine motion range")
+end
+
+-- Get the range of a line.
+-- If no `line` is given, uses the current cursor line.
+---@param line integer? A 0-indexed line number.
+function Range:of_line(line)
+  local start = Location:of_line_start(line)
+  local stop = Location:of_line_end(line)
+  return self:new(start, stop)
 end
 
 -- Transpose this range to a new starting location.

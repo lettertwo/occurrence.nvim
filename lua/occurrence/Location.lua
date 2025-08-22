@@ -193,6 +193,23 @@ function Location:of_mark(mark)
   return self:from_markpos(vim.api.nvim_buf_get_mark(0, mark))
 end
 
+-- Get the location of the start of a line.
+-- If no `line` is given, uses the current cursor line.
+---@param line integer? A 0-indexed line number.
+function Location:of_line_start(line)
+  line = line or vim.api.nvim_win_get_cursor(0)[1]
+  return self:new(line, 0)
+end
+
+-- Get the location of the end of a line.
+-- If no `line` is given, uses the current cursor line.
+---@param line integer? A 0-indexed line number.
+function Location:of_line_end(line)
+  line = line or vim.api.nvim_win_get_cursor(0)[1]
+  local endcol = vim.api.nvim_buf_get_lines(0, line, line + 1, false)[1]:len()
+  return self:new(line, endcol)
+end
+
 --- Returns the distance between this `Location` and another `Location`.
 ---@param other Location
 function Location:distance(other)
