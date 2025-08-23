@@ -10,8 +10,6 @@ local log = require("occurrence.log")
 ---@type table<integer, Keymap>
 local KEYMAP_CACHE = {}
 
-local OPFUNC_AUGROUP = vim.api.nvim_create_augroup("OccurrenceOpfunc", { clear = true })
-
 local original_opfunc = vim.go.operatorfunc
 
 -- Based on https://github.com/neovim/neovim/issues/14157#issuecomment-1320787927
@@ -207,45 +205,6 @@ A.activate = Action.new(function(occurrence, config)
   keymap:x("ga", A.mark_selection:with(occurrence), "Mark occurrences")
   keymap:x("gx", A.unmark_selection:with(occurrence), "Unmark occurrences")
 
-  --- listen for operator-pending mode to activate opfunc keybindings
-  --- FIXME: This doesn't seem very reliable?
-  vim.api.nvim_create_autocmd("ModeChanged", {
-    group = OPFUNC_AUGROUP,
-    pattern = "*:no*",
-    callback = function()
-      vim.print("ModeChanged to operator-pending, setting opfunc keybindings")
-      local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
-
-      vim.print("operator:", operator, "count:", count, "register:", register)
-
-      local operator_action = O[operator]
-
-      if not operator_action then
-        log.error("Unsupported operator for opfunc_motion:", operator)
-        return
-      end
-
-      operator_action = operator_action:with(occurrence) + cancel_action
-
-      log.debug("Activating operator-pending keybindings for buffer", occurrence.buffer)
-
-      keymap:o("<Esc>", cancel_action, "Clear occurrence")
-      keymap:o("<C-c>", cancel_action, "Clear occurrence")
-      keymap:o("<C-[>", cancel_action, "Clear occurrence")
-      keymap:o(config.operator_pending, "<cmd>normal! ^v$<cr>", "Operate on occurrences linewise")
-
-      local cursor = Cursor:save()
-
-      set_opfunc(function(type)
-        operator_action(Range:of_motion(), count, register, type)
-        cursor:restore()
-      end)
-
-      -- TODO: Figure out how to reset the opfunc without being triggered by keymap.
-      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-c>g@", true, false, true), "o", false)
-    end,
-  })
-
   -- Delete marked occurrences.
   -- TODO: add shortcuts like "dd", "dp", etc.
   -- keymap:n("d", create_opfunc(M.delete_motion:with(occurrence)), { expr = true, desc = "Delete marked occurrences" })
@@ -295,7 +254,7 @@ A.activate_opfunc = Action.new(function(occurrence, config)
   local cursor = Cursor:save()
 
   set_opfunc(function(type)
-    operator_action(Range:of_motion(type), count, register, type)
+    operator_action(operator, Range:of_motion(type), count, register, type)
     cursor:restore()
   end)
 
@@ -312,8 +271,7 @@ A.deactivate = Action.new(function(occurrence)
     log.debug("Deactivated keybindings for buffer", occurrence.buffer)
   end
 
-  vim.api.nvim_clear_autocmds({ group = OPFUNC_AUGROUP })
-  vim.schedule(reset_opfunc)
+  reset_opfunc()
 end)
 
 return A

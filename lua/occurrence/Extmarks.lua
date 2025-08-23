@@ -28,7 +28,7 @@ end
 
 -- Add an extmark and highlight for the given `Range`.
 ---@param buffer integer
---@param range Range
+---@param range Range
 ---@return boolean added Whether an extmark was added.
 function Extmarks:add(buffer, range)
   local key = range:serialize()
