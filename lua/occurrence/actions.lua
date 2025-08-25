@@ -71,6 +71,30 @@ A.find_visual_subword = Action.new(function(occurrence)
   setmode("n")
 end)
 
+-- Find all occurrences using the last search pattern.
+A.find_last_search = Action.new(function(occurrence)
+  assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
+  local pattern = vim.fn.getreg("/")
+  assert(pattern ~= "", "no search pattern available")
+
+  -- Convert vim search pattern to occurrence pattern
+  -- Remove leading/trailing delimiters and escape for literal search if needed
+  local cleaned_pattern = pattern:gsub("^\\v", ""):gsub("^\\V", "")
+
+  -- For now, treat search patterns as literal text
+  -- TODO: Add support for regex patterns in future
+  occurrence:set(cleaned_pattern, { is_word = false })
+end)
+
+-- Find all occurrences using the current search pattern if available,
+-- otherwise use the word under the cursor.
+A.find_active_search_or_cursor_word = Action.new(function(occurrence)
+  if vim.v.hlsearch == 1 then
+    return A.find_last_search:with(occurrence)()
+  end
+  return A.find_cursor_word:with(occurrence)()
+end)
+
 -- Go to the next occurrence.
 A.goto_next = Action.new(function(occurrence)
   occurrence:match_cursor({ direction = "forward", wrap = true })
@@ -249,7 +273,7 @@ A.activate_opfunc = Action.new(function(occurrence, config)
   keymap:o("<Esc>", cancel_action, "Clear occurrence")
   keymap:o("<C-c>", cancel_action, "Clear occurrence")
   keymap:o("<C-[>", cancel_action, "Clear occurrence")
-  keymap:o(config.operator_pending, "<cmd>normal! ^v$<cr>", "Operate on occurrences linewise")
+  keymap:o(config.keymap.operator_pending, "<cmd>normal! ^v$<cr>", "Operate on occurrences linewise")
 
   local cursor = Cursor:save()
 

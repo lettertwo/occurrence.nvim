@@ -1,7 +1,7 @@
 local log = require("occurrence.log")
 
----@class OccurrenceConfig
-local Config = {
+---@class OccurrenceKeymapConfig
+local KeymapConfig = {
   ---@type string keymap to mark occurrences of the word under cursor to be targeted by the next operation. Default is 'go'.
   normal = "go",
   ---@type string keymap to mark occurrences of the visually selected subword to be targeted by the next operation. Default is 'go'.
@@ -10,11 +10,28 @@ local Config = {
   operator_pending = "o",
 }
 
+---@class OccurrenceSearchConfig
+local SearchConfig = {
+  ---@type boolean enable search integration. Default is `true`.
+  enabled = true,
+  ---@type string? keymap to mark occurrences of the last search pattern to be targeted by the next operation.
+  ---If this is `nil` or the same as `config.normal`, the word under cursor will be used if there is no active search.
+  ---Default is `nil` (same as `config.normal`)
+  normal = nil,
+}
+
+---@class OccurrenceConfig
+local Config = {
+  keymap = KeymapConfig,
+  search = SearchConfig,
+}
+
 ---Options for configuring occurrence.
 ---@class OccurrenceOptions: OccurrenceConfig
 ---@field operator_pending? string
 ---@field normal? string
 ---@field visual? string
+---@field search? OccurrenceSearchConfig
 
 ---Validate the given options.
 ---@param opts OccurrenceOptions
@@ -27,8 +44,8 @@ function Config:validate(opts)
     if self[k] == nil then
       error("invalid option: " .. k)
     end
-    if type(v) ~= type(self[v]) then
-      error("option " .. k .. " must be a " .. type(self[v]))
+    if type(v) ~= type(self[k]) then
+      error("option " .. k .. " must be a " .. type(self[k]))
     end
   end
 end
