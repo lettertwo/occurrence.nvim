@@ -86,7 +86,7 @@ end
 ---@param opts table | string
 function Keymap:n(lhs, rhs, opts)
   vim.keymap.set(MODE.n, lhs, self.wrap_action(rhs), self:parse_opts(opts))
-  table.insert(self.active_keymaps[MODE.n], lhs)
+  self.active_keymaps[MODE.n][lhs] = true
 end
 
 -- Register an operator-pending mode keymap.
@@ -95,7 +95,7 @@ end
 ---@param opts table | string
 function Keymap:o(lhs, rhs, opts)
   vim.keymap.set(MODE.o, lhs, self.wrap_action(rhs), self:parse_opts(opts))
-  table.insert(self.active_keymaps[MODE.o], lhs)
+  self.active_keymaps[MODE.o][lhs] = true
 end
 
 -- Register a visual or select mode keymap.
@@ -104,13 +104,13 @@ end
 ---@param opts table | string
 function Keymap:x(lhs, rhs, opts)
   vim.keymap.set(MODE.x, lhs, self.wrap_action(rhs), self:parse_opts(opts))
-  table.insert(self.active_keymaps[MODE.x], lhs)
+  self.active_keymaps[MODE.x][lhs] = true
 end
 
 -- Resets all active keymaps registered by this instance.
 function Keymap:reset()
   for mode, bindings in pairs(self.active_keymaps) do
-    for _, lhs in ipairs(bindings) do
+    for lhs in pairs(bindings) do
       if not pcall(vim.keymap.del, mode, lhs, { buffer = self.buffer }) then
         log.warn("Failed to unmap " .. mode .. " " .. lhs)
       end
