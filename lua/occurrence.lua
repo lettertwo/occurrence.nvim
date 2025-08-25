@@ -1,12 +1,5 @@
 local M = {}
 
--- TODO: investigate undo breakpoints for iterative edits?
--- For example, this inserts an undo point whenver a comma is typed in insert mode:
--- vim.keymap.set("i", ",", ",<c-g>u")
-
--- TODO: look at https://github.com/ggandor/leap.nvim for implementation inspiration
--- perhaps there is a world where occurrence is a leap extension...
-
 -- TODO: look at :h SafeState. Is this an event that can help with detecting pending ops?
 
 -- TODO: look at :h command-preview. Can we get inc updating this way?
