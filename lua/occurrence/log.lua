@@ -28,15 +28,13 @@ log.levels = LEVELS
 ---@type occurrence.LogLevel
 local current_level = LEVELS.INFO
 
-local PREFIX = "[Occurrence] "
 local NOTIFY_OPTIONS = { title = "Occurrence" }
 
 ---Prefix and concatenate arguments to a log function.
 ---@param ... any
 ---@return string
 function log.to_message(...)
-  return PREFIX .. table.concat(vim.tbl_map(tostring, { ... }), " ")
-  -- return PREFIX .. table.concat(vim.tbl_flatten({ ... }), " ")
+  return table.concat(vim.tbl_map(tostring, { ... }), " ")
 end
 
 --- Sets the current log level.

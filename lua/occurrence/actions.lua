@@ -65,7 +65,10 @@ local actions = {}
 actions.find_cursor_word = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
   local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
-  assert(word ~= "", "no word under cursor")
+  if word == "" then
+    log.warn("No word under cursor")
+    return
+  end
   occurrence:set(word, { is_word = true })
 end)
 
@@ -73,10 +76,14 @@ end)
 -- If no buffer is given, mark occurrences in the current buffer.
 actions.find_visual_subword = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
-  local pos1 = vim.fn.getpos("v")
-  local pos2 = vim.fn.getpos(".")
-  local text = table.concat(vim.api.nvim_buf_get_text(0, pos1[2] - 1, pos1[3] - 1, pos2[2] - 1, pos2[3], {}))
-  assert(text ~= "", "no text selected")
+  local range = Range.of_selection()
+  assert(range, "no visual selection")
+  local text =
+    table.concat(vim.api.nvim_buf_get_text(0, range.start.line, range.start.col, range.stop.line, range.stop.col, {}))
+  if text == "" then
+    log.warn("Empty visual selection")
+    return
+  end
   occurrence:set(text)
   setmode("n")
 end)
@@ -85,7 +92,11 @@ end)
 actions.find_last_search = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
   local pattern = vim.fn.getreg("/")
-  assert(pattern ~= "", "no search pattern available")
+
+  if pattern == "" then
+    log.warn("No search pattern available")
+    return
+  end
 
   -- Convert vim search pattern to occurrence pattern
   -- Remove leading/trailing delimiters and escape for literal search if needed
@@ -202,7 +213,7 @@ end)
 ---@param config occurrence.Config
 actions.activate = Action.new(function(occurrence, config)
   if not occurrence:has_matches() then
-    log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")
+    log.warn("No matches found for pattern:", occurrence.pattern, "skipping activation")
     return
   end
   log.debug("Activating keybindings for buffer", occurrence.buffer)
@@ -287,7 +298,7 @@ end
 ---@param config occurrence.Config
 actions.activate_opfunc = Action.new(function(occurrence, config)
   if not occurrence:has_matches() then
-    log.debug("No matches found for pattern:", occurrence.pattern, "skipping activation")
+    log.warn("No matches found for pattern:", occurrence.pattern, "skipping activation")
     return
   end
 
