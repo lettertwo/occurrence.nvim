@@ -1,19 +1,23 @@
 local log = require("occurrence.log")
 
----@class OccurrenceRegister
+---@module 'occurrence.Register'
+local register = {}
+
+---@class occurrence.Register
 ---@field protected register string The register to use for yanking or deleting text.
 ---@field protected type string The type of register, e.g., "char", "line", or "block".
 ---@field protected text string[] The text to be saved in the register.
 local Register = {}
 
----@param register? string The register to use for yanking or deleting text.
----@param type? string The type of register, e.g., "char", "line", or "block".
-function Register.new(register, type)
-  local self = setmetatable({}, { __index = Register })
-  self.register = register or vim.v.register
-  self.type = type or "char" -- default to char motion
-  self.text = {}
-  return self
+---@param register_name? string The register to use for yanking or deleting text.
+---@param register_type? string The type of register, e.g., "char", "line", or "block".
+---@return occurrence.Register
+function register.new(register_name, register_type)
+  return setmetatable({
+    register = register_name or vim.v.register,
+    type = register_type or "char", -- default to char motion
+    text = {},
+  }, { __index = Register })
 end
 
 ---@param text string | string[] The text to add to the register.
@@ -40,4 +44,4 @@ function Register:save()
   end
 end
 
-return Register
+return register

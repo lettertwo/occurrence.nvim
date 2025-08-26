@@ -1,16 +1,18 @@
----@class OccurencyLog
----@field trace function
----@field debug function
----@field info function
----@field info_once function
----@field warn function
----@field warn_once function
----@field error function
----@field error_once function
+---@module 'occurrence.log'
+---@class occurrence.log
+---@field trace fun(...): nil
+---@field debug fun(...): nil
+---@field info fun(...): nil
+---@field info_once fun(...): nil
+---@field warn fun(...): nil
+---@field warn_once fun(...): nil
+---@field error fun(...): nil
+---@field error_once fun(...): nil
 ---@operator call:string
+---@overload fun(...): nil
 local log = {}
 
----@enum LogLevel
+---@enum occurrence.LogLevel
 local LEVELS = {
   TRACE = 0,
   DEBUG = 1,
@@ -23,25 +25,28 @@ local LEVELS = {
 log.levels = LEVELS
 
 -- Default log level is INFO.
----@type LogLevel
+---@type occurrence.LogLevel
 local current_level = LEVELS.INFO
 
 local PREFIX = "[Occurrence] "
 local NOTIFY_OPTIONS = { title = "Occurrence" }
 
 ---Prefix and concatenate arguments to a log function.
+---@param ... any
+---@return string
 function log.to_message(...)
   return PREFIX .. table.concat(vim.tbl_map(tostring, { ... }), " ")
   -- return PREFIX .. table.concat(vim.tbl_flatten({ ... }), " ")
 end
 
 --- Sets the current log level.
----@param level LogLevel One of `log.levels`
+---@param level occurrence.LogLevel One of `log.levels`
 function log.set_level(level)
   assert(vim.tbl_contains(vim.tbl_values(LEVELS), level), string.format("Invalid log level: %d", level))
   current_level = level
 end
 
+---@return occurrence.LogLevel
 function log.get_level()
   return current_level
 end

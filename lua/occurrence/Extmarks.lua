@@ -1,21 +1,26 @@
 local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 
+---@module 'occurrence.Extmarks'
+local extmarks = {}
+
 local NS = vim.api.nvim_create_namespace("Occurrence")
 
 -- TODO: make hl groups
 local OCCURRENCE_HL_GROUP = "Underlined" -- "Occurrence"
 
 -- A map of `Range` objects to extmark ids.
----@class Extmarks
+---@class occurrence.Extmarks
 local Extmarks = {}
 
-function Extmarks:new()
-  return setmetatable({}, { __index = self })
+---@return occurrence.Extmarks
+function extmarks.new()
+  return setmetatable({}, { __index = Extmarks })
 end
 
 -- Check if there is an extmark for the given id or `Range`.
----@param id_or_range? number | Range
+---@param id_or_range? number | occurrence.Range
+---@return boolean
 function Extmarks:has(id_or_range)
   if id_or_range == nil then
     return false
@@ -28,7 +33,7 @@ end
 
 -- Add an extmark and highlight for the given `Range`.
 ---@param buffer integer
----@param range Range
+---@param range occurrence.Range
 ---@return boolean added Whether an extmark was added.
 function Extmarks:add(buffer, range)
   local key = range:serialize()
@@ -51,8 +56,8 @@ end
 -- Get the current `Range` for the extmark originally added at the given `Range`.
 -- This is useful for, e.g., cascading edits to the buffer at marked occurrences.
 ---@param buffer integer
----@param id_or_range number | Range
----@return Range | nil
+---@param id_or_range number | occurrence.Range
+---@return occurrence.Range?
 function Extmarks:get(buffer, id_or_range)
   local key, id
   if type(id_or_range) == "number" then
@@ -66,7 +71,7 @@ function Extmarks:get(buffer, id_or_range)
   if id ~= nil and key ~= nil then
     local loc = vim.api.nvim_buf_get_extmark_by_id(buffer, NS, id, {})
     assert(next(loc), "Unexpected missing extmark")
-    return Range:deserialize(key):move(Location:new(unpack(loc)))
+    return Range.deserialize(key):move(Location.new(unpack(loc)))
   end
 end
 
@@ -76,7 +81,7 @@ end
 -- that exactly matches the range.
 --
 ---@param buffer number
----@param id_or_range number | Range
+---@param id_or_range number | occurrence.Range
 ---@return boolean deleted Whether an extmark was removed.
 function Extmarks:del(buffer, id_or_range)
   local key, id
@@ -105,11 +110,11 @@ end
 -- - The current 'live' range of the extmark.
 --
 ---@param buffer integer
----@param opts? { range?: Range, reverse?: boolean }
----@return fun(): Range?, Range? next_extmark
+---@param opts? { range?: occurrence.Range, reverse?: boolean }
+---@return fun(): occurrence.Range?, occurrence.Range? next_extmark
 function Extmarks:iter(buffer, opts)
-  local range = opts and opts.range or Range:new(Location:new(0, 0), Location:new(vim.fn.line("$"), 0))
-  ---@type Location | nil
+  local range = opts and opts.range or Range.new(Location.new(0, 0), Location.new(vim.fn.line("$"), 0))
+  ---@type occurrence.Location | nil
   local start = opts and opts.reverse and range.stop or range.start
   local stop = opts and opts.reverse and range.start or range.stop
 
@@ -128,12 +133,12 @@ function Extmarks:iter(buffer, opts)
     end
 
     --- List of (extmark_id, row, col) tuples in traversal order.
-    local extmarks = vim.api.nvim_buf_get_extmarks(buffer, NS, start:to_extmarkpos(), stop:to_extmarkpos(), {})
+    local marks = vim.api.nvim_buf_get_extmarks(buffer, NS, start:to_extmarkpos(), stop:to_extmarkpos(), {})
 
-    if next(extmarks) then
-      local id, row, col = unpack(extmarks[1])
-      local original_range = Range:deserialize(self[id])
-      local current_location = Location:from_extmarkpos({ row, col })
+    if next(marks) then
+      local id, row, col = unpack(marks[1])
+      local original_range = Range.deserialize(self[id])
+      local current_location = Location.from_extmarkpos({ row, col })
       if original_range ~= nil and current_location ~= nil then
         -- Update the start position for the next iteration.
         laststart = start
@@ -146,4 +151,4 @@ function Extmarks:iter(buffer, opts)
   return next_extmark
 end
 
-return Extmarks
+return extmarks

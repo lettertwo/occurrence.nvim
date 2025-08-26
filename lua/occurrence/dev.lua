@@ -1,8 +1,9 @@
-local M = {}
+---@module 'occurrence.dev'
+local dev = {}
 
 local prev_opts = {}
 
-function M.setup(opts)
+function dev.setup(opts)
   if opts == nil then
     opts = prev_opts
   end
@@ -13,7 +14,7 @@ function M.setup(opts)
   require("occurrence").setup(opts)
 end
 
-function M.reload()
+function dev.reload()
   require("occurrence").reset() -- Reset twice; once before reload, and...
   ---@diagnostic disable-next-line: undefined-field
   local luacache = (_G.__luacache or {}).cache -- impatient.nvim cache
@@ -30,10 +31,10 @@ function M.reload()
     end
   end
   require("occurrence").reset() -- ...once after reload.
-  M.setup()
+  dev.setup()
 end
 
-vim.api.nvim_create_user_command("ReloadOccurrence", M.reload, {
+vim.api.nvim_create_user_command("ReloadOccurrence", dev.reload, {
   desc = "Reload the occurrence plugin and run setup again",
   force = true,
 })
@@ -44,4 +45,4 @@ vim.api.nvim_create_autocmd({ "BufWritePost" }, {
   group = vim.api.nvim_create_augroup("OccurrenceDev", { clear = true }),
 })
 
-return M
+return dev

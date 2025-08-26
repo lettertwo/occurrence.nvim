@@ -4,10 +4,13 @@ local Range = require("occurrence.Range")
 local Extmarks = require("occurrence.Extmarks")
 local log = require("occurrence.log")
 
+---@module 'occurrence.Occurrence'
+local occurrence = {}
+
 local NS = vim.api.nvim_create_namespace("Occurrence")
 
 -- A weak-key map of Occurrence instances to their internal state stores.
----@type table<Occurrence, OccurrenceState>
+---@type table<occurrence.Occurrence, occurrence.OccurrenceState>
 local STATE_CACHE = setmetatable({}, {
   __mode = "k",
   __index = function()
@@ -16,7 +19,7 @@ local STATE_CACHE = setmetatable({}, {
 })
 
 -- A weak-key map of Occurrence instances to their extmarks.
----@type table<Occurrence, Extmarks>
+---@type table<occurrence.Occurrence, occurrence.Extmarks>
 local EXTMARKS_CACHE = setmetatable({}, {
   __mode = "k",
   __index = function()
@@ -24,26 +27,26 @@ local EXTMARKS_CACHE = setmetatable({}, {
   end,
 })
 
----@param state OccurrenceState
+---@param state occurrence.OccurrenceState
 ---@param flags string
----@return Range | nil
+---@return occurrence.Range | nil
 local function search(state, flags)
   if state.pattern then
-    local start = Location:from_pos(vim.fn.searchpos(state.pattern, flags))
+    local start = Location.from_pos(vim.fn.searchpos(state.pattern, flags))
     if start then
-      return Range:new(start, start + state.span)
+      return Range.new(start, start + state.span)
     end
   end
 end
 
 -- The internal state store for an Occurrence.
----@class OccurrenceState
+---@class occurrence.OccurrenceState
 ---@field buffer integer The buffer in which the occurrence was found.
 ---@field span integer The number of bytes in the occurrence.
 ---@field pattern? string The pattern that was used to find the occurrence.
 
 -- A stateful representation of an occurrence of a pattern in a buffer.
----@class Occurrence: OccurrenceState
+---@class occurrence.Occurrence: occurrence.OccurrenceState
 local Occurrence = {}
 
 local OCCURRENCE_META = {
@@ -72,14 +75,14 @@ local OCCURRENCE_META = {
 ---@param buffer? integer
 ---@param text? string
 ---@param opts? { is_word: boolean }
----@return Occurrence
-function Occurrence:new(buffer, text, opts)
-  local occurrence = {}
+---@return occurrence.Occurrence
+function occurrence.new(buffer, text, opts)
+  local self = {}
   ---@diagnostic disable-next-line: missing-fields
-  STATE_CACHE[occurrence] = { buffer = buffer or vim.api.nvim_get_current_buf() }
-  EXTMARKS_CACHE[occurrence] = Extmarks:new()
-  self.set(occurrence, text, opts)
-  return setmetatable(occurrence, OCCURRENCE_META)
+  STATE_CACHE[self] = { buffer = buffer or vim.api.nvim_get_current_buf() }
+  EXTMARKS_CACHE[self] = Extmarks.new()
+  Occurrence.set(self, text, opts)
+  return setmetatable(self, OCCURRENCE_META)
 end
 
 -- Move the cursor to the nearest occurrence.
@@ -94,13 +97,13 @@ end
 -- If `direction` is 'backward', then the search will scan back to the nearest occurrence before the cursor position.
 -- For both directions, a match directly at the cursor position will be ignored.
 ---@param opts? { direction?: 'forward' | 'backward', marked?: boolean, wrap?: boolean }
----@return Range | nil
+---@return occurrence.Range | nil
 function Occurrence:match_cursor(opts)
   opts = vim.tbl_extend("force", { direction = nil, marked = false, wrap = false }, opts or {})
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   assert(state.pattern, "Occurrence has not been initialized with a pattern")
   assert(state.buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
-  local cursor = Cursor:save() -- store cursor position before searching.
+  local cursor = Cursor.save() -- store cursor position before searching.
 
   local flags = opts.wrap and "nw" or "nW"
 
@@ -162,7 +165,7 @@ end
 
 -- Mark the occurrences contained within the given `Range`.
 -- If no `range` is provided, the entire buffer will be marked.
----@param range? Range
+---@param range? occurrence.Range
 ---@return boolean marked Whether occurrences were marked.
 function Occurrence:mark(range)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
@@ -178,7 +181,7 @@ end
 
 -- Unmark the occurrences contained within the given `Range`.
 -- If no `range` is provided, all occurrences will be unmarked.
----@param range? Range
+---@param range? occurrence.Range
 ---@return boolean unmarked Whether occurrences were unmarked.
 function Occurrence:unmark(range)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
@@ -203,14 +206,14 @@ end
 
 -- Get an iterator of matching occurrence ranges.
 -- If `range` is provided, only yields the occurrences contained within the given `Range`.
----@param range? Range
----@return fun(): Range next_match
+---@param range? occurrence.Range
+---@return fun(): occurrence.Range next_match
 function Occurrence:matches(range)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
-  local location = range and range.start or Location:new(0, 0)
+  local location = range and range.start or Location.new(0, 0)
   local match
   local function next_match()
-    local cursor = Cursor:save()
+    local cursor = Cursor.save()
     cursor:move(location)
     match = search(state, match and "W" or "cW")
     cursor:restore()
@@ -231,8 +234,8 @@ end
 --   This can be used to unmark the occurrence, e.g., `occurrence:unmark(original_range)`.
 -- - The current 'live' range of the marked occurrence.
 --   This can be used to make edits to the buffer, e.g., with `vim.api.nvim_buf_set_text(...)`.
----@param opts? { range?: Range, reverse?: boolean }
----@return fun(): Range?, Range? next_mark
+---@param opts? { range?: occurrence.Range, reverse?: boolean }
+---@return fun(): occurrence.Range?, occurrence.Range? next_mark
 function Occurrence:marks(opts)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
@@ -248,7 +251,7 @@ function Occurrence:set(text, opts)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
 
   -- Clear all extmarks and highlights.
-  EXTMARKS_CACHE[self] = Extmarks:new()
+  EXTMARKS_CACHE[self] = Extmarks.new()
   vim.api.nvim_buf_clear_namespace(state.buffer, NS, 0, -1)
 
   if text == nil then
@@ -260,4 +263,4 @@ function Occurrence:set(text, opts)
   end
 end
 
-return Occurrence
+return occurrence

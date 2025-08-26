@@ -1,10 +1,13 @@
 -- A 0-indexed line and column pair representing a location in a buffer,
 -- e.g., the cursor position, or a mark location, or the start or end of a range.
 ---@see occurrence.Range
---
----@class Location
----@operator add(integer): Location
----@overload fun(line: number, col: number): Location
+
+---@module 'occurrence.Location'
+local location = {}
+
+---@class occurrence.Location
+---@operator add(integer): occurrence.Location
+---@overload fun(line: number, col: number): occurrence.Location
 ---@field line integer A 0-indexed line number.
 ---@field col integer A 0-indexed column number.
 local Location = {}
@@ -13,90 +16,39 @@ local function readonly()
   error("Location is read-only")
 end
 
----@param location Location
-local function tostring(location)
-  return string.format("Location(%d, %d)", location.line, location.col)
+---@param self occurrence.Location
+---@return string
+local function tostring(self)
+  return string.format("Location(%d, %d)", self.line, self.col)
 end
 
 -- Creates a new `Location` from the given line and column numbers.
 -- If either argument is invalid, returns `nil`.
 -- @param line A 0-indexed line number.
 -- @param col A 0-indexed column number.
----@return Location
-function Location:new(line, col)
+---@return occurrence.Location
+function location.new(line, col)
   assert(type(line) == "number", "line must be a number")
   assert(type(col) == "number", "col must be a number")
   assert(line >= 0, "line must be >= 0")
   assert(col >= 0, "col must be >= 0")
 
-  local location = { line, col }
-  location.line = line
-  location.col = col
+  local self = { line, col }
+  self.line = line
+  self.col = col
 
-  return setmetatable(location, {
-    __index = self,
-    __call = self.new,
+  return setmetatable(self, {
+    __index = Location,
+    __call = location.new,
     __newindex = readonly,
     __tostring = tostring,
-    __add = self.add,
-    __lt = self.lt,
-    __le = self.le,
-    __eq = self.eq,
-    __gt = self.gt,
-    __ge = self.ge,
+    __add = Location.add,
+    __lt = Location.lt,
+    __le = Location.le,
+    __eq = Location.eq,
+    __gt = Location.gt,
+    __ge = Location.ge,
   })
-end
-
--- Serializes the `Location` to a string.
--- For a pretty-printed representation, use `tostring(Location)`.
----@return string
-function Location:serialize()
-  return table.concat(self, ":")
-end
-
--- Create a new `Location` from a `Location:serialize()` string.
----@param str string
----@return Location
-function Location:deserialize(str)
-  local line, col = str:match("^(%d+):(%d+)$")
-  return self:new(tonumber(line), tonumber(col))
-end
-
--- Creates a new `Location` from the given 'extmark-like' position.
--- An 'extmark-like' position has 0-based lines, and 0-based columns.
---
--- The following API functions use "extmark-like" indexing:
---
--- - nvim_buf_del_extmark()
--- - nvim_buf_get_extmark_by_id()
--- - nvim_buf_get_extmarks()
--- - nvim_buf_set_extmark()
---
--- If the position is invalid, returns `nil`.
---
----@param pos integer[] An "extmark-like" (0,0)-indexed position tuple.
-function Location:from_extmarkpos(pos)
-  local line = pos and pos[1]
-  local col = pos and pos[2]
-  if line < 0 or col < 0 then
-    return nil
-  end
-  return self:new(line, col)
-end
-
--- Returns an 'extmark-like' position for the given `Location`.
--- An 'extmark-like' position has 0-based lines, and 0-based columns.
---
--- The following API functions use "extmark-like" indexing:
---
--- - nvim_buf_del_extmark()
--- - nvim_buf_get_extmark_by_id()
--- - nvim_buf_get_extmarks()
--- - nvim_buf_set_extmark()
---
----@return integer[] An "extmark-like" (0,0)-indexed position tuple.
-function Location:to_extmarkpos()
-  return { self.line, self.col }
 end
 
 -- Creates a new `Location` from the given 'mark-like' position.
@@ -113,13 +65,14 @@ end
 -- If the position is invalid, returns `nil`.
 --
 ---@param pos integer[] A "mark-like" (1,0)-indexed position tuple.
-function Location:from_markpos(pos)
+---@return occurrence.Location?
+function location.from_markpos(pos)
   local line = pos and pos[1]
   local col = pos and pos[2]
   if line < 1 or col < 0 then
     return nil
   end
-  return self:new(line - 1, col)
+  return location.new(line - 1, col)
 end
 
 -- Get a new `Location` from a position tuple.
@@ -136,7 +89,8 @@ end
 -- If the position is invalid, returns `nil`.
 --
 ---@param pos integer[]
-function Location:from_pos(pos)
+---@return occurrence.Location?
+function location.from_pos(pos)
   if not pos or #pos < 2 then
     return nil
   end
@@ -149,7 +103,100 @@ function Location:from_pos(pos)
   if line < 1 or col < 1 then
     return nil
   end
-  return self:new(line - 1, col - 1)
+  return location.new(line - 1, col - 1)
+end
+
+-- Creates a new `Location` from the given 'extmark-like' position.
+-- An 'extmark-like' position has 0-based lines, and 0-based columns.
+--
+-- The following API functions use "extmark-like" indexing:
+--
+-- - nvim_buf_del_extmark()
+-- - nvim_buf_get_extmark_by_id()
+-- - nvim_buf_get_extmarks()
+-- - nvim_buf_set_extmark()
+--
+-- If the position is invalid, returns `nil`.
+--
+---@param pos integer[] An "extmark-like" (0,0)-indexed position tuple.
+---@return occurrence.Location?
+function location.from_extmarkpos(pos)
+  local line = pos and pos[1]
+  local col = pos and pos[2]
+  if line < 0 or col < 0 then
+    return nil
+  end
+  return location.new(line, col)
+end
+
+-- Get the location of the cursor.
+---@return occurrence.Location?
+function location.of_cursor()
+  return location.from_markpos(vim.api.nvim_win_get_cursor(0))
+end
+
+-- Get the location of a mark.
+-- Note: Mark names are not prefixed with a quote.
+---@param mark string
+---@return occurrence.Location?
+function location.of_mark(mark)
+  return location.from_markpos(vim.api.nvim_buf_get_mark(0, mark))
+end
+
+-- Get the location of the start of a line.
+-- If no `line` is given, uses the current cursor line.
+---@param line integer? A 0-indexed line number.
+---@return occurrence.Location
+function location.of_line_start(line)
+  line = line or vim.api.nvim_win_get_cursor(0)[1]
+  return location.new(line, 0)
+end
+
+-- Get the location of the end of a line.
+-- If no `line` is given, uses the current cursor line.
+---@param line integer? A 0-indexed line number.
+---@return occurrence.Location
+function location.of_line_end(line)
+  line = line or vim.api.nvim_win_get_cursor(0)[1]
+  local endcol = vim.api.nvim_buf_get_lines(0, line, line + 1, false)[1]:len()
+  return location.new(line, endcol)
+end
+
+-- Create a new `Location` from a `Location:serialize()` string.
+---@param str string
+---@return occurrence.Location
+function location.deserialize(str)
+  local line, col = str:match("^(%d+):(%d+)$")
+  return location.new(tonumber(line), tonumber(col))
+end
+
+-- Serializes the `Location` to a string.
+-- For a pretty-printed representation, use `tostring(Location)`.
+---@return string
+function Location:serialize()
+  return table.concat(self, ":")
+end
+
+-- Returns a plain table representation of the given `Location`.
+-- The table has two elements: `{ line, col }`.
+---@return integer[]
+function Location:totable()
+  return vim.list_slice(self)
+end
+
+-- Returns an 'extmark-like' position for the given `Location`.
+-- An 'extmark-like' position has 0-based lines, and 0-based columns.
+--
+-- The following API functions use "extmark-like" indexing:
+--
+-- - nvim_buf_del_extmark()
+-- - nvim_buf_get_extmark_by_id()
+-- - nvim_buf_get_extmarks()
+-- - nvim_buf_set_extmark()
+--
+---@return integer[] An "extmark-like" (0,0)-indexed position tuple.
+function Location:to_extmarkpos()
+  return { self.line, self.col }
 end
 
 -- Returns a 'search-like' position for the given `Location`.
@@ -181,37 +228,9 @@ function Location:to_markpos()
   return { self.line + 1, self.col }
 end
 
--- Get the location of the cursor.
-function Location:of_cursor()
-  return self:from_markpos(vim.api.nvim_win_get_cursor(0))
-end
-
--- Get the location of a mark.
--- Note: Mark names are not prefixed with a quote.
----@param mark string
-function Location:of_mark(mark)
-  return self:from_markpos(vim.api.nvim_buf_get_mark(0, mark))
-end
-
--- Get the location of the start of a line.
--- If no `line` is given, uses the current cursor line.
----@param line integer? A 0-indexed line number.
-function Location:of_line_start(line)
-  line = line or vim.api.nvim_win_get_cursor(0)[1]
-  return self:new(line, 0)
-end
-
--- Get the location of the end of a line.
--- If no `line` is given, uses the current cursor line.
----@param line integer? A 0-indexed line number.
-function Location:of_line_end(line)
-  line = line or vim.api.nvim_win_get_cursor(0)[1]
-  local endcol = vim.api.nvim_buf_get_lines(0, line, line + 1, false)[1]:len()
-  return self:new(line, endcol)
-end
-
 --- Returns the distance between this `Location` and another `Location`.
----@param other Location
+---@param other occurrence.Location
+---@return number
 function Location:distance(other)
   local a = math.abs(self.line - other.line)
   local b = math.abs(self.col - other.col)
@@ -226,41 +245,46 @@ end
 --
 ---@param col_or_line integer
 ---@param col? integer
----@overload fun(self: Location, col: integer): Location
----@overload fun(self: Location, line: integer, col: integer): Location
+---@overload fun(self: occurrence.Location, col: integer): occurrence.Location
+---@overload fun(self: occurrence.Location, line: integer, col: integer): occurrence.Location
 function Location:add(col_or_line, col)
   if col ~= nil then
-    return self:new(self.line + col_or_line, self.col + col)
+    return location.new(self.line + col_or_line, self.col + col)
   elseif type(col_or_line) == "number" then
-    return self:new(self.line, self.col + col_or_line)
+    return location.new(self.line, self.col + col_or_line)
   else
     error("invalid argument")
   end
 end
 
----@param other Location
+---@param other occurrence.Location
+---@return boolean
 function Location:lt(other)
   return self.line < other.line or self.line == other.line and self.col < other.col
 end
 
----@param other Location
+---@param other occurrence.Location
+---@return boolean
 function Location:le(other)
   return self:lt(other) or self:eq(other)
 end
 
----@param other Location
+---@param other occurrence.Location
+---@return boolean
 function Location:eq(other)
   return self.line == other.line and self.col == other.col
 end
 
----@param other Location
+---@param other occurrence.Location
+---@return boolean
 function Location:gt(other)
   return self.line > other.line or self.line == other.line and self.col > other.col
 end
 
----@param other Location
+---@param other occurrence.Location
+---@return boolean
 function Location:ge(other)
   return self:gt(other) or self:eq(other)
 end
 
-return Location
+return location

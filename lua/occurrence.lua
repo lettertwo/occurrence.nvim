@@ -1,18 +1,19 @@
-local M = {}
+---@module 'occurrence'
+local occurrence = {}
 
 -- TODO: look at :h SafeState. Is this an event that can help with detecting pending ops?
 
 -- TODO: look at :h command-preview. Can we get inc updating this way?
 
-function M.reset()
+function occurrence.reset()
   require("occurrence.Keymap"):reset()
 end
 
----@param opts OccurrenceOptions
-function M.setup(opts)
+---@param opts occurrence.Options
+function occurrence.setup(opts)
   local Keymap = require("occurrence.Keymap")
   local actions = require("occurrence.actions")
-  local config = require("occurrence.Config"):new(opts)
+  local config = require("occurrence.Config").new(opts)
 
   Keymap:n(
     config.keymap.normal,
@@ -52,4 +53,4 @@ function M.setup(opts)
   end
 end
 
-return M
+return occurrence

@@ -1,6 +1,9 @@
 local log = require("occurrence.log")
 
----@class OccurrenceKeymapConfig
+---@module 'occurrence.Config'
+local config = {}
+
+---@class occurrence.KeymapConfig
 local KeymapConfig = {
   ---@type string keymap to mark occurrences of the word under cursor to be targeted by the next operation. Default is 'go'.
   normal = "go",
@@ -10,7 +13,7 @@ local KeymapConfig = {
   operator_pending = "o",
 }
 
----@class OccurrenceSearchConfig
+---@class occurrence.SearchConfig
 local SearchConfig = {
   ---@type boolean enable search integration. Default is `true`.
   enabled = true,
@@ -20,22 +23,22 @@ local SearchConfig = {
   normal = nil,
 }
 
----@class OccurrenceConfig
+---@class occurrence.Config
 local Config = {
   keymap = KeymapConfig,
   search = SearchConfig,
 }
 
 ---Options for configuring occurrence.
----@class OccurrenceOptions: OccurrenceConfig
+---@class occurrence.Options: occurrence.Config
 ---@field operator_pending? string
 ---@field normal? string
 ---@field visual? string
----@field search? OccurrenceSearchConfig
+---@field search? occurrence.SearchConfig
 
 ---Validate the given options.
----@param opts OccurrenceOptions
----@return nil error if the options represent an invalid configuration.
+---Errors if the options represent an invalid configuration.
+---@param opts occurrence.Options
 function Config:validate(opts)
   if type(opts) ~= "table" then
     error("opts must be a table")
@@ -51,19 +54,19 @@ function Config:validate(opts)
 end
 
 ---Validate and parse the given options.
----@param opts? OccurrenceOptions
----@return OccurrenceConfig config The configuration parsed from the given options, with defaults applied.
-function Config:new(opts)
+---@param opts? occurrence.Options
+---@return occurrence.Config config The configuration parsed from the given options, with defaults applied.
+function config.new(opts)
   local meta = {
-    __index = self,
+    __index = Config,
     __newindex = function()
       error("cannot modify config")
     end,
   }
   if opts ~= nil then
-    local ok, err = pcall(self.validate, self, opts)
+    local ok, err = pcall(Config.validate, Config, opts)
     if ok then
-      meta.__index = vim.tbl_extend("force", self, opts)
+      meta.__index = vim.tbl_extend("force", Config, opts)
     else
       log.warn_once(err)
     end
@@ -71,4 +74,4 @@ function Config:new(opts)
   return setmetatable({}, meta)
 end
 
-return Config
+return config

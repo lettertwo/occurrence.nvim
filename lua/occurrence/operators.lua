@@ -4,34 +4,34 @@ local Register = require("occurrence.Register")
 
 local log = require("occurrence.log")
 
----@class OccurrenceOperators
-local O = {}
+---@module 'occurrence.operators'
+local operators = {}
 
----@class OperatorConfigBase
+---@class occurrence.OperatorConfigBase
 ---@field uses_register boolean Whether the operator uses a register.
 ---@field modifies_text boolean Whether the operator modifies text.
 
----@class VisualFeedkeysOperatorConfig: OperatorConfigBase
+---@class occurrence.VisualFeedkeysOperatorConfig: occurrence.OperatorConfigBase
 ---@field method 'visual_feedkeys'
 
----@class CommandOperatorConfig: OperatorConfigBase
+---@class occurrence.CommandOperatorConfig: occurrence.OperatorConfigBase
 ---@field method 'command'
 
 -- Function to generate replacement text for direct_api method.
 -- If nil is returned on any n + 1 edits, the first edit replacement value is reused.
----@alias ReplacementFunction fun(text?: string | string[], edit: Location, index: integer): string | string[] | nil
+---@alias occurrence.ReplacementFunction fun(text?: string | string[], edit: occurrence.Location, index: integer): string | string[] | nil
 
----@class DirectApiOperatorConfig: OperatorConfigBase
+---@class occurrence.DirectApiOperatorConfig: occurrence.OperatorConfigBase
 ---@field method 'direct_api'
----@field replacement? string | string[] | ReplacementFunction Text to replace the occurrence with, or a function that returns the replacement text.
+---@field replacement? string | string[] | occurrence.ReplacementFunction Text to replace the occurrence with, or a function that returns the replacement text.
 
----@alias OperatorConfig VisualFeedkeysOperatorConfig | CommandOperatorConfig | DirectApiOperatorConfig
+---@alias occurrence.OperatorConfig occurrence.VisualFeedkeysOperatorConfig | occurrence.CommandOperatorConfig | occurrence.DirectApiOperatorConfig
 
----@param config OperatorConfig
+---@param config occurrence.OperatorConfig
 local function create_operator(config)
-  ---@param occurrence Occurrence
+  ---@param occurrence occurrence.Occurrence
   ---@param operator string
-  ---@param range? Range
+  ---@param range? occurrence.Range
   ---@param count? integer
   ---@param register? string
   ---@param register_type? string
@@ -58,7 +58,7 @@ local function create_operator(config)
     -- Initialize register if needed
     local reg = config.uses_register and Register.new(register, register_type) or nil
 
-    local original_cursor = Cursor:save()
+    local original_cursor = Cursor.save()
 
     local edited = 0
 
@@ -82,7 +82,7 @@ local function create_operator(config)
         vim.cmd("silent! undojoin")
       end
 
-      Cursor:move(edit.start)
+      Cursor.move(edit.start)
 
       -- Get text for register/processing
       local text = nil
@@ -128,7 +128,7 @@ local function create_operator(config)
       elseif config.method == "visual_feedkeys" then
         log.debug("executing nvim_feedkeys:", operator)
         vim.cmd("normal! v")
-        Cursor:move(edit.stop)
+        Cursor.move(edit.stop)
         vim.api.nvim_feedkeys(operator, "x", true)
       else
         ---@diagnostic disable-next-line: undefined-field
@@ -154,10 +154,10 @@ end
 
 --- Generic fallback for unknown operators
 ---@param operator string
----@return Action
-function O.get_operator(operator)
-  if O[operator] then
-    return O[operator]
+---@return occurrence.Action
+function operators.get_operator(operator)
+  if operators[operator] then
+    return operators[operator]
   end
 
   log.debug("Creating generic fallback for operator:", operator)
@@ -170,20 +170,20 @@ function O.get_operator(operator)
   }
 
   -- Cache the generated operator for future use
-  O[operator] = create_operator(fallback_config)
-  return O[operator]
+  operators[operator] = create_operator(fallback_config)
+  return operators[operator]
 end
 
 --- Check if an operator is supported
 ---@param operator string
 ---@return boolean
-function O.is_supported(operator)
-  return O[operator] ~= nil
+function operators.is_supported(operator)
+  return operators[operator] ~= nil
 end
 
 -- Supported operators
 
-O.change = create_operator({
+operators.change = create_operator({
   method = "direct_api",
   uses_register = true,
   modifies_text = true,
@@ -198,26 +198,26 @@ O.change = create_operator({
   end,
 })
 
-O.delete = create_operator({
+operators.delete = create_operator({
   method = "direct_api",
   uses_register = true,
   modifies_text = true,
   replacement = {},
 })
 
-O.yank = create_operator({
+operators.yank = create_operator({
   method = "direct_api",
   uses_register = true,
   modifies_text = false,
 })
 
-O.indent_left = create_operator({
+operators.indent_left = create_operator({
   method = "command",
   uses_register = false,
   modifies_text = true,
 })
 
-O.indent_right = create_operator({
+operators.indent_right = create_operator({
   method = "command",
   uses_register = false,
   modifies_text = true,
@@ -225,15 +225,15 @@ O.indent_right = create_operator({
 
 -- Default operator mappings :h operator
 
-O["c"] = O.change
-O["d"] = O.delete
-O["y"] = O.yank
-O["<"] = O.indent_left
-O[">"] = O.indent_right
+operators["c"] = operators.change
+operators["d"] = operators.delete
+operators["y"] = operators.yank
+operators["<"] = operators.indent_left
+operators[">"] = operators.indent_right
 
 -- TODO:
 -- |g@| call function set with the 'operatorfunc' option
--- O["g@"] = O.opfunc
+-- operators["g@"] = O.opfunc
 
 -- The rest of these are handled by the generic fallback
 
@@ -248,4 +248,4 @@ O[">"] = O.indent_right
 -- |g?| ROT13 encoding
 -- |zf| define a fold
 
-return O
+return operators

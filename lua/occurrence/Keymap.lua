@@ -1,15 +1,15 @@
 local log = require("occurrence.log")
 
----@enum OccurrenceKeymapMode
+---@module 'occurrence.Keymap'
+
+---@enum occurrence.KeymapMode
 local MODE = {
   n = "n", ---Normal mode.
   o = "o", ---Operator-pending mode.
   x = "x", ---Visual or select mode.
 }
 
--- A table that maps modes to active keymaps.
----@class Modemap: table<OccurrenceKeymapMode, string[]>
-local Modemap = {
+local Modemap_mt = {
   __index = function(self, key)
     assert(MODE[key], "Invalid mode: " .. key)
     local mode = rawget(self, key)
@@ -21,44 +21,47 @@ local Modemap = {
   end,
 }
 
----@return Modemap
-function Modemap:new()
-  return setmetatable({}, self)
+-- A table that maps modes to active keymaps.
+---@class occurrence.Modemap: table<occurrence.KeymapMode, string[]>
+
+---@return occurrence.Modemap
+local function create_modemap()
+  return setmetatable({}, Modemap_mt)
 end
 
 -- A keymap utility that can be used to bind keys to actions.
 -- It tracks active bindings and can be used to neatly deactivate all of them.
----@class Keymap
----@field active_keymaps Modemap A table that maps modes to active keymaps.
+---@class occurrence.Keymap
+---@field active_keymaps occurrence.Modemap
 ---@field buffer? integer The buffer the keymap is bound to. If `nil`, the keymap is global.
 local Keymap = {
-  active_keymaps = Modemap:new(),
+  active_keymaps = create_modemap(),
 }
 
----@class BufferKeymap: Keymap
+---@class occurrence.BufferKeymap: occurrence.Keymap
 ---@field buffer integer The buffer this keymap is bound to.
 
 -- Creates a new keymap bound to a buffer.
 ---@param buffer integer The buffer to bind to.
----@return BufferKeymap
-function Keymap:new(buffer)
-  ---@type BufferKeymap
+---@return occurrence.BufferKeymap
+function Keymap.new(buffer)
+  ---@type occurrence.BufferKeymap
   local bound_keymap = {
     buffer = buffer,
-    active_keymaps = Modemap:new(),
+    active_keymaps = create_modemap(),
   }
-  setmetatable(bound_keymap, { __index = self })
+  setmetatable(bound_keymap, { __index = Keymap })
   return bound_keymap
 end
 
----@param mode OccurrenceKeymapMode
+---@param mode occurrence.KeymapMode
 ---@return nil error if the mode is invalid.
 function Keymap.validate_mode(mode)
   assert(MODE[mode], "Invalid mode: " .. mode)
 end
 
 --- Wraps an action in a function so that it can be used as a keymap callback.
----@param action string | function | Action
+---@param action string | function | occurrence.Action
 ---@return string | function
 function Keymap.wrap_action(action)
   if type(action) == "table" then
@@ -66,7 +69,7 @@ function Keymap.wrap_action(action)
       return action()
     end
   end
-  ---@cast action -Action
+  ---@cast action -occurrence.Action
   return action
 end
 
@@ -82,7 +85,7 @@ end
 
 -- Register a normal mode keymap.
 ---@param lhs string
----@param rhs string | function | Action
+---@param rhs string | function | occurrence.Action
 ---@param opts table | string
 function Keymap:n(lhs, rhs, opts)
   vim.keymap.set(MODE.n, lhs, self.wrap_action(rhs), self:parse_opts(opts))
@@ -91,7 +94,7 @@ end
 
 -- Register an operator-pending mode keymap.
 ---@param lhs string
----@param rhs string | function | Action
+---@param rhs string | function | occurrence.Action
 ---@param opts table | string
 function Keymap:o(lhs, rhs, opts)
   vim.keymap.set(MODE.o, lhs, self.wrap_action(rhs), self:parse_opts(opts))
@@ -100,7 +103,7 @@ end
 
 -- Register a visual or select mode keymap.
 ---@param lhs string
----@param rhs string | function | Action
+---@param rhs string | function | occurrence.Action
 ---@param opts table | string
 function Keymap:x(lhs, rhs, opts)
   vim.keymap.set(MODE.x, lhs, self.wrap_action(rhs), self:parse_opts(opts))

@@ -27,16 +27,19 @@ local function is_callable(callback)
   return false
 end
 
+---@module 'occurrence.Action'
+local action = {}
+
 -- A callable type that can be used as a keymap callback.
 -- It can be sequenced with other actions via the `+` operator.
 -- The callback will receive the `Occurrence` for the current buffer as its first argument.
 -- If the action is sequenced with other actions, the callback will receive the results
 -- of the previous action as additional arguments.
----@class Action
----@operator add(Action | fun(occurrence: Occurrence, ...): any): Action
----@overload fun(occurrence: Occurrence?, ...): any
+---@class occurrence.Action
+---@operator add(occurrence.Action | fun(occurrence: occurrence.Occurrence, ...): any): occurrence.Action
+---@overload fun(occurrence: occurrence.Occurrence?, ...): any
 ---@field protected type `ACTION`
----@field protected callback fun(occurrence: Occurrence, ...): any
+---@field protected callback fun(occurrence: occurrence.Occurrence, ...): any
 ---@field protected args? any
 local Action = {}
 
@@ -46,12 +49,12 @@ local Action = {}
 -- but note that the bound occurrence will be passed to the subsequent action
 -- _unless_ that action is also bound to an `Occurrence`.
 --
----@class OccurrenceAction: Action
----@operator add(Action | fun(occurrence: Occurrence, ...): any): OccurrenceAction
+---@class occurrence.OccurrenceAction: occurrence.Action
+---@operator add(occurrence.Action | fun(occurrence: occurrence.Occurrence, ...): any): occurrence.OccurrenceAction
 ---@overload fun(...): any
----@field new fun(callback?: (fun(occurrence: Occurrence, ...): nil) | Action, ...: any): self
+---@field new fun(callback?: (fun(occurrence: occurrence.Occurrence, ...): nil) | occurrence.Action, ...: any): self
 ---@field bind fun(...: any): self
----@field protected occurrence Occurrence
+---@field protected occurrence occurrence.Occurrence
 
 local function is_occurrence_action(action)
   return type(action) == "table" and pcall(action.is_action, action) and action.occurrence ~= nil
@@ -69,12 +72,12 @@ end
 -- Create a new action from a callback or existing action.
 -- If the `callback` is a function (or other callable), the new action will wrap it.
 -- If the `callback` is an action, the new action will extend it.
----@param callback (fun(occurrence: Occurrence, ...): any) | Action
----@return self
-function Action.new(callback)
+---@param callback (fun(occurrence: occurrence.Occurrence, ...): any) | occurrence.Action
+---@return occurrence.Action
+function action.new(callback)
   assert(callback, "Action must have a callback")
 
-  local action = { type = ACTION }
+  local self = { type = ACTION }
   local meta = Action
   if Action.is_action(callback) then
     -- If the callback is an action, we just extend it.
@@ -83,13 +86,13 @@ function Action.new(callback)
   elseif not is_callable(callback) then
     error("callback must be callable")
   else
-    action.callback = callback
+    self.callback = callback
   end
 
-  return setmetatable(action, {
+  return setmetatable(self, {
     __index = meta,
-    __add = meta.add,
-    __call = meta.call,
+    __add = meta.add, ---@diagnostic disable-line: invisible
+    __call = meta.call, ---@diagnostic disable-line: invisible
   })
 end
 
@@ -104,10 +107,10 @@ end
 -- the bound occurrence to the next action _unless_ that action
 -- is also bound to an `Occurrence`.
 --
----@param occurrence Occurrence
----@return OccurrenceAction
+---@param occurrence occurrence.Occurrence
+---@return occurrence.OccurrenceAction
 function Action:with(occurrence)
-  local bound = self:new()
+  local bound = action.new(self)
   local callback = self.callback
   local args = self.args
   if args ~= nil then
@@ -120,7 +123,7 @@ function Action:with(occurrence)
     end
   end
   getmetatable(bound).__call = bound.call
-  ---@cast bound OccurrenceAction
+  ---@cast bound occurrence.OccurrenceAction
   ---@diagnostic disable-next-line: invisible
   bound.occurrence = occurrence
   return bound
@@ -143,7 +146,7 @@ function Action:bind(...)
     args = concat(self.args, args)
   end
 
-  local bound = self:new()
+  local bound = action.new(self)
 
   if args then
     bound.args = args
@@ -172,20 +175,20 @@ end
 -- This is normally invoked by using the `+` operator, not called directly.
 --
 ---@protected
----@param left Action | fun(occurrence: Occurrence, ...): any
----@param right Action | fun(occurrence: Occurrence, ...): any
+---@param left occurrence.Action | fun(occurrence: occurrence.Occurrence, ...): any
+---@param right occurrence.Action | fun(occurrence: occurrence.Occurrence, ...): any
 ---@return self
 function Action.add(left, right)
   if is_callable(right) then
     if is_occurrence_action(left) and is_occurrence_action(right) then
-      local combined = left:new()
+      local combined = action.new(left)
       function combined:call(...)
         return right(unpack({ left(...) }))
       end
       getmetatable(combined).__call = combined.call
       return combined
     elseif is_occurrence_action(left) then
-      local combined = left:new()
+      local combined = action.new(left)
       function combined:call(...)
         ---@diagnostic disable-next-line: undefined-field
         return right(left.occurrence, unpack({ left(...) }))
@@ -193,11 +196,11 @@ function Action.add(left, right)
       getmetatable(combined).__call = combined.call
       return combined
     elseif is_occurrence_action(right) then
-      return Action.new(function(occurrence, ...)
+      return action.new(function(occurrence, ...)
         return right(unpack({ left(occurrence, ...) }))
       end)
     else
-      return Action.new(function(occurrence, ...)
+      return action.new(function(occurrence, ...)
         return right(occurrence, unpack({ left(occurrence, ...) }))
       end)
     end
@@ -212,9 +215,9 @@ end
 -- This is normally invoked by using the `()` operator, not called directly.
 --
 ---@protected
----@param occurrence? Occurrence
+---@param occurrence? occurrence.Occurrence
 function Action:call(occurrence, ...)
-  return self.callback(occurrence or Occurrence:new(), ...)
+  return self.callback(occurrence or Occurrence.new(), ...)
 end
 
-return Action
+return action

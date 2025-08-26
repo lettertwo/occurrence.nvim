@@ -10,17 +10,17 @@ describe("Occurrence", function()
     it("finds matches", function()
       local bufnr = util.buffer("foo")
 
-      local foo = Occurrence:new(bufnr, "foo", {})
+      local foo = Occurrence.new(bufnr, "foo", {})
       assert.is_true(foo:has_matches())
 
-      local bar = Occurrence:new(bufnr, "bar", {})
+      local bar = Occurrence.new(bufnr, "bar", {})
       assert.is_false(bar:has_matches())
     end)
 
     it("iterates over matches", function()
       local bufnr = util.buffer("foo bar foo")
 
-      local foo = Occurrence:new(bufnr, "foo", {})
+      local foo = Occurrence.new(bufnr, "foo", {})
       local matches = {}
       for match in foo:matches() do
         table.insert(matches, tostring(match))
@@ -35,9 +35,9 @@ describe("Occurrence", function()
     it("iterates over matches with a custom range", function()
       local bufnr = util.buffer("foo bar foo")
 
-      local foo = Occurrence:new(bufnr, "foo", {})
+      local foo = Occurrence.new(bufnr, "foo", {})
       local matches = {}
-      for match in foo:matches(Range:deserialize("0:0::0:4")) do
+      for match in foo:matches(Range.deserialize("0:0::0:4")) do
         table.insert(matches, tostring(match))
       end
 
@@ -46,7 +46,7 @@ describe("Occurrence", function()
       }, matches)
 
       matches = {}
-      for match in foo:matches(Range:deserialize("0:4::1:0")) do
+      for match in foo:matches(Range.deserialize("0:4::1:0")) do
         table.insert(matches, tostring(match))
       end
 
@@ -59,7 +59,7 @@ describe("Occurrence", function()
   describe("marks", function()
     it("marks matches", function()
       local bufnr = util.buffer("foo bar foo")
-      local foo = Occurrence:new(bufnr, "foo", {})
+      local foo = Occurrence.new(bufnr, "foo", {})
 
       foo:mark()
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
@@ -71,16 +71,16 @@ describe("Occurrence", function()
 
     it("marks matches within a range", function()
       local bufnr = util.buffer("foo bar foo")
-      local foo = Occurrence:new(bufnr, "foo", {})
+      local foo = Occurrence.new(bufnr, "foo", {})
 
-      foo:mark(Range:deserialize("0:0::0:4"))
+      foo:mark(Range.deserialize("0:0::0:4"))
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
       assert.same({ { 1, 0, 0 } }, marks)
     end)
 
     it("unmarks matches", function()
       local bufnr = util.buffer("foo bar foo")
-      local foo = Occurrence:new(bufnr, "foo", {})
+      local foo = Occurrence.new(bufnr, "foo", {})
 
       foo:mark()
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
@@ -96,16 +96,16 @@ describe("Occurrence", function()
 
     it("unmarks matches within a range", function()
       local bufnr = util.buffer("foo bar foo")
-      local foo = Occurrence:new(bufnr, "foo", {})
+      local foo = Occurrence.new(bufnr, "foo", {})
 
-      foo:mark(Range:deserialize("0:0::1:0"))
+      foo:mark(Range.deserialize("0:0::1:0"))
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 8 },
       }, marks)
 
-      foo:unmark(Range:deserialize("0:0::0:4"))
+      foo:unmark(Range.deserialize("0:0::0:4"))
       marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
       assert.same({ { 2, 0, 8 } }, marks)
     end)
@@ -113,8 +113,8 @@ describe("Occurrence", function()
     it("iterates over marks", function()
       local bufnr = util.buffer("foo bar foo")
 
-      local foo = Occurrence:new(bufnr, "foo", {})
-      foo:mark(Range:deserialize("0:0::1:0"))
+      local foo = Occurrence.new(bufnr, "foo", {})
+      foo:mark(Range.deserialize("0:0::1:0"))
 
       local marked = {}
       for mark in foo:marks() do
@@ -132,11 +132,11 @@ describe("Occurrence", function()
     it("iterates over marks within a range", function()
       local bufnr = util.buffer("foo bar foo")
 
-      local foo = Occurrence:new(bufnr, "foo", {})
-      foo:mark(Range:deserialize("0:0::1:0"))
+      local foo = Occurrence.new(bufnr, "foo", {})
+      foo:mark(Range.deserialize("0:0::1:0"))
 
       local marked = {}
-      for mark in foo:marks({ range = Range:deserialize("0:0::0:4") }) do
+      for mark in foo:marks({ range = Range.deserialize("0:0::0:4") }) do
         table.insert(marked, tostring(mark))
       end
 
@@ -151,7 +151,7 @@ describe("Occurrence", function()
       it("moves the cursor to the nearest occurrence", function()
         local bufnr = util.buffer("foo bar foo")
         -- match "bar"
-        local o = Occurrence:new(bufnr, "bar", {})
+        local o = Occurrence.new(bufnr, "bar", {})
 
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 
@@ -186,7 +186,7 @@ describe("Occurrence", function()
     describe('direction = "forward"', function()
       it("moves the cursor forward to the nearest occurrence", function()
         local bufnr = util.buffer("foo bar foo")
-        local o = Occurrence:new(bufnr, "bar", {})
+        local o = Occurrence.new(bufnr, "bar", {})
 
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 
@@ -207,7 +207,7 @@ describe("Occurrence", function()
     describe('direction = "backward"', function()
       it("moves the cursor backward to the nearest occurrence", function()
         local bufnr = util.buffer("foo bar foo")
-        local o = Occurrence:new(bufnr, "bar", {})
+        local o = Occurrence.new(bufnr, "bar", {})
 
         -- move cursor to the end of the buffer
         vim.cmd("normal! G$")
@@ -230,7 +230,7 @@ describe("Occurrence", function()
     describe("wrap = true", function()
       it("wraps the cursor to the nearest occurrence", function()
         local bufnr = util.buffer("foo bar foo")
-        local o = Occurrence:new(bufnr, "foo", {})
+        local o = Occurrence.new(bufnr, "foo", {})
 
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 
@@ -249,10 +249,10 @@ describe("Occurrence", function()
     describe("marked = true", function()
       it("moves the cursor to marked occurrences", function()
         local bufnr = util.buffer("foo bar foo")
-        local o = Occurrence:new(bufnr, "foo", {})
+        local o = Occurrence.new(bufnr, "foo", {})
 
         -- mark the first 'foo' match
-        assert.is_true(o:mark(Range:deserialize("0:0::0:3")))
+        assert.is_true(o:mark(Range.deserialize("0:0::0:3")))
 
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 
@@ -267,7 +267,7 @@ describe("Occurrence", function()
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 
         -- mark all 'foo' matches
-        assert.is_true(o:mark(Range:deserialize("0:0::1:0")))
+        assert.is_true(o:mark(Range.deserialize("0:0::1:0")))
 
         -- test that the cursor moves to the next marked match
         o:match_cursor({ direction = "forward", marked = true })
@@ -280,7 +280,7 @@ describe("Occurrence", function()
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 
         -- unmark the first 'foo' match
-        assert.is_true(o:unmark(Range:deserialize("0:0::0:3")))
+        assert.is_true(o:unmark(Range.deserialize("0:0::0:3")))
 
         -- test that the cursor moves to the remaining marked match
         o:match_cursor({ direction = "forward", marked = true })
