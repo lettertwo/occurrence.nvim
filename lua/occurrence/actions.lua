@@ -69,7 +69,7 @@ actions.find_cursor_word = Action.new(function(occurrence)
     log.warn("No word under cursor")
     return
   end
-  occurrence:set(word, { is_word = true })
+  occurrence:add(word, { is_word = true })
 end)
 
 -- Find all occurrences of the visually selected text in the given buffer.
@@ -84,7 +84,7 @@ actions.find_visual_subword = Action.new(function(occurrence)
     log.warn("Empty visual selection")
     return
   end
-  occurrence:set(text)
+  occurrence:add(text)
   setmode("n")
 end)
 
@@ -104,7 +104,7 @@ actions.find_last_search = Action.new(function(occurrence)
 
   -- For now, treat search patterns as literal text
   -- TODO: Add support for regex patterns in future
-  occurrence:set(cleaned_pattern, { is_word = false })
+  occurrence:add(cleaned_pattern, { is_word = false })
 end)
 
 -- Find all occurrences using the current search pattern if available,
@@ -208,6 +208,19 @@ actions.unmark_all = Action.new(function(occurrence)
   end
 end)
 
+actions.find_and_mark_cursor_word = actions.find_cursor_word + actions.mark_all
+
+actions.find_and_mark_cursor_word_or_toggle_mark = Action.new(function(occurrence)
+  local cursor = Cursor.save()
+  local range = occurrence:match_cursor()
+  if range and range:contains(cursor.location) then
+    return actions.toggle_mark:with(occurrence)()
+  else
+    cursor:restore()
+    return actions.find_and_mark_cursor_word(occurrence)
+  end
+end)
+
 -- Activate keybindings for the given configuration.
 ---@param occurrence occurrence.Occurrence
 ---@param config occurrence.Config
@@ -240,7 +253,7 @@ actions.activate = Action.new(function(occurrence, config)
   keymap:n("gN", actions.goto_previous:with(occurrence), "Previous occurrence")
 
   -- Manage occurrence marks.
-  keymap:n("go", actions.toggle_mark:with(occurrence), "Toggle occurrence mark")
+  keymap:n("go", actions.find_and_mark_cursor_word_or_toggle_mark:with(occurrence), "Toggle occurrence mark")
   keymap:n("ga", actions.mark:with(occurrence), "Mark occurrence")
   keymap:n("gx", actions.unmark:with(occurrence), "Unmark occurrence")
 

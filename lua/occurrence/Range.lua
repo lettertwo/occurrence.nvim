@@ -122,6 +122,15 @@ function range.of_line(line)
   return range.new(start, stop)
 end
 
+-- Get the range of the current buffer.
+---@return occurrence.Range
+function range.of_buffer()
+  local line_count = vim.api.nvim_buf_line_count(0)
+  local start = Location.new(0, 0)
+  local stop = Location.of_line_end(line_count - 1)
+  return range.new(start, stop)
+end
+
 -- Create a new `Range` from a `Range:serialize()` string.
 ---@param str string
 ---@return occurrence.Range
