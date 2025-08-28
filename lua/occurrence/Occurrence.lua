@@ -60,14 +60,17 @@ setmetatable(SearchFlags, {
 })
 
 ---@param pattern string
----@param span integer
 ---@param flags occurrence.SearchFlags
 ---@return occurrence.Range | nil
-local function search(pattern, span, flags)
+local function search(pattern, flags)
   local start = Location.from_pos(vim.fn.searchpos(pattern, tostring(SearchFlags(flags))))
-  if start then
-    --- TODO: we'll need to compute span dynamically to support regex-like patterns.
-    return Range.new(start, start + span)
+  if start ~= nil then
+    local txt = vim.fn.getline(start.line + 1)
+    local matchend = vim.fn.matchend(txt, pattern)
+    if matchend == -1 then
+      return nil
+    end
+    return Range.new(start, start + (matchend - start.col))
   end
   return nil
 end
@@ -79,13 +82,13 @@ end
 ---@return occurrence.Range | nil
 local function closest(state, flags, cursor, bounds)
   if #state.patterns == 1 then
-    return search(state.patterns[1], state.spans[1], flags)
+    return search(state.patterns[1], flags)
   end
   if #state.patterns > 1 then
     local closest_match = nil
     cursor = assert(cursor or Location.of_cursor(), "cursor location not found")
     for i, pattern in ipairs(state.patterns) do
-      local match = search(pattern, state.spans[i], flags)
+      local match = search(pattern, flags)
       if match and not closest_match then
         closest_match = match
       elseif match and closest_match then
@@ -117,7 +120,6 @@ end
 -- The internal state store for an Occurrence.
 ---@class occurrence.OccurrenceState
 ---@field patterns string[] The patterns tracked by this occurrence.
----@field spans integer[] The number of bytes for each pattern.
 
 -- A stateful representation of an occurrence of a pattern in a buffer.
 ---@class occurrence.Occurrence
@@ -309,8 +311,6 @@ function Occurrence:matches(range)
     local match_state = {
       ---@type string
       pattern = pattern,
-      ---@type integer
-      span = state.spans[i],
       ---@type occurrence.Location
       location = start_location,
       ---@type occurrence.Range | nil
@@ -322,7 +322,7 @@ function Occurrence:matches(range)
     function match_state.peek()
       local cursor = Cursor.save()
       cursor:move(match_state.location)
-      match_state.match = search(match_state.pattern, match_state.span, match_state.flags)
+      match_state.match = search(match_state.pattern, match_state.flags)
       cursor:restore()
       if match_state.match and range and not range:contains(match_state.match) then
         match_state.match = nil
@@ -393,7 +393,7 @@ end
 ---@param opts? { is_word: boolean }
 function Occurrence:set(text, opts)
   -- (re-)initialize the internal state store for this Occurrence.
-  local state = { patterns = {}, spans = {} }
+  local state = { patterns = {} }
   STATE_CACHE[self] = state
 
   -- Clear all extmarks and highlights.
@@ -413,7 +413,6 @@ function Occurrence:add(text, opts)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local pattern = opts and opts.is_word and string.format([[\V\<%s\>]], text) or string.format([[\V%s]], text)
   table.insert(state.patterns, pattern)
-  table.insert(state.spans, #text)
 end
 
 return occurrence
