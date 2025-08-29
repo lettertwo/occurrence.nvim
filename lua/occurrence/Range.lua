@@ -39,11 +39,17 @@ function range.new(start, stop)
   assert(start <= stop, "start must be less than or equal to start")
 
   local self = vim.iter({ start:totable(), stop:totable() }):flatten():totable()
-  self.start = start
-  self.stop = stop
 
   return setmetatable(self, {
-    __index = Range,
+    __index = function(t, k)
+      if k == "start" then
+        return start
+      elseif k == "stop" then
+        return stop
+      else
+        return Range[k]
+      end
+    end,
     __call = range.new,
     __newindex = readonly,
     __tostring = tostring,
@@ -72,14 +78,18 @@ function range.of_selection()
     local vstart = vim.fn.getpos("v")
     if vstart ~= nil then
       local start = Location.from_pos(vstart)
-      local stop = Location.of_cursor()
+      -- We add 1 because Range is end-exclusive,
+      -- and we want the cursor position to be included in the range.
+      local stop = Location.of_cursor() + 1
       if start and stop then
         if stop < start then
           start, stop = stop, start
         end
         if mode == "V" then
           start = Location.new(start.line, 0)
-          stop = Location.of_line_end(stop.line)
+          -- We add 1 because Range is end-exclusive,
+          -- and we want the entire line to be included in the range.
+          stop = Location.of_line_end(stop.line) + 1
         end
         return range.new(start, stop)
       end
@@ -103,9 +113,15 @@ function range.of_motion(motion_type)
     if stop < start then
       start, stop = stop, start
     end
-    if motion_type == "line" then
+    if motion_type == nil or motion_type == "char" then
+      -- We add 1 because Range is end-exclusive,
+      -- and we want the entire motion to be included in the range.
+      stop = stop + 1
+    elseif motion_type == "line" then
       start = Location.new(start.line, 0)
-      stop = Location.of_line_end(stop.line)
+      -- We add 1 because Range is end-exclusive,
+      -- and we want the entire line to be included in the range.
+      stop = Location.of_line_end(stop.line) + 1
     end
     return range.new(start, stop)
   end
@@ -118,7 +134,9 @@ end
 ---@return occurrence.Range
 function range.of_line(line)
   local start = Location.of_line_start(line)
-  local stop = Location.of_line_end(line)
+  -- We add 1 because Range is end-exclusive,
+  -- and we want the entire line to be included in the range.
+  local stop = Location.of_line_end(line) + 1
   return range.new(start, stop)
 end
 
@@ -127,7 +145,9 @@ end
 function range.of_buffer()
   local line_count = vim.api.nvim_buf_line_count(0)
   local start = Location.new(0, 0)
-  local stop = Location.of_line_end(line_count - 1)
+  -- We add 1 because Range is end-exclusive,
+  -- and we want the entire buffer to be included in the range.
+  local stop = Location.of_line_end(line_count - 1) + 1
   return range.new(start, stop)
 end
 
@@ -189,3 +209,4 @@ function Range:eq(other)
 end
 
 return range
+
