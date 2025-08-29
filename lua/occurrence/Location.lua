@@ -34,11 +34,17 @@ function location.new(line, col)
   assert(col >= 0, "col must be >= 0")
 
   local self = { line, col }
-  self.line = line
-  self.col = col
 
   return setmetatable(self, {
-    __index = Location,
+    __index = function(t, k)
+      if k == "line" then
+        return line
+      elseif k == "col" then
+        return col
+      else
+        return Location[k]
+      end
+    end,
     __call = location.new,
     __newindex = readonly,
     __tostring = tostring,
@@ -123,7 +129,7 @@ end
 function location.from_extmarkpos(pos)
   local line = pos and pos[1]
   local col = pos and pos[2]
-  if line < 0 or col < 0 then
+  if not line or not col or line < 0 or col < 0 then
     return nil
   end
   return location.new(line, col)
@@ -148,7 +154,7 @@ end
 ---@param line integer? A 0-indexed line number.
 ---@return occurrence.Location
 function location.of_line_start(line)
-  line = line or vim.api.nvim_win_get_cursor(0)[1]
+  line = line or (vim.api.nvim_win_get_cursor(0)[1] - 1)
   return location.new(line, 0)
 end
 
@@ -157,7 +163,7 @@ end
 ---@param line integer? A 0-indexed line number.
 ---@return occurrence.Location
 function location.of_line_end(line)
-  line = line or vim.api.nvim_win_get_cursor(0)[1]
+  line = line or (vim.api.nvim_win_get_cursor(0)[1] - 1)
   local endcol = vim.api.nvim_buf_get_lines(0, line, line + 1, false)[1]:len()
   return location.new(line, endcol)
 end
