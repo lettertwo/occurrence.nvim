@@ -15,5 +15,5 @@ doc/occurrence.txt: lemmy-help $(PLUGIN_FILES)
 doc: doc/occurrence.txt
 
 .PHONY: test
-test: busted
+test:
 	@busted

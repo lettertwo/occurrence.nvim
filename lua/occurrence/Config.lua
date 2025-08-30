@@ -36,42 +36,66 @@ local Config = {
 ---@field visual? string
 ---@field search? occurrence.SearchConfig
 
+---Create a deep read-only table
+---@param tbl table
+---@return table
+local function make_readonly(tbl)
+  return setmetatable({}, {
+    __index = function(_, key)
+      local value = tbl[key]
+      if type(value) == "table" then
+        return make_readonly(value)
+      end
+      return value
+    end,
+    __newindex = function()
+      error("cannot modify config")
+    end,
+    __pairs = function()
+      return pairs(tbl)
+    end,
+    __ipairs = function()
+      return ipairs(tbl)
+    end,
+  })
+end
+
 ---Validate the given options.
----Errors if the options represent an invalid configuration.
+---Returns error message if the options represent an invalid configuration.
 ---@param opts occurrence.Options
+---@return string? error_message
 function Config:validate(opts)
   if type(opts) ~= "table" then
-    error("opts must be a table")
+    return "opts must be a table"
   end
   for k, v in pairs(opts) do
     if self[k] == nil then
-      error("invalid option: " .. k)
+      return "invalid option: " .. k
     end
     if type(v) ~= type(self[k]) then
-      error("option " .. k .. " must be a " .. type(self[k]))
+      return "option " .. k .. " must be a " .. type(self[k])
     end
   end
+  return nil
 end
 
 ---Validate and parse the given options.
 ---@param opts? occurrence.Options
 ---@return occurrence.Config config The configuration parsed from the given options, with defaults applied.
 function config.new(opts)
-  local meta = {
-    __index = Config,
-    __newindex = function()
-      error("cannot modify config")
-    end,
-  }
+  local result_config = vim.deepcopy(Config)
+
   if opts ~= nil then
-    local ok, err = pcall(Config.validate, Config, opts)
-    if ok then
-      meta.__index = vim.tbl_extend("force", Config, opts)
-    else
+    local err = Config:validate(opts)
+    if err then
       log.warn_once(err)
+    else
+      result_config = vim.tbl_deep_extend("force", result_config, opts)
     end
   end
-  return setmetatable({}, meta)
+
+  return make_readonly(result_config)
 end
 
 return config
+
