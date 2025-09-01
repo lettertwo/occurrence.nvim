@@ -114,35 +114,23 @@ end
 ---@return fun(): occurrence.Range?, occurrence.Range? next_extmark
 function Extmarks:iter(buffer, opts)
   local range = opts and opts.range or Range.new(Location.new(0, 0), Location.new(vim.fn.line("$"), 0))
-  ---@type occurrence.Location | nil
+  -- If `reverse` is true, invert the start and stop locations.
   local start = opts and opts.reverse and range.stop or range.start
   local stop = opts and opts.reverse and range.start or range.stop
 
-  -- Keep track of the last start location to avoid infinite loops
-  -- when there are no more extmarks to traverse.
-  local laststart
+  --- List of (extmark_id, row, col) tuples in traversal order.
+  --- NOTE: If `end` is less than `start`, marks are returned in reverse order.
+  local marks = vim.api.nvim_buf_get_extmarks(buffer, NS, start:to_extmarkpos(), stop:to_extmarkpos(), {})
+  local index = 1
 
   local function next_extmark()
-    if start == nil then
-      return
-    end
-
-    -- Avoid infinite loops.
-    if laststart ~= nil and start == laststart then
-      return
-    end
-
-    --- List of (extmark_id, row, col) tuples in traversal order.
-    local marks = vim.api.nvim_buf_get_extmarks(buffer, NS, start:to_extmarkpos(), stop:to_extmarkpos(), {})
-
-    if next(marks) then
-      local id, row, col = unpack(marks[1])
+    local mark = marks[index]
+    index = index + 1
+    if mark then
+      local id = mark[1]
       local original_range = Range.deserialize(self[id])
-      local current_location = Location.from_extmarkpos({ row, col })
+      local current_location = Location.from_extmarkpos(vim.api.nvim_buf_get_extmark_by_id(buffer, NS, id, {}))
       if original_range ~= nil and current_location ~= nil then
-        -- Update the start position for the next iteration.
-        laststart = start
-        start = original_range.stop
         return original_range, original_range:move(current_location)
       end
     end
