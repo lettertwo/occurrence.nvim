@@ -58,19 +58,20 @@ setmetatable(SearchFlags, {
     return result
   end,
 })
-
 ---@param pattern string
 ---@param flags occurrence.SearchFlags
 ---@return occurrence.Range | nil
 local function search(pattern, flags)
   local start = Location.from_pos(vim.fn.searchpos(pattern, tostring(SearchFlags(flags))))
   if start ~= nil then
-    local txt = vim.fn.getline(start.line + 1)
-    local matchend = vim.fn.matchend(txt, pattern)
-    if matchend == -1 then
+    local cursor = Cursor.save()
+    cursor:move(start)
+    local matchend = Location.from_pos(vim.fn.searchpos(pattern, "nWe"))
+    cursor:restore()
+    if matchend == nil then
       return nil
     end
-    return Range.new(start, start + (matchend - start.col))
+    return Range.new(start, matchend + 1)
   end
   return nil
 end
@@ -411,7 +412,8 @@ end
 ---@param opts? { is_word: boolean }
 function Occurrence:add(text, opts)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
-  local pattern = opts and opts.is_word and string.format([[\V\<%s\>]], text) or string.format([[\V%s]], text)
+  local escaped = text:gsub("\n", "\\n")
+  local pattern = opts and opts.is_word and string.format([[\V\C\<%s\>]], escaped) or string.format([[\V\C%s]], escaped)
   table.insert(state.patterns, pattern)
 end
 

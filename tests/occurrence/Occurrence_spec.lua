@@ -17,6 +17,57 @@ describe("Occurrence", function()
       assert.is_false(bar:has_matches())
     end)
 
+    it("finds matches with special characters", function()
+      local bufnr = util.buffer([[foo.bar
+      foo(bar)
+      foo[bar]
+      foo{bar}
+      foo^bar$
+      foo*bar+
+      foo?bar|
+      foo\bar
+      foo\nbar]])
+
+      local foo = Occurrence.new(bufnr, "foo.bar", {})
+      assert.is_true(foo:has_matches())
+
+      foo = Occurrence.new(bufnr, "foo(bar)", {})
+      assert.is_true(foo:has_matches())
+
+      foo = Occurrence.new(bufnr, "foo[bar]", {})
+      assert.is_true(foo:has_matches())
+
+      foo = Occurrence.new(bufnr, "foo{bar}", {})
+      assert.is_true(foo:has_matches())
+
+      foo = Occurrence.new(bufnr, "foo^bar$", {})
+      assert.is_true(foo:has_matches())
+
+      foo = Occurrence.new(bufnr, "foo*bar+", {})
+      assert.is_true(foo:has_matches())
+
+      foo = Occurrence.new(bufnr, "foo?bar|", {})
+      assert.is_true(foo:has_matches())
+
+      foo = Occurrence.new(bufnr, [[foo\\bar]], {})
+      assert.is_true(foo:has_matches())
+
+      foo = Occurrence.new(bufnr, [[foo\\nbar]], {})
+      assert.is_true(foo:has_matches())
+    end)
+
+    it("is case-sensitive", function()
+      local bufnr = util.buffer("Foo foo FOO")
+
+      local foo = Occurrence.new(bufnr, "foo", {})
+      assert.is_true(foo:has_matches())
+      local count = 0
+      for _ in foo:matches() do
+        count = count + 1
+      end
+      assert.equals(1, count)
+    end)
+
     it("iterates over matches", function()
       local bufnr = util.buffer("foo bar foo")
 
