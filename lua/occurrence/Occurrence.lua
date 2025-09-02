@@ -146,7 +146,7 @@ end
 ---@field patterns string[] The patterns tracked by this occurrence.
 
 -- A stateful representation of an occurrence of a pattern in a buffer.
----@class occurrence.Occurrence
+---@class occurrence.Occurrence: occurrence.OccurrenceState
 ---@field buffer integer The buffer in which the occurrence was found.
 local Occurrence = {}
 

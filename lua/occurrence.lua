@@ -17,19 +17,19 @@ function occurrence.setup(opts)
 
   Keymap:n(
     config.keymap.normal,
-    actions.find_cursor_word + actions.mark_all + actions.activate:bind(config),
+    actions.mark_cursor_word + actions.activate:bind(config),
     { expr = true, desc = "Find occurrences of word under cursor" }
   )
 
   Keymap:x(
     config.keymap.visual,
-    actions.find_visual_subword + actions.mark_all + actions.activate:bind(config),
+    actions.mark_visual_subword + actions.activate:bind(config),
     { expr = true, desc = "Find occurrences of selection" }
   )
 
   Keymap:o(
     config.keymap.operator_pending,
-    actions.find_cursor_word + actions.mark_all + actions.activate_opfunc:bind(config),
+    actions.mark_cursor_word + actions.activate_opfunc:bind(config),
     { expr = true, desc = "Operate on occurrences of word under cursor" }
   )
 
@@ -40,13 +40,13 @@ function occurrence.setup(opts)
       -- will use the word under the cursor.
       Keymap:n(
         config.search.normal or config.keymap.normal,
-        actions.find_active_search_or_cursor_word + actions.mark_all + actions.activate:bind(config),
+        actions.mark_active_search_or_cursor_word + actions.activate:bind(config),
         { expr = true, desc = "Find occurrences of active search or word under cursor" }
       )
     else
       Keymap:n(
         config.search.normal,
-        actions.find_last_search + actions.mark_all + actions.activate:bind(config),
+        actions.mark_last_search + actions.activate:bind(config),
         { expr = true, desc = "Find occurrences of last search" }
       )
     end

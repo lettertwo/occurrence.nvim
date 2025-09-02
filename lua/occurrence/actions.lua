@@ -34,7 +34,7 @@ end
 -- Based on https://github.com/neovim/neovim/issues/14157#issuecomment-1320787927
 local set_opfunc = vim.fn[vim.api.nvim_exec2(
   [[
-  func s:set_opfunc(val)
+  func! s:set_opfunc(val)
     let &opfunc = a:val
   endfunc
   echon get(function('s:set_opfunc'), 'name')
@@ -78,8 +78,10 @@ actions.find_visual_subword = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
   local range = Range.of_selection()
   assert(range, "no visual selection")
-  local text =
-    table.concat(vim.api.nvim_buf_get_text(0, range.start.line, range.start.col, range.stop.line, range.stop.col, {}))
+  local text = table.concat(
+    vim.api.nvim_buf_get_text(0, range.start.line, range.start.col, range.stop.line, range.stop.col, {}),
+    "\n"
+  )
   if text == "" then
     log.warn("Empty visual selection")
     return
@@ -208,25 +210,34 @@ actions.unmark_all = Action.new(function(occurrence)
   end
 end)
 
-actions.find_and_mark_cursor_word = actions.find_cursor_word + actions.mark_all
+actions.mark_cursor_word = actions.find_cursor_word + actions.mark_all
 
-actions.find_and_mark_cursor_word_or_toggle_mark = Action.new(function(occurrence)
+actions.mark_cursor_word_or_toggle_mark = Action.new(function(occurrence)
+  if occurrence.patterns == nil or #occurrence.patterns == 0 then
+    return actions.mark_cursor_word(occurrence)
+  end
   local cursor = Cursor.save()
   local range = occurrence:match_cursor()
   if range and range:contains(cursor.location) then
-    return actions.toggle_mark:with(occurrence)()
+    return actions.toggle_mark(occurrence)
   else
     cursor:restore()
-    return actions.find_and_mark_cursor_word(occurrence)
+    return actions.mark_cursor_word(occurrence)
   end
 end)
+
+actions.mark_visual_subword = actions.find_visual_subword + actions.mark_all
+
+actions.mark_active_search_or_cursor_word = actions.find_active_search_or_cursor_word + actions.mark_all
+
+actions.mark_last_search = actions.find_last_search + actions.mark_all
 
 -- Activate keybindings for the given configuration.
 ---@param occurrence occurrence.Occurrence
 ---@param config occurrence.Config
 actions.activate = Action.new(function(occurrence, config)
   if not occurrence:has_matches() then
-    log.warn("No matches found for pattern:", occurrence.pattern, "skipping activation")
+    log.warn("No matches found for pattern(s):", table.concat(occurrence.patterns, ", "), "skipping activation")
     return
   end
   log.debug("Activating keybindings for buffer", occurrence.buffer)
@@ -253,7 +264,7 @@ actions.activate = Action.new(function(occurrence, config)
   keymap:n("gN", actions.goto_previous:with(occurrence), "Previous occurrence")
 
   -- Manage occurrence marks.
-  keymap:n("go", actions.find_and_mark_cursor_word_or_toggle_mark:with(occurrence), "Toggle occurrence mark")
+  keymap:n("go", actions.mark_cursor_word_or_toggle_mark:with(occurrence), "Toggle occurrence mark")
   keymap:n("ga", actions.mark:with(occurrence), "Mark occurrence")
   keymap:n("gx", actions.unmark:with(occurrence), "Unmark occurrence")
 
