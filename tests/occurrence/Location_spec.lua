@@ -167,20 +167,6 @@ describe("Location", function()
     end)
   end)
 
-  describe("distance", function()
-    it("calculates distance between locations", function()
-      local loc1 = Location.new(0, 0)
-      local loc2 = Location.new(3, 4)
-      local distance = loc1:distance(loc2)
-      assert.equals(5, distance) -- 3-4-5 triangle
-    end)
-
-    it("returns 0 for same location", function()
-      local loc = Location.new(5, 5)
-      assert.equals(0, loc:distance(loc))
-    end)
-  end)
-
   describe("add", function()
     it("adds column offset with single argument", function()
       local loc = Location.new(5, 10)
@@ -393,4 +379,3 @@ describe("Location", function()
     end)
   end)
 end)
-

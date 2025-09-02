@@ -76,6 +76,26 @@ local function search(pattern, flags)
   return nil
 end
 
+---@param loc1 occurrence.Location
+---@param loc2 occurrence.Location
+local function char_dist(loc1, loc2)
+  if loc1.line == loc2.line then
+    return math.abs(loc1.col - loc2.col)
+  end
+  if loc1 > loc2 then
+    loc2, loc1 = loc1, loc2
+  end
+  local lines = vim.api.nvim_buf_get_lines(0, loc1.line, loc2.line + 1, false)
+  local chars = loc2.col
+  if #lines > 1 then
+    chars = chars + #lines[1] - loc1.col
+    for i = 2, #lines - 1 do
+      chars = chars + #lines[i]
+    end
+  end
+  return chars
+end
+
 ---@param state occurrence.OccurrenceState
 ---@param flags occurrence.SearchFlags
 ---@param cursor? occurrence.Location
@@ -93,19 +113,22 @@ local function closest(state, flags, cursor, bounds)
       if match and not closest_match then
         closest_match = match
       elseif match and closest_match then
-        local match_dist = math.min(cursor:distance(match.start), cursor:distance(match.stop))
-        local closest_match_dist = math.min(cursor:distance(closest_match.start), cursor:distance(closest_match.stop))
+        local match_dist = math.min(char_dist(cursor, match.start), char_dist(cursor, match.stop))
+        local closest_match_dist =
+          math.min(char_dist(cursor, closest_match.start), char_dist(cursor, closest_match.stop))
 
         -- If wrapping is enabled, we need to consider the distance to the bounds.
         if flags.wrap and bounds then
           if flags.backward then
-            match_dist = math.min(match_dist, cursor:distance(bounds.start) + bounds.stop:distance(match.stop))
+            match_dist = math.min(match_dist, char_dist(cursor, bounds.start) + char_dist(bounds.stop, match.stop))
             closest_match_dist =
-              math.min(closest_match_dist, cursor:distance(bounds.start) + bounds.stop:distance(closest_match.stop))
+              math.min(closest_match_dist, char_dist(cursor, bounds.start) + char_dist(bounds.stop, closest_match.stop))
           else
-            match_dist = math.min(match_dist, cursor:distance(bounds.stop) + bounds.start:distance(match.start))
-            closest_match_dist =
-              math.min(closest_match_dist, cursor:distance(bounds.stop) + bounds.start:distance(closest_match.start))
+            match_dist = math.min(match_dist, char_dist(cursor, bounds.stop) + char_dist(bounds.start, match.start))
+            closest_match_dist = math.min(
+              closest_match_dist,
+              char_dist(cursor, bounds.stop) + char_dist(bounds.start, closest_match.start)
+            )
           end
         end
 
@@ -226,22 +249,25 @@ function Occurrence:match_cursor(opts)
     elseif prev_match:contains(cursor.location) then
       match = prev_match
     else
-      local prev_dist = math.min(cursor.location:distance(prev_match.start), cursor.location:distance(prev_match.stop))
-      local next_dist = math.min(cursor.location:distance(next_match.start), cursor.location:distance(next_match.stop))
+      local prev_dist =
+        math.min(char_dist(cursor.location, prev_match.start), char_dist(cursor.location, prev_match.stop))
+      local next_dist =
+        math.min(char_dist(cursor.location, next_match.start), char_dist(cursor.location, next_match.stop))
       if opts.wrap and bounds then
         -- If wrapping is enabled, we need to consider the distance to the bounds.
         if opts.direction == "backward" then
           prev_dist =
-            math.min(prev_dist, cursor.location:distance(bounds.start) + bounds.stop:distance(prev_match.stop))
+            math.min(prev_dist, char_dist(cursor.location, bounds.start) + char_dist(bounds.stop, prev_match.stop))
           next_dist =
-            math.min(next_dist, cursor.location:distance(bounds.stop) + bounds.start:distance(next_match.stop))
+            math.min(next_dist, char_dist(cursor.location, bounds.stop) + char_dist(bounds.start, next_match.stop))
         else
           prev_dist =
-            math.min(prev_dist, cursor.location:distance(bounds.stop) + bounds.start:distance(prev_match.start))
+            math.min(prev_dist, char_dist(cursor.location, bounds.stop) + char_dist(bounds.start, prev_match.start))
           next_dist =
-            math.min(next_dist, cursor.location:distance(bounds.start) + bounds.stop:distance(next_match.start))
+            math.min(next_dist, char_dist(cursor.location, bounds.start) + char_dist(bounds.stop, next_match.start))
         end
       end
+
       match = prev_dist < next_dist and prev_match or next_match
     end
   end
@@ -305,6 +331,7 @@ end
 function Occurrence:matches(range)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local start_location = range and range.start or Location.new(0, 0)
+  local last_location = start_location
 
   ---@type occurrence.PatternMatchState[]
   local pattern_matchers = vim.iter(ipairs(state.patterns)):fold({}, function(acc, i, pattern)
@@ -348,10 +375,9 @@ function Occurrence:matches(range)
     for _, next_pattern_match in ipairs(pattern_matchers) do
       local match = next_pattern_match.peek()
       if match then
-        if
-          not next_best_match
-          or match.start:distance(start_location) < next_best_match.start:distance(start_location)
-        then
+        if not next_best_match then
+          next_best_match = match
+        elseif char_dist(last_location, match.start) < char_dist(last_location, next_best_match.start) then
           next_best_match = match
         end
       end
@@ -363,6 +389,7 @@ function Occurrence:matches(range)
           break
         end
       end
+      last_location = next_best_match.start
 
       return next_best_match
     end

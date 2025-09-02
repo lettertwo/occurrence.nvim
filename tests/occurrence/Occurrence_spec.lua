@@ -152,6 +152,23 @@ describe("Occurrence", function()
         "Range(start: Location(0, 20), stop: Location(0, 23))",
       }, matches)
     end)
+
+    it("iterates over matches for multiple patterns on multiple lines", function()
+      local bufnr = util.buffer([[
+        foo bar baz
+        foo bar baz
+      ]])
+      local occ = Occurrence.new(bufnr, "bar", {})
+      occ:add("baz", {})
+
+      local matches = vim.iter(occ:matches()):map(tostring):totable()
+      assert.same({
+        "Range(start: Location(0, 12), stop: Location(0, 15))",
+        "Range(start: Location(0, 16), stop: Location(0, 19))",
+        "Range(start: Location(1, 12), stop: Location(1, 15))",
+        "Range(start: Location(1, 16), stop: Location(1, 19))",
+      }, matches)
+    end)
   end)
 
   describe("marks", function()
@@ -361,6 +378,67 @@ describe("Occurrence", function()
         "Range(start: Location(0, 4), stop: Location(0, 7))",
         "Range(start: Location(0, 8), stop: Location(0, 11))",
         "Range(start: Location(0, 12), stop: Location(0, 15))",
+      }, marked)
+    end)
+
+    it("iterates over marks for multiple patterns on multiple lines", function()
+      local bufnr = util.buffer([[
+        foo bar baz
+        foo bar baz
+      ]])
+      local occ = Occurrence.new(bufnr, "bar", {})
+      occ:add("baz", {})
+
+      occ:mark()
+
+      local marked = {}
+      for mark in occ:marks() do
+        table.insert(marked, tostring(mark))
+      end
+      assert.same({
+        "Range(start: Location(0, 12), stop: Location(0, 15))",
+        "Range(start: Location(0, 16), stop: Location(0, 19))",
+        "Range(start: Location(1, 12), stop: Location(1, 15))",
+        "Range(start: Location(1, 16), stop: Location(1, 19))",
+      }, marked)
+    end)
+
+    it("iterates over marks within a multiline pattern", function()
+      local bufnr = util.buffer([[
+        bar baz
+        foo bar baz
+        foo bar baz
+      ]])
+      local occ = Occurrence.new(bufnr, [[baz\n        foo]], {})
+
+      assert.is_true(occ:mark())
+
+      local marked = vim.iter(occ:marks()):map(tostring):totable()
+
+      assert.same({
+        "Range(start: Location(0, 12), stop: Location(1, 11))",
+        "Range(start: Location(1, 16), stop: Location(2, 11))",
+      }, marked)
+    end)
+
+    it("iterates over marks for multiple multiline patterns", function()
+      local bufnr = util.buffer([[
+        bar baz
+        foo bar baz
+        foo bar baz
+      ]])
+      local occ = Occurrence.new(bufnr, [[baz\n        foo]], {})
+      occ:add([[bar baz\n        foo]], {})
+
+      assert.is_true(occ:mark())
+
+      local marked = vim.iter(occ:marks()):map(tostring):totable()
+
+      assert.same({
+        "Range(start: Location(0, 8), stop: Location(1, 11))",
+        "Range(start: Location(0, 12), stop: Location(1, 11))",
+        "Range(start: Location(1, 12), stop: Location(2, 11))",
+        "Range(start: Location(1, 16), stop: Location(2, 11))",
       }, marked)
     end)
   end)
@@ -637,6 +715,40 @@ describe("Occurrence", function()
         occ:match_cursor({ direction = "backward", marked = true })
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
       end)
+    end)
+
+    it("moves the cursor to the nearest occurrence on the same line", function()
+      local bufnr = util.buffer([[
+        foo bar baz
+        foo bar baz
+      ]])
+      local o = Occurrence.new(bufnr, "bar", {})
+      o:add("baz", {})
+
+      assert.is_true(o:mark())
+
+      assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
+
+      o:match_cursor({ direction = "forward", wrap = true, marked = true })
+      assert.same({ 1, 12 }, vim.api.nvim_win_get_cursor(0)) -- first 'bar'
+
+      o:match_cursor({ direction = "forward", wrap = true, marked = true })
+      assert.same({ 1, 16 }, vim.api.nvim_win_get_cursor(0)) -- first 'baz'
+
+      o:match_cursor({ direction = "forward", wrap = true, marked = true })
+      assert.same({ 2, 12 }, vim.api.nvim_win_get_cursor(0)) -- second 'bar'
+
+      o:match_cursor({ direction = "forward", wrap = true, marked = true })
+      assert.same({ 2, 16 }, vim.api.nvim_win_get_cursor(0)) -- second 'baz'
+
+      o:match_cursor({ direction = "backward", wrap = true, marked = true })
+      assert.same({ 2, 12 }, vim.api.nvim_win_get_cursor(0)) -- second 'bar'
+
+      o:match_cursor({ direction = "backward", wrap = true, marked = true })
+      assert.same({ 1, 16 }, vim.api.nvim_win_get_cursor(0)) -- first 'baz'
+
+      o:match_cursor({ direction = "backward", wrap = true, marked = true })
+      assert.same({ 1, 12 }, vim.api.nvim_win_get_cursor(0)) -- first 'bar'
     end)
   end)
 end)

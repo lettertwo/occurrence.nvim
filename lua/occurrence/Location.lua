@@ -234,15 +234,6 @@ function Location:to_markpos()
   return { self.line + 1, self.col }
 end
 
---- Returns the distance between this `Location` and another `Location`.
----@param other occurrence.Location
----@return number
-function Location:distance(other)
-  local a = math.abs(self.line - other.line)
-  local b = math.abs(self.col - other.col)
-  return math.sqrt(a * a + b * b)
-end
-
 -- Add an offset to a `Location` to get a new `Location`.
 --
 -- A single integer argument is interpreted as a column offset.
