@@ -56,17 +56,21 @@ local Action = {}
 ---@field bind fun(...: any): self
 ---@field protected occurrence occurrence.Occurrence
 
-local function is_occurrence_action(action)
-  return type(action) == "table" and pcall(action.is_action, action) and action.occurrence ~= nil
+local function is_occurrence_action(value)
+  return type(value) == "table" and pcall(value.is_action, value) and value.occurrence ~= nil
 end
 
 ---@param candidate any
 ---@return boolean
-function Action.is_action(candidate, ...)
+function action.is_action(candidate, ...)
   if select("#", ...) > 0 then
     error("no arguments expected")
   end
   return type(candidate) == "table" and candidate.type == ACTION
+end
+
+function Action:is_action()
+  return true
 end
 
 -- Create a new action from a callback or existing action.
@@ -79,7 +83,7 @@ function action.new(callback)
 
   local self = { type = ACTION }
   local meta = Action
-  if Action.is_action(callback) then
+  if action.is_action(callback) then
     -- If the callback is an action, we just extend it.
     ---@cast callback -function
     meta = callback

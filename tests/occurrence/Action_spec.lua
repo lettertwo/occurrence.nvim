@@ -74,13 +74,6 @@ describe("Action", function()
       local action = Action.new(function() end)
       assert.is_true(action:with({}):is_action())
     end)
-
-    it("errors when called with an argument", function()
-      local action = Action.new(function() end)
-      assert.error(function()
-        action:is_action(action)
-      end, "no arguments expected")
-    end)
   end)
 
   describe(":with", function()
