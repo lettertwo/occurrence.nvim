@@ -4,9 +4,9 @@ local log = require("occurrence.log")
 local register = {}
 
 ---@class occurrence.Register
----@field protected register string The register to use for yanking or deleting text.
----@field protected type string The type of register, e.g., "char", "line", or "block".
----@field protected text string[] The text to be saved in the register.
+---@field register string The register to use for yanking or deleting text.
+---@field type string The type of register, e.g., "char", "line", or "block".
+---@field text string[] The text to be saved in the register.
 local Register = {}
 
 ---@param register_name? string The register to use for yanking or deleting text.
