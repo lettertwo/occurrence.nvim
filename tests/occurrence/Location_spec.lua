@@ -267,14 +267,22 @@ describe("Location", function()
   end)
 
   describe("integration tests", function()
+    local bufnr
+
     before_each(function()
-      util.buffer({
+      bufnr = util.buffer({
         "line 0: short",
         "line 1: this is a longer line with more content",
         "line 2: medium length line",
         "line 3: x",
         "", -- empty line 4
       })
+    end)
+
+    after_each(function()
+      if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+        vim.api.nvim_buf_delete(bufnr, { force = true })
+      end
     end)
 
     describe("of_cursor", function()

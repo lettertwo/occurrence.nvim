@@ -1,7 +1,6 @@
 local assert = require("luassert")
 local spy = require("luassert.spy")
 local match = require("luassert.match")
-local util = require("tests.util")
 local Action = require("occurrence.Action")
 
 describe("action", function()
@@ -13,6 +12,7 @@ describe("action", function()
 
     it("returns true for an occurrence action", function()
       local action = Action.new(function() end)
+      ---@diagnostic disable-next-line: missing-fields
       assert.is_true(Action.is_action(action:with({})))
     end)
 
@@ -72,6 +72,7 @@ describe("Action", function()
 
     it("returns true for an occurrence action instance", function()
       local action = Action.new(function() end)
+      ---@diagnostic disable-next-line: missing-fields
       assert.is_true(action:with({}):is_action())
     end)
   end)
@@ -275,7 +276,7 @@ describe("Action", function()
     end)
 
     it("combines a bound action with an action", function()
-      local cb1 = spy.new(function(o, a)
+      local cb1 = spy.new(function(_, a)
         return a
       end)
       local cb2 = spy.new(function()

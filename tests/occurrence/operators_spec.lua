@@ -6,7 +6,6 @@ local util = require("tests.util")
 
 local operators = require("occurrence.operators")
 local Occurrence = require("occurrence.Occurrence")
-local Register = require("occurrence.Register")
 
 describe("operators", function()
   local bufnr

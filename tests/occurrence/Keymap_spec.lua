@@ -289,6 +289,7 @@ describe("Keymap", function()
 
       assert.is_true(keymap1.active_keymaps.n["test_key"])
       assert.is_true(keymap2.active_keymaps.n["test_key"])
+      ---@diagnostic disable-next-line: undefined-field
       assert.is_true(Keymap.active_keymaps.n["test_key"])
 
       -- Reset one shouldn't affect the other
@@ -296,12 +297,14 @@ describe("Keymap", function()
 
       assert.same({}, keymap1.active_keymaps.n) -- empty after reset
       assert.is_true(keymap2.active_keymaps.n["test_key"])
+      ---@diagnostic disable-next-line: undefined-field
       assert.is_true(Keymap.active_keymaps.n["test_key"])
 
       Keymap:reset()
 
       assert.same({}, keymap1.active_keymaps.n)
       assert.is_true(keymap2.active_keymaps.n["test_key"])
+      ---@diagnostic disable-next-line: undefined-field
       assert.same({}, Keymap.active_keymaps.n)
 
       keymap2:reset()

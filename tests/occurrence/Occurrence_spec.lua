@@ -6,9 +6,17 @@ local Range = require("occurrence.Range")
 local NS = vim.api.nvim_create_namespace("Occurrence")
 
 describe("Occurrence", function()
+  local bufnr
+
+  after_each(function()
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+      vim.api.nvim_buf_delete(bufnr, { force = true })
+    end
+  end)
+
   describe("matches", function()
     it("finds matches", function()
-      local bufnr = util.buffer("foo")
+      bufnr = util.buffer("foo")
 
       local foo = Occurrence.new(bufnr, "foo", {})
       assert.is_true(foo:has_matches())
@@ -18,7 +26,7 @@ describe("Occurrence", function()
     end)
 
     it("finds matches with special characters", function()
-      local bufnr = util.buffer([[foo.bar
+      bufnr = util.buffer([[foo.bar
       foo(bar)
       foo[bar]
       foo{bar}
@@ -57,7 +65,7 @@ describe("Occurrence", function()
     end)
 
     it("is case-sensitive", function()
-      local bufnr = util.buffer("Foo foo FOO")
+      bufnr = util.buffer("Foo foo FOO")
 
       local foo = Occurrence.new(bufnr, "foo", {})
       assert.is_true(foo:has_matches())
@@ -69,7 +77,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over matches", function()
-      local bufnr = util.buffer("foo bar foo")
+      bufnr = util.buffer("foo bar foo")
 
       local foo = Occurrence.new(bufnr, "foo", {})
       local matches = {}
@@ -84,7 +92,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over matches for multiple patterns", function()
-      local bufnr = util.buffer("foo bar baz foo bar baz")
+      bufnr = util.buffer("foo bar baz foo bar baz")
       local occ = Occurrence.new(bufnr, "foo", {})
       occ:add("bar", {})
       occ:add("baz", {})
@@ -104,7 +112,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over matches with a custom range", function()
-      local bufnr = util.buffer("foo bar foo")
+      bufnr = util.buffer("foo bar foo")
 
       local foo = Occurrence.new(bufnr, "foo", {})
       local matches = {}
@@ -127,7 +135,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over matches for multiple patterns with a custom range", function()
-      local bufnr = util.buffer("foo bar baz foo bar baz")
+      bufnr = util.buffer("foo bar baz foo bar baz")
       local occ = Occurrence.new(bufnr, "foo", {})
       occ:add("bar", {})
       occ:add("baz", {})
@@ -154,7 +162,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over matches for multiple patterns on multiple lines", function()
-      local bufnr = util.buffer([[
+      bufnr = util.buffer([[
         foo bar baz
         foo bar baz
       ]])
@@ -173,7 +181,7 @@ describe("Occurrence", function()
 
   describe("marks", function()
     it("marks matches", function()
-      local bufnr = util.buffer("foo bar foo")
+      bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.new(bufnr, "foo", {})
 
       foo:mark()
@@ -185,7 +193,7 @@ describe("Occurrence", function()
     end)
 
     it("marks matches for multiple patterns", function()
-      local bufnr = util.buffer("foo bar baz foo bar baz")
+      bufnr = util.buffer("foo bar baz foo bar baz")
       local occ = Occurrence.new(bufnr, "foo", {})
       occ:add("bar", {})
       occ:add("baz", {})
@@ -203,7 +211,7 @@ describe("Occurrence", function()
     end)
 
     it("marks matches within a range", function()
-      local bufnr = util.buffer("foo bar foo")
+      bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.new(bufnr, "foo", {})
 
       foo:mark(Range.deserialize("0:0::0:4"))
@@ -212,7 +220,7 @@ describe("Occurrence", function()
     end)
 
     it("marks matches within a range for multiple patterns", function()
-      local bufnr = util.buffer("foo bar baz foo bar baz")
+      bufnr = util.buffer("foo bar baz foo bar baz")
       local occ = Occurrence.new(bufnr, "foo", {})
       occ:add("bar", {})
       occ:add("baz", {})
@@ -228,7 +236,7 @@ describe("Occurrence", function()
     end)
 
     it("unmarks matches", function()
-      local bufnr = util.buffer("foo bar foo")
+      bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.new(bufnr, "foo", {})
 
       foo:mark()
@@ -244,7 +252,7 @@ describe("Occurrence", function()
     end)
 
     it("unmarks matches for multiple patterns", function()
-      local bufnr = util.buffer("foo bar baz foo bar baz")
+      bufnr = util.buffer("foo bar baz foo bar baz")
       local occ = Occurrence.new(bufnr, "foo", {})
       occ:add("bar", {})
       occ:add("baz", {})
@@ -266,7 +274,7 @@ describe("Occurrence", function()
     end)
 
     it("unmarks matches within a range", function()
-      local bufnr = util.buffer("foo bar foo")
+      bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.new(bufnr, "foo", {})
 
       foo:mark(Range.deserialize("0:0::1:0"))
@@ -282,7 +290,7 @@ describe("Occurrence", function()
     end)
 
     it("unmarks matches for multiple patterns within a range", function()
-      local bufnr = util.buffer("foo bar baz foo bar baz")
+      bufnr = util.buffer("foo bar baz foo bar baz")
       local occ = Occurrence.new(bufnr, "foo", {})
       occ:add("bar", {})
       occ:add("baz", {})
@@ -305,7 +313,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over marks", function()
-      local bufnr = util.buffer("foo bar foo")
+      bufnr = util.buffer("foo bar foo")
 
       local foo = Occurrence.new(bufnr, "foo", {})
       foo:mark(Range.deserialize("0:0::1:0"))
@@ -324,7 +332,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over marks for multiple patterns", function()
-      local bufnr = util.buffer("foo bar baz foo bar baz")
+      bufnr = util.buffer("foo bar baz foo bar baz")
       local occ = Occurrence.new(bufnr, "foo", {})
       occ:add("bar", {})
       occ:add("baz", {})
@@ -346,7 +354,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over marks within a range", function()
-      local bufnr = util.buffer("foo bar foo")
+      bufnr = util.buffer("foo bar foo")
 
       local foo = Occurrence.new(bufnr, "foo", {})
       foo:mark(Range.deserialize("0:0::1:0"))
@@ -362,7 +370,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over marks for multiple patterns within a range", function()
-      local bufnr = util.buffer("foo bar baz foo bar baz")
+      bufnr = util.buffer("foo bar baz foo bar baz")
       local occ = Occurrence.new(bufnr, "foo", {})
       occ:add("bar", {})
       occ:add("baz", {})
@@ -382,7 +390,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over marks for multiple patterns on multiple lines", function()
-      local bufnr = util.buffer([[
+      bufnr = util.buffer([[
         foo bar baz
         foo bar baz
       ]])
@@ -404,7 +412,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over marks within a multiline pattern", function()
-      local bufnr = util.buffer([[
+      bufnr = util.buffer([[
         bar baz
         foo bar baz
         foo bar baz
@@ -422,7 +430,7 @@ describe("Occurrence", function()
     end)
 
     it("iterates over marks for multiple multiline patterns", function()
-      local bufnr = util.buffer([[
+      bufnr = util.buffer([[
         bar baz
         foo bar baz
         foo bar baz
@@ -446,7 +454,7 @@ describe("Occurrence", function()
   describe("match_cursor", function()
     describe("default", function()
       it("moves the cursor to the nearest occurrence", function()
-        local bufnr = util.buffer("foo bar foo")
+        bufnr = util.buffer("foo bar foo")
         -- match "bar"
         local o = Occurrence.new(bufnr, "bar", {})
 
@@ -480,7 +488,7 @@ describe("Occurrence", function()
       end)
 
       it("moves the cursor to the nearest occurrence for multiple patterns", function()
-        local bufnr = util.buffer("foo bar baz foo bar baz")
+        bufnr = util.buffer("foo bar baz foo bar baz")
         local occ = Occurrence.new(bufnr, "foo", {})
         occ:add("bar", {})
 
@@ -506,7 +514,7 @@ describe("Occurrence", function()
 
     describe('direction = "forward"', function()
       it("moves the cursor forward to the nearest occurrence", function()
-        local bufnr = util.buffer("foo bar foo")
+        bufnr = util.buffer("foo bar foo")
         local o = Occurrence.new(bufnr, "bar", {})
 
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
@@ -525,7 +533,7 @@ describe("Occurrence", function()
       end)
 
       it("moves the cursor forward to the nearest occurrence for multiple patterns", function()
-        local bufnr = util.buffer("foo bar baz foo bar baz")
+        bufnr = util.buffer("foo bar baz foo bar baz")
         local occ = Occurrence.new(bufnr, "foo", {})
         occ:add("bar", {})
 
@@ -548,7 +556,7 @@ describe("Occurrence", function()
 
     describe('direction = "backward"', function()
       it("moves the cursor backward to the nearest occurrence", function()
-        local bufnr = util.buffer("foo bar foo")
+        bufnr = util.buffer("foo bar foo")
         local o = Occurrence.new(bufnr, "bar", {})
 
         -- move cursor to the end of the buffer
@@ -569,7 +577,7 @@ describe("Occurrence", function()
       end)
 
       it("moves the cursor backward to the nearest occurrence for multiple patterns", function()
-        local bufnr = util.buffer("foo bar baz foo bar baz")
+        bufnr = util.buffer("foo bar baz foo bar baz")
         local occ = Occurrence.new(bufnr, "foo", {})
         occ:add("bar", {})
 
@@ -597,7 +605,7 @@ describe("Occurrence", function()
 
     describe("wrap = true", function()
       it("wraps the cursor to the nearest occurrence", function()
-        local bufnr = util.buffer("foo bar foo")
+        bufnr = util.buffer("foo bar foo")
         local o = Occurrence.new(bufnr, "foo", {})
 
         assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
@@ -614,7 +622,7 @@ describe("Occurrence", function()
       end)
 
       it("wraps the cursor to the nearest occurrence for multiple patterns", function()
-        local bufnr = util.buffer("foo bar baz foo bar baz")
+        bufnr = util.buffer("foo bar baz foo bar baz")
         local occ = Occurrence.new(bufnr, "foo", {})
         occ:add("bar", {})
 
@@ -640,7 +648,7 @@ describe("Occurrence", function()
 
     describe("marked = true", function()
       it("moves the cursor to marked occurrences", function()
-        local bufnr = util.buffer("foo bar foo")
+        bufnr = util.buffer("foo bar foo")
         local o = Occurrence.new(bufnr, "foo", {})
 
         -- mark the first 'foo' match
@@ -683,7 +691,7 @@ describe("Occurrence", function()
       end)
 
       it("moves the cursor to marked occurrences for multiple patterns", function()
-        local bufnr = util.buffer("foo bar baz foo bar baz")
+        bufnr = util.buffer("foo bar baz foo bar baz")
         local occ = Occurrence.new(bufnr, "foo", {})
         occ:add("bar", {})
 
@@ -718,7 +726,7 @@ describe("Occurrence", function()
     end)
 
     it("moves the cursor to the nearest occurrence on the same line", function()
-      local bufnr = util.buffer([[
+      bufnr = util.buffer([[
         foo bar baz
         foo bar baz
       ]])

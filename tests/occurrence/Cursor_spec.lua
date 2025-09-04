@@ -4,14 +4,23 @@ local Location = require("occurrence.Location")
 local Cursor = require("occurrence.Cursor")
 
 describe("Cursor", function()
+  local bufnr
+
   before_each(function()
-    util.buffer({
+    bufnr = util.buffer({
       "first line of text content here",
       "second line with more detailed content",
       "third line for cursor testing purposes",
       "fourth line is shorter than others",
       "fifth and final line of the test buffer",
     })
+  end)
+
+  after_each(function()
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+      vim.api.nvim_buf_delete(bufnr, { force = true })
+    end
+    bufnr = nil
   end)
 
   describe("cursor.save", function()
@@ -363,4 +372,3 @@ describe("Cursor", function()
     end)
   end)
 end)
-

@@ -230,13 +230,21 @@ describe("Range", function()
   end)
 
   describe("integration tests", function()
+    local bufnr
+
     before_each(function()
-      util.buffer({
+      bufnr = util.buffer({
         "hello world this is a test",
         "second line with more content",
         "", -- empty line 3
         "fourth line here",
       })
+    end)
+
+    after_each(function()
+      if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+        vim.api.nvim_buf_delete(bufnr, { force = true })
+      end
     end)
 
     it("of_line creates ranges that contain cursor positions", function()

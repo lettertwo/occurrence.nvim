@@ -1,13 +1,9 @@
 local assert = require("luassert")
 local spy = require("luassert.spy")
 local match = require("luassert.match")
-local util = require("tests.util")
 local config = require("occurrence.Config")
 
 describe("Config", function()
-  -- We can't directly test Config:validate since it's an internal method
-  -- Instead we test it indirectly through config.new behavior
-
   describe("config.new validation", function()
     it("validates valid options", function()
       local valid_opts = {

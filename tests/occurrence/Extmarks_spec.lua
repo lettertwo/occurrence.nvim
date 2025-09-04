@@ -7,14 +7,22 @@ local Extmarks = require("occurrence.Extmarks")
 local NS = vim.api.nvim_create_namespace("Occurrence")
 
 describe("Extmarks", function()
+  local bufnr
+
   before_each(function()
-    util.buffer({
+    bufnr = util.buffer({
       "first line of text content here",
       "second line with more detailed content",
       "third line for extmark testing purposes",
       "fourth line is shorter than others",
       "fifth and final line of the test buffer",
     })
+  end)
+
+  after_each(function()
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+      vim.api.nvim_buf_delete(bufnr, { force = true })
+    end
   end)
 
   describe("extmarks.new", function()
@@ -343,7 +351,7 @@ describe("Extmarks", function()
       local search_range = Range.new(Location.new(0, 0), Location.new(2, 0))
 
       local count = 0
-      for original, current in extmarks:iter(buf, { range = search_range }) do
+      for original in extmarks:iter(buf, { range = search_range }) do
         count = count + 1
         assert.is_true(original.start.line < 3) -- should not include line 3
       end
