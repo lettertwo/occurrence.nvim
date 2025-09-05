@@ -177,6 +177,86 @@ describe("Occurrence", function()
         "Range(start: Location(1, 16), stop: Location(1, 19))",
       }, matches)
     end)
+
+    it("iterates over matches for a provided pattern", function()
+      bufnr = util.buffer("foo bar foo")
+
+      local foo = Occurrence.new(bufnr, "foo", {})
+      local matches = {}
+      for match in foo:matches(nil, "bar") do
+        table.insert(matches, tostring(match))
+      end
+
+      assert.same({
+        "Range(start: Location(0, 4), stop: Location(0, 7))",
+      }, matches)
+    end)
+
+    it("iterates over matches for a provided pattern with a custom range", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+
+      local foo = Occurrence.new(bufnr, "foo", {})
+      local matches = {}
+      for match in foo:matches(Range.deserialize("0:0::0:15"), "foo") do
+        table.insert(matches, tostring(match))
+      end
+
+      assert.same({
+        "Range(start: Location(0, 0), stop: Location(0, 3))",
+        "Range(start: Location(0, 8), stop: Location(0, 11))",
+      }, matches)
+    end)
+
+    it("iterates over matches for a provided pattern on multiple lines", function()
+      bufnr = util.buffer([[
+        foo bar baz
+        foo bar baz
+        foo bar baz
+      ]])
+      local occ = Occurrence.new(bufnr, "bar", {})
+      occ:add("baz", {})
+
+      local matches = vim.iter(occ:matches(nil, "baz")):map(tostring):totable()
+      assert.same({
+        "Range(start: Location(0, 16), stop: Location(0, 19))",
+        "Range(start: Location(1, 16), stop: Location(1, 19))",
+        "Range(start: Location(2, 16), stop: Location(2, 19))",
+      }, matches)
+    end)
+
+    it("iterates over multiple provided patterns", function()
+      bufnr = util.buffer("foo bar baz foo bar baz")
+      local occ = Occurrence.new(bufnr, "foo", {})
+      occ:add("bar", {})
+      occ:add("baz", {})
+
+      local matches = {}
+      for match in occ:matches(nil, { "foo", "baz" }) do
+        table.insert(matches, tostring(match))
+      end
+      assert.same({
+        "Range(start: Location(0, 0), stop: Location(0, 3))",
+        "Range(start: Location(0, 8), stop: Location(0, 11))",
+        "Range(start: Location(0, 12), stop: Location(0, 15))",
+        "Range(start: Location(0, 20), stop: Location(0, 23))",
+      }, matches)
+    end)
+
+    it("iterates over multiple provided patterns with a custom range", function()
+      bufnr = util.buffer("foo bar baz foo bar baz")
+      local occ = Occurrence.new(bufnr, "foo", {})
+      occ:add("bar", {})
+      occ:add("baz", {})
+
+      local matches = {}
+      for match in occ:matches(Range.deserialize("0:5::0:15"), { "foo", "baz" }) do
+        table.insert(matches, tostring(match))
+      end
+      assert.same({
+        "Range(start: Location(0, 8), stop: Location(0, 11))",
+        "Range(start: Location(0, 12), stop: Location(0, 15))",
+      }, matches)
+    end)
   end)
 
   describe("marks", function()

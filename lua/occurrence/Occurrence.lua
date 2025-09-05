@@ -2,7 +2,6 @@ local Location = require("occurrence.Location")
 local Cursor = require("occurrence.Cursor")
 local Range = require("occurrence.Range")
 local Extmarks = require("occurrence.Extmarks")
-local log = require("occurrence.log")
 
 ---@module 'occurrence.Occurrence'
 local occurrence = {}
@@ -326,15 +325,23 @@ end
 
 -- Get an iterator of matching occurrence ranges.
 -- If `range` is provided, only yields the occurrences contained within the given `Range`.
+-- If `patterns` is provided, only yields occurrences matching these patterns.
 ---@param range? occurrence.Range
+---@param patterns? string | string[]
 ---@return fun(): occurrence.Range next_match
-function Occurrence:matches(range)
+function Occurrence:matches(range, patterns)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local start_location = range and range.start or Location.new(0, 0)
   local last_location = start_location
 
+  if patterns == nil then
+    patterns = state.patterns
+  elseif type(patterns) == "string" then
+    patterns = { patterns }
+  end
+
   ---@type occurrence.PatternMatchState[]
-  local pattern_matchers = vim.iter(ipairs(state.patterns)):fold({}, function(acc, i, pattern)
+  local pattern_matchers = vim.iter(ipairs(patterns)):fold({}, function(acc, i, pattern)
     ---@class occurrence.PatternMatchState
     local match_state = {
       ---@type string
