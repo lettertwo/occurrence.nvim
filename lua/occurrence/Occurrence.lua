@@ -415,6 +415,12 @@ function Occurrence:marks(opts)
   return extmarks:iter(self.buffer, opts)
 end
 
+-- Whether or not there is at least one marked occurrence in the buffer.
+function Occurrence:has_marks()
+  local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
+  return extmarks:has_any()
+end
+
 -- Set the text to search for.
 -- If the `is_word` option is set, the text will only match when surrounded with word boundaries.
 ---@param text? string

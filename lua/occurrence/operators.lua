@@ -65,8 +65,19 @@ local function create_operator(config)
     -- Cache for replacement values when using a function
     local cached_replacement = nil
 
-    -- Collect edits into a table and unmark all occurrences before applying operation
     edits = edits:totable()
+
+    -- For modifications with functions, test cancellation before unmarking
+    if config.modifies_text and type(config.replacement) == "function" and #edits > 0 then
+      local test_replacement = config.replacement(nil, edits[1], 1)
+      if test_replacement == false then
+        log.debug("Operation cancelled by user")
+        original_cursor:restore()
+        return
+      end
+      cached_replacement = test_replacement
+    end
+
     for o in occurrence:marks() do
       occurrence:unmark(o)
     end
@@ -100,11 +111,16 @@ local function create_operator(config)
         if config.modifies_text then
           local replacement = config.replacement
           if type(replacement) == "function" then
-            replacement = replacement(text, edit, i) or cached_replacement
-            -- cache initial replacement for re-use on edits that don't provide new replacement values,
-            -- e.g., when doing a change oeration.
-            if edited == 0 then
-              cached_replacement = replacement
+            -- Use cached replacement for first edit, or call function for subsequent edits
+            if i == 1 and cached_replacement ~= nil then
+              replacement = cached_replacement
+            else
+              replacement = replacement(text, edit, i) or cached_replacement
+              -- cache initial replacement for re-use on edits that don't provide new replacement values,
+              -- e.g., when doing a change operation.
+              if edited == 0 and cached_replacement == nil then
+                cached_replacement = replacement
+              end
             end
           end
 
@@ -190,7 +206,11 @@ operators.change = create_operator({
   replacement = function(_, edit, index)
     -- For the first edit, capture user input
     if index == 1 then
-      local input = vim.fn.input("Change to: ")
+      local ok, input = pcall(vim.fn.input, "Change to: ")
+      if not ok then
+        -- User cancelled with Ctrl-C - return false to abort operation
+        return false
+      end
       return input
     end
     -- For subsequent edits, return the cached replacement value

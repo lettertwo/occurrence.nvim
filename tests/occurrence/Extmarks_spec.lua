@@ -31,6 +31,7 @@ describe("Extmarks", function()
 
       assert.is_table(extmarks)
       assert.is_function(extmarks.has)
+      assert.is_function(extmarks.has_any)
       assert.is_function(extmarks.add)
       assert.is_function(extmarks.get)
       assert.is_function(extmarks.del)
@@ -50,6 +51,41 @@ describe("Extmarks", function()
       extmarks1:add(buf, range)
       assert.is_true(extmarks1:has(range))
       assert.is_false(extmarks2:has(range))
+    end)
+  end)
+
+  describe("Extmarks:has_any", function()
+    local extmarks, buf
+
+    before_each(function()
+      extmarks = Extmarks.new()
+      buf = vim.api.nvim_get_current_buf()
+    end)
+
+    it("returns false when no extmarks exist", function()
+      assert.is_false(extmarks:has_any())
+    end)
+
+    it("returns true when at least one extmark exists", function()
+      local range = Range.new(Location.new(0, 0), Location.new(0, 5))
+      extmarks:add(buf, range)
+
+      assert.is_true(extmarks:has_any())
+    end)
+
+    it("returns false after all extmarks are deleted", function()
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
+      local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
+      extmarks:add(buf, range1)
+      extmarks:add(buf, range2)
+
+      assert.is_true(extmarks:has_any())
+
+      extmarks:del(buf, range1)
+      assert.is_true(extmarks:has_any())
+
+      extmarks:del(buf, range2)
+      assert.is_false(extmarks:has_any())
     end)
   end)
 

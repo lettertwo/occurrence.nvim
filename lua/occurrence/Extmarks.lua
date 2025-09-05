@@ -31,6 +31,12 @@ function Extmarks:has(id_or_range)
   end
 end
 
+-- Check if there are any extmarks.
+---@return boolean
+function Extmarks:has_any()
+  return next(self) ~= nil
+end
+
 -- Add an extmark and highlight for the given `Range`.
 ---@param buffer integer
 ---@param range occurrence.Range
