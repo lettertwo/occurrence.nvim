@@ -158,7 +158,11 @@ describe("operators", function()
       assert.same({ "test bar test", "baz test bar" }, final_lines)
 
       -- Verify input was called
-      assert.stub(input_stub).was_called_with("Change to: ")
+      assert.stub(input_stub).was_called_with({
+        prompt = "Change to: ",
+        default = "foo",
+        cancelreturn = false,
+      })
 
       input_stub:revert()
     end)

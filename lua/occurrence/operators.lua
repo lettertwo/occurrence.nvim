@@ -19,7 +19,7 @@ local operators = {}
 
 -- Function to generate replacement text for direct_api method.
 -- If nil is returned on any n + 1 edits, the first edit replacement value is reused.
----@alias occurrence.ReplacementFunction fun(text?: string | string[], edit: occurrence.Location, index: integer): string | string[] | nil
+---@alias occurrence.ReplacementFunction fun(text?: string | string[], edit: occurrence.Location, index: integer): string | string[] | false | nil
 
 ---@class occurrence.DirectApiOperatorConfig: occurrence.OperatorConfigBase
 ---@field method 'direct_api'
@@ -67,27 +67,10 @@ local function create_operator(config)
 
     edits = edits:totable()
 
-    -- For modifications with functions, test cancellation before unmarking
-    if config.modifies_text and type(config.replacement) == "function" and #edits > 0 then
-      local test_replacement = config.replacement(nil, edits[1], 1)
-      if test_replacement == false then
-        log.debug("Operation cancelled by user")
-        original_cursor:restore()
-        return
-      end
-      cached_replacement = test_replacement
-    end
-
-    for o in occurrence:marks() do
-      occurrence:unmark(o)
-    end
-
     log.debug("edits found:" .. #edits)
 
     -- Apply operation to all occurrences
     for i, edit in ipairs(edits) do
-      log.debug(edit)
-
       -- Create single undo block for all edits
       if config.modifies_text and edited > 0 then
         vim.cmd("silent! undojoin")
@@ -109,25 +92,30 @@ local function create_operator(config)
       -- Apply the operation based on method
       if config.method == "direct_api" then
         if config.modifies_text then
-          local replacement = config.replacement
-          if type(replacement) == "function" then
-            -- Use cached replacement for first edit, or call function for subsequent edits
-            if i == 1 and cached_replacement ~= nil then
-              replacement = cached_replacement
-            else
-              replacement = replacement(text, edit, i) or cached_replacement
-              -- cache initial replacement for re-use on edits that don't provide new replacement values,
-              -- e.g., when doing a change operation.
-              if edited == 0 and cached_replacement == nil then
-                cached_replacement = replacement
-              end
-            end
+          local replacement
+          if type(config.replacement) == "function" then
+            replacement = config.replacement(text, edit, i)
+          else
+            replacement = config.replacement
+          end
+
+          if i == 1 and replacement == false then
+            log.debug("Operation cancelled by user")
+            original_cursor:restore()
+            return
           end
 
           if type(replacement) == "string" then
             replacement = { replacement }
           end
 
+          replacement = replacement or cached_replacement or {}
+
+          if replacement and replacement ~= cached_replacement then
+            cached_replacement = replacement
+          end
+
+          occurrence:unmark(edit)
           vim.api.nvim_buf_set_text(
             0,
             edit.start.line,
@@ -136,21 +124,33 @@ local function create_operator(config)
             edit.stop.col,
             replacement or {}
           )
+          edited = edited + 1
+        else
+          -- NOTE: at this point, "direct_api" that does not modify text is a no-op.
+          -- If it "uses_register", the text has already been yanked to the register.
+          -- Maybe we will want to support processing the text in some way in the future,
+          -- but that likely means rethinking "direct_api" with a replacement function as
+          -- something more general.
+          occurrence:unmark(edit)
+          edited = edited + 1
         end
       elseif config.method == "command" then
         local start_line, stop_line = edit.start.line + 1, edit.stop.line + 1
         log.debug("execuing command: ", string.format("%d,%d%s", start_line, stop_line, operator))
+        occurrence:unmark(edit)
         vim.cmd(string.format("%d,%d%s", start_line, stop_line, operator))
+        edited = edited + 1
       elseif config.method == "visual_feedkeys" then
         log.debug("executing nvim_feedkeys:", operator)
         vim.cmd("normal! v")
         Cursor.move(edit.stop)
+        occurrence:unmark(edit)
         vim.api.nvim_feedkeys(operator, "x", true)
+        edited = edited + 1
       else
         ---@diagnostic disable-next-line: undefined-field
         error("Unknown operator method: " .. tostring(config.method))
       end
-      edited = edited + 1
     end
 
     if edited == 0 then
@@ -203,10 +203,14 @@ operators.change = create_operator({
   method = "direct_api",
   uses_register = true,
   modifies_text = true,
-  replacement = function(_, edit, index)
+  replacement = function(text, _, index)
     -- For the first edit, capture user input
     if index == 1 then
-      local ok, input = pcall(vim.fn.input, "Change to: ")
+      local ok, input = pcall(vim.fn.input, {
+        prompt = "Change to: ",
+        default = type(text) == "table" and table.concat(text) or (text or ""),
+        cancelreturn = false,
+      })
       if not ok then
         -- User cancelled with Ctrl-C - return false to abort operation
         return false
