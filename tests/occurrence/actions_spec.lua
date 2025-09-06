@@ -196,6 +196,30 @@ describe("actions", function()
       assert.equals(2, marked_count) -- All 'foo' occurrences marked
     end)
 
+    it("mark_cursor_word should only mark the new cursor word", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      local occurrence = Occurrence.new(bufnr, "foo", {})
+      assert.is_true(occurrence:has_matches())
+
+      actions.mark_cursor_word(occurrence)
+      local marked_count = #vim.iter(occurrence:marks()):totable()
+      assert.equals(2, marked_count) -- All 'foo' occurrences marked
+
+      -- unmark all first
+      actions.unmark_all(occurrence)
+      marked_count = #vim.iter(occurrence:marks()):totable()
+      assert.equals(0, marked_count)
+
+      -- Move cursor to 'bar' and mark
+      vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
+      actions.mark_cursor_word(occurrence)
+
+      -- Check that only 'bar' occurrences are marked
+      marked_count = #vim.iter(occurrence:marks()):totable()
+      assert.equals(1, marked_count) -- All 'bar' occurrences marked
+    end)
+
     it("mark_cursor_word_or_toggle_mark should toggle existing occurrence", function()
       bufnr = util.buffer("foo bar baz foo")
 

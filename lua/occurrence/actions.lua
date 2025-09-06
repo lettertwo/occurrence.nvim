@@ -210,7 +210,16 @@ actions.unmark_all = Action.new(function(occurrence)
   end
 end)
 
-actions.mark_cursor_word = actions.find_cursor_word + actions.mark_all
+actions.mark_cursor_word = Action.new(function(occurrence)
+  actions.find_cursor_word(occurrence)
+  -- mark all occurrences of the newest pattern
+  if occurrence.patterns ~= nil and #occurrence.patterns > 0 then
+    local pattern = occurrence.patterns[#occurrence.patterns]
+    for range in occurrence:matches(nil, pattern) do
+      occurrence:mark(range)
+    end
+  end
+end)
 
 actions.mark_cursor_word_or_toggle_mark = Action.new(function(occurrence)
   if occurrence.patterns == nil or #occurrence.patterns == 0 then
@@ -268,7 +277,7 @@ actions.activate = Action.new(function(occurrence, config)
   keymap:n("ga", actions.mark:with(occurrence), "Mark occurrence")
   keymap:n("gx", actions.unmark:with(occurrence), "Unmark occurrence")
 
-  -- Use visual/select to narrow occurrence matches.
+  -- Use visual/select to narrow occurrence marks.
   keymap:x("go", actions.toggle_mark_selection:with(occurrence), "Toggle occurrence marks")
   keymap:x("ga", actions.mark_selection:with(occurrence), "Mark occurrences")
   keymap:x("gx", actions.unmark_selection:with(occurrence), "Unmark occurrences")
@@ -375,6 +384,10 @@ end)
 
 -- Deactivate the keymap for the given occurrence.
 actions.deactivate = Action.new(function(occurrence)
+  if occurrence:has_marks() then
+    log.warn("Occurrence still has marks, not deactivating keymap")
+    return
+  end
   local keymap = KEYMAP_CACHE[occurrence.buffer]
   if keymap then
     keymap:reset()
