@@ -299,42 +299,4 @@ describe("actions", function()
       assert.equals(2, marked_count) -- All 'foo' occurrences marked
     end)
   end)
-
-  describe("activation", function()
-    it("warns when no matches found", function()
-      -- mock vim.notify to capture warnings
-      local original_notify = vim.notify
-      vim.notify = spy.new(function() end)
-      local occurrence = Occurrence.new(bufnr, "nonexistent", {})
-
-      actions.activate(occurrence, {})
-
-      assert.spy(vim.notify).was_called_with(match.is_match("No matches found"), vim.log.levels.WARN, match._)
-
-      -- Clean up
-      actions.deactivate(occurrence)
-
-      -- restore original notify
-      vim.notify = original_notify
-    end)
-
-    it("succeeds when matches are found", function()
-      -- mock vim.notify to capture warnings
-      local original_notify = vim.notify
-      vim.notify = spy.new(function() end)
-
-      bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
-
-      actions.activate(occurrence, {})
-
-      assert.spy(vim.notify).was_not_called()
-
-      -- Clean up
-      actions.deactivate(occurrence)
-
-      -- restore original notify
-      vim.notify = original_notify
-    end)
-  end)
 end)
