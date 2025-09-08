@@ -3,11 +3,36 @@ local log = require("occurrence.log")
 ---@module 'occurrence.Config'
 local config = {}
 
+---Options for configuring operators.
+---@class occurrence.OperatorKeymapOptions: { [string]: occurrence.OperatorConfig | occurrence.SupportedOperators | boolean | nil }
+---@field ["c"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["d"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["y"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["<"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field [">"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["gu"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["gU"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["g~"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["g?"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["dd"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["cc"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["yy"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["C"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["D"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["Y"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["gq"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["gw"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["zf"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["="] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["!"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@field ["g@"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+
 ---Options for configuring keymaps.
 ---@class occurrence.KeymapOptions
 ---@field normal string?
 ---@field visual string?
 ---@field operator_pending string?
+---@field operators occurrence.OperatorKeymapOptions?
 
 ---Options for configuring search.
 ---@class occurrence.SearchOptions
@@ -19,6 +44,37 @@ local config = {}
 ---@field keymap occurrence.KeymapOptions?
 ---@field search occurrence.SearchOptions?
 
+-- Default operator mappings :h operator
+---@class occurrence.OperatorKeymapConfig: { [string]: occurrence.OperatorConfig | occurrence.SupportedOperators | boolean }
+local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
+  ["c"] = "change",
+  ["d"] = "delete",
+  ["y"] = "yank",
+  ["<"] = "indent_left",
+  [">"] = "indent_right",
+
+  ["gu"] = true, -- make lowercase
+  ["gU"] = true, -- make uppercase
+  ["g~"] = true, -- swap case
+  ["g?"] = true, -- ROT13 encoding
+
+  -- TODO: implement these
+  ["dd"] = false, -- delete line
+  ["cc"] = false, -- change line
+  ["yy"] = false, -- yank line
+  ["C"] = false, -- change to end of line
+  ["D"] = false, -- delete to end of line
+  ["Y"] = false, -- yank to end of line
+
+  -- TODO: implement these
+  ["gq"] = false, -- text formatting
+  ["gw"] = false, -- text formatting with no cursor movement
+  ["zf"] = false, -- define a fold
+  ["="] = false, -- filter through 'equalprg' or C-indenting if empty
+  ["!"] = false, -- filter through an external program
+  ["g@"] = false, -- call function set with 'operatorfunc'
+}
+
 -- Default keymap configuration
 ---@class occurrence.KeymapConfig
 local DEFAULT_KEYMAP_CONFIG = {
@@ -28,6 +84,8 @@ local DEFAULT_KEYMAP_CONFIG = {
   visual = "go",
   ---@type string keymap to modify a pending operation to target occurrences of the word under cursor. Default is 'o'.
   operator_pending = "o",
+  ---@type occurrence.OperatorKeymapConfig configuration for operators.
+  operators = DEFAULT_OPERATOR_KEYMAP_CONFIG,
 }
 
 -- Default search configuration

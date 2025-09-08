@@ -1,8 +1,13 @@
 local Action = require("occurrence.Action")
+local Config = require("occurrence.Config")
 local Cursor = require("occurrence.Cursor")
 local Register = require("occurrence.Register")
 
 local log = require("occurrence.log")
+
+-- A map of operator names to their created Action instances.
+---@type table<string, occurrence.Action>
+local OPERATOR_CACHE = {}
 
 ---@module 'occurrence.operators'
 local operators = {}
@@ -10,6 +15,7 @@ local operators = {}
 ---@class occurrence.OperatorConfigBase
 ---@field uses_register boolean Whether the operator uses a register.
 ---@field modifies_text boolean Whether the operator modifies text.
+---@field desc? string Optional description of the operator. If defined, this will be used to describe keymaps.
 
 ---@class occurrence.VisualFeedkeysOperatorConfig: occurrence.OperatorConfigBase
 ---@field method 'visual_feedkeys'
@@ -168,108 +174,156 @@ local function create_operator(config)
   end)
 end
 
---- Generic fallback for unknown operators
----@param operator string
----@return occurrence.Action
-function operators.get_operator(operator)
-  if operators[operator] then
-    return operators[operator]
-  end
+-- Supported operators
+---@enum (key) occurrence.SupportedOperators
+local supported_operators = {
+  change = {
+    desc = "Change marked occurrences",
+    method = "direct_api",
+    uses_register = true,
+    modifies_text = true,
+    replacement = function(text, _, index)
+      -- For the first edit, capture user input
+      if index == 1 then
+        local ok, input = pcall(vim.fn.input, {
+          prompt = "Change to: ",
+          default = type(text) == "table" and table.concat(text) or (text or ""),
+          cancelreturn = false,
+        })
+        if not ok then
+          -- User cancelled with Ctrl-C - return false to abort operation
+          return false
+        end
+        return input
+      end
+      -- For subsequent edits, return the cached replacement value
+      return nil
+    end,
+  },
 
-  log.debug("Creating generic fallback for operator:", operator)
+  delete = {
+    desc = "Delete marked occurrences",
+    method = "direct_api",
+    uses_register = true,
+    modifies_text = true,
+    replacement = {},
+  },
 
-  -- Create generic operator with conservative defaults
-  local fallback_config = {
+  yank = {
+    desc = "Yank marked occurrences",
+    method = "direct_api",
+    uses_register = true,
+    modifies_text = false,
+  },
+
+  indent_left = {
+    method = "command",
     uses_register = false,
     modifies_text = true,
-    method = "visual_feedkeys",
-  }
+  },
 
-  -- Cache the generated operator for future use
-  operators[operator] = create_operator(fallback_config)
-  return operators[operator]
+  indent_right = {
+    method = "command",
+    uses_register = false,
+    modifies_text = true,
+  },
+}
+
+-- Generic operator with conservative defaults
+local FALLBACK_CONFIG = {
+  uses_register = false,
+  modifies_text = true,
+  method = "visual_feedkeys",
+}
+
+---@param operator string
+---@param operators_config? occurrence.OperatorKeymapConfig
+---@return occurrence.OperatorConfig|false|nil
+function operators.get_operator_config(operator, operators_config)
+  operators_config = operators_config or Config.new():keymap().operators
+  operator = operators.resolve_name(operator, operators_config)
+
+  local operator_config = operators_config[operator]
+  if operator_config == false then
+    return false
+  end
+
+  if type(operator_config) == "table" then
+    return operator_config
+  end
+
+  local supported_operator_config = supported_operators[operator]
+  if type(supported_operator_config) == "table" then
+    return supported_operator_config
+  end
+
+  return nil
+end
+
+---@param operator string
+---@param operators_config? occurrence.OperatorKeymapConfig
+function operators.get_desc(operator, operators_config)
+  local operator_config = operators.get_operator_config(operator, operators_config)
+  if type(operator_config) == "table" and operator_config.desc then
+    return operator_config.desc
+  end
+  return "'" .. operator .. "' on marked occurrences"
+end
+
+---@param name string
+---@param operators_config? occurrence.OperatorKeymapConfig
+---@return string
+function operators.resolve_name(name, operators_config)
+  operators_config = operators_config or Config.new():keymap().operators
+  local resolved = operators_config[name]
+  local seen = {}
+  while type(resolved) == "string" do
+    if seen[name] then
+      error("Circular operator alias detected: '" .. name .. "' <-> '" .. resolved .. "'")
+    end
+    seen[name] = true
+    name = resolved
+    resolved = operators_config[name]
+  end
+  return name
+end
+
+--- Generic fallback for unknown operators
+---@param operator string
+---@param config? occurrence.Config
+---@return occurrence.Action
+function operators.get_operator(operator, config)
+  local operators_config = config and config:keymap().operators or nil
+  local operator_name = operators.resolve_name(operator, operators_config)
+  local operator_action = OPERATOR_CACHE[operator_name]
+
+  if not operator_action then
+    local operator_config = operators.get_operator_config(operator, operators_config)
+    if operator_config == false then
+      if operator_name ~= operator then
+        error("Operator '" .. operator_name .. "' (alias '" .. operator .. "') is disabled in the configuration.")
+      else
+        error("Operator '" .. operator .. "' is disabled in the configuration.")
+      end
+    elseif operator_config then
+      operator_action = create_operator(operator_config)
+    else
+      log.debug("Creating generic fallback for operator:", operator_name)
+      operator_action = create_operator(FALLBACK_CONFIG)
+    end
+    OPERATOR_CACHE[operator_name] = operator_action
+  end
+
+  return operator_action
 end
 
 --- Check if an operator is supported
 ---@param operator string
+---@param config? occurrence.Config
 ---@return boolean
-function operators.is_supported(operator)
-  return operators[operator] ~= nil
+function operators.is_supported(operator, config)
+  local operator_config = operators.get_operator_config(operator, config and config:keymap().operators or nil)
+  return operator_config ~= false
 end
-
--- Supported operators
-
-operators.change = create_operator({
-  method = "direct_api",
-  uses_register = true,
-  modifies_text = true,
-  replacement = function(text, _, index)
-    -- For the first edit, capture user input
-    if index == 1 then
-      local ok, input = pcall(vim.fn.input, {
-        prompt = "Change to: ",
-        default = type(text) == "table" and table.concat(text) or (text or ""),
-        cancelreturn = false,
-      })
-      if not ok then
-        -- User cancelled with Ctrl-C - return false to abort operation
-        return false
-      end
-      return input
-    end
-    -- For subsequent edits, return the cached replacement value
-    return nil
-  end,
-})
-
-operators.delete = create_operator({
-  method = "direct_api",
-  uses_register = true,
-  modifies_text = true,
-  replacement = {},
-})
-
-operators.yank = create_operator({
-  method = "direct_api",
-  uses_register = true,
-  modifies_text = false,
-})
-
-operators.indent_left = create_operator({
-  method = "command",
-  uses_register = false,
-  modifies_text = true,
-})
-
-operators.indent_right = create_operator({
-  method = "command",
-  uses_register = false,
-  modifies_text = true,
-})
-
--- Default operator mappings :h operator
-
-operators["c"] = operators.change
-operators["d"] = operators.delete
-operators["y"] = operators.yank
-operators["<"] = operators.indent_left
-operators[">"] = operators.indent_right
-
--- TODO:
--- |g@| call function set with the 'operatorfunc' option
--- operators["g@"] = O.opfunc
-
--- The rest of these are handled by the generic fallback
-
--- |~| swap case (only if 'tildeop' is set)
--- |g~| swap case
--- |gu| make lowercase
--- |gU| make uppercase
--- |!| filter through an external program
--- |=| filter through 'equalprg' or C-indenting if empty
--- |gq| text formatting
--- |gw| text formatting with no cursor movement
--- |g?| ROT13 encoding
--- |zf| define a fold
 
 return operators

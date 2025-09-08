@@ -4,6 +4,7 @@ local spy = require("luassert.spy")
 local stub = require("luassert.stub")
 local util = require("tests.util")
 
+local Config = require("occurrence.Config")
 local operators = require("occurrence.operators")
 local Occurrence = require("occurrence.Occurrence")
 
@@ -34,7 +35,7 @@ describe("operators", function()
       assert.same({ "foo bar foo", "baz foo bar" }, initial_lines)
 
       -- Apply delete operator
-      operators.delete(occurrence, "d", nil, nil, '"')
+      operators.get_operator("delete")(occurrence, "d", nil, nil, '"')
 
       -- Check that 'foo' occurrences were deleted
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -52,7 +53,7 @@ describe("operators", function()
       end
 
       -- Apply delete operator to default register
-      operators.delete(occurrence, "d", nil, nil, '"')
+      operators.get_operator("delete")(occurrence, "d", nil, nil, '"')
 
       -- Check register content
       local register_content = vim.fn.getreg('"')
@@ -70,7 +71,7 @@ describe("operators", function()
       end
 
       -- Apply delete operator to register 'a'
-      operators.delete(occurrence, "d", nil, nil, "a")
+      operators.get_operator("delete")(occurrence, "d", nil, nil, "a")
 
       -- Check register content
       local register_content = vim.fn.getreg("a")
@@ -93,7 +94,7 @@ describe("operators", function()
       assert.same({ "foo bar foo", "baz foo bar" }, initial_lines)
 
       -- Apply yank operator
-      operators.yank(occurrence, "y", nil, nil, '"')
+      operators.get_operator("yank")(occurrence, "y", nil, nil, '"')
 
       -- Check that text was not modified
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -111,7 +112,7 @@ describe("operators", function()
       end
 
       -- Apply yank operator
-      operators.yank(occurrence, "y", nil, nil, '"')
+      operators.get_operator("yank")(occurrence, "y", nil, nil, '"')
 
       -- Check register content
       local register_content = vim.fn.getreg('"')
@@ -128,7 +129,7 @@ describe("operators", function()
       end
 
       -- Apply yank operator
-      operators.yank(occurrence, "y", nil, nil, '"')
+      operators.get_operator("yank")(occurrence, "y", nil, nil, '"')
 
       -- Check register content (multiple foo's concatenated)
       local register_content = vim.fn.getreg('"')
@@ -151,7 +152,7 @@ describe("operators", function()
       input_stub.returns("test")
 
       -- Apply change operator
-      operators.change(occurrence, "c", nil, nil, '"')
+      operators.get_operator("change")(occurrence, "c", nil, nil, '"')
 
       -- Check that all 'foo' occurrences were replaced with "test"
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -182,7 +183,7 @@ describe("operators", function()
       input_stub.returns("new")
 
       -- Apply change operator
-      operators.change(occurrence, "c", nil, nil, '"')
+      operators.get_operator("change")(occurrence, "c", nil, nil, '"')
 
       -- Check register content contains original text
       local register_content = vim.fn.getreg('"')
@@ -205,7 +206,7 @@ describe("operators", function()
       input_stub.returns("changed")
 
       -- Apply change operator
-      operators.change(occurrence, "c", nil, nil, '"')
+      operators.get_operator("change")(occurrence, "c", nil, nil, '"')
 
       -- Check that all occurrences were changed to the same text
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -233,7 +234,7 @@ describe("operators", function()
       assert.has_no.errors(function()
         local cmd_stub = stub(vim, "cmd")
 
-        operators.indent_left(occurrence, "<", nil, nil, nil)
+        operators.get_operator("indent_left")(occurrence, "<", nil, nil, nil)
 
         -- Verify command was called
         assert.stub(cmd_stub).was_called()
@@ -243,12 +244,148 @@ describe("operators", function()
     end)
   end)
 
-  describe("get_operator fallback", function()
+  describe("get_operator", function()
+    it("retrieves supported operators", function()
+      assert.is_true(operators.is_supported("delete"))
+      assert.is_true(operators.is_supported("yank"))
+      assert.is_true(operators.is_supported("change"))
+      assert.is_true(operators.is_supported("indent_left"))
+      assert.is_true(operators.is_supported("indent_right"))
+
+      local delete_op = operators.get_operator("delete")
+      local yank_op = operators.get_operator("yank")
+      local change_op = operators.get_operator("change")
+      local indent_left_op = operators.get_operator("indent_left")
+      local indent_right_op = operators.get_operator("indent_right")
+
+      assert.is_true(delete_op:is_action())
+      assert.is_true(yank_op:is_action())
+      assert.is_true(change_op:is_action())
+      assert.is_true(indent_left_op:is_action())
+      assert.is_true(indent_right_op:is_action())
+    end)
+
+    it("supports aliasing operators", function()
+      local config = Config.new({
+        keymap = {
+          operators = {
+            ["del"] = "delete",
+            ["yd"] = "yank",
+            ["ch"] = "change",
+          },
+        },
+      })
+
+      assert.is_true(operators.is_supported("del", config))
+      assert.is_true(operators.is_supported("yd", config))
+      assert.is_true(operators.is_supported("ch", config))
+
+      local del_op = operators.get_operator("del", config)
+      local yd_op = operators.get_operator("yd", config)
+      local ch_op = operators.get_operator("ch", config)
+
+      assert.is_true(del_op:is_action())
+      assert.is_true(yd_op:is_action())
+      assert.is_true(ch_op:is_action())
+
+      local delete_op = operators.get_operator("delete")
+      local yank_op = operators.get_operator("yank")
+      local change_op = operators.get_operator("change")
+
+      assert.equals(delete_op, del_op)
+      assert.equals(yank_op, yd_op)
+      assert.equals(change_op, ch_op)
+    end)
+
+    it("errors for recursive aliasing", function()
+      local config = Config.new({
+        keymap = {
+          operators = {
+            ["change"] = "delete",
+            ["delete"] = "change",
+          },
+        },
+      })
+
+      assert.error(function()
+        operators.is_supported("change", config)
+      end, "Circular operator alias detected: 'change' <-> 'delete'")
+
+      assert.error(function()
+        operators.is_supported("delete", config)
+      end, "Circular operator alias detected: 'delete' <-> 'change'")
+
+      assert.error(function()
+        operators.get_operator("change", config)
+      end, "Circular operator alias detected: 'change' <-> 'delete'")
+
+      assert.error(function()
+        operators.get_operator("delete", config)
+      end, "Circular operator alias detected: 'delete' <-> 'change'")
+    end)
+
+    it("supports custom operators", function()
+      local config = Config.new({
+        keymap = {
+          operators = {
+            ["custom_op"] = {
+              method = "direct_api",
+              uses_register = true,
+              modifies_text = true,
+              replacement = function()
+                return "test"
+              end,
+            },
+          },
+        },
+      })
+
+      assert.is_true(operators.is_supported("custom_op", config))
+      local custom_op = operators.get_operator("custom_op", config)
+
+      assert.is_true(custom_op:is_action())
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.new(bufnr, "foo", {})
+      occurrence:mark()
+      -- Apply custom operator
+      custom_op(occurrence, "custom_op", nil, nil, '"')
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "test bar test", "baz test bar" }, final_lines)
+    end)
+
+    it("creates default configs for enabled operators", function()
+      local config = Config.new({
+        keymap = {
+          operators = {
+            ["custom1"] = true,
+          },
+        },
+      })
+      assert.is_true(operators.is_supported("custom1", config))
+
+      local custom1_op = operators.get_operator("custom1", config)
+
+      assert.is_true(custom1_op:is_action())
+    end)
+
+    it("errors for disabled operators", function()
+      local config = Config.new({
+        keymap = {
+          operators = {
+            ["nonexistent_op"] = false,
+          },
+        },
+      })
+      assert.is_false(operators.is_supported("nonexistent_op", config))
+      assert.error(function()
+        operators.get_operator("nonexistent_op", config)
+      end)
+    end)
+
     it("creates a fallback operator for unknown operators", function()
       local unknown_op = operators.get_operator("unknown")
-
+      assert.is_true(operators.is_supported("unknown")) -- Unknown operators are supported by default
       assert.is_true(unknown_op:is_action())
-      assert.is_true(operators.is_supported("unknown")) -- Should be cached now
     end)
 
     it("returns cached operator on subsequent calls", function()
@@ -302,7 +439,7 @@ describe("operators", function()
       end
 
       -- Apply delete with count=1
-      operators.delete(occurrence, "d", nil, 1, '"')
+      operators.get_operator("delete")(occurrence, "d", nil, 1, '"')
 
       -- Only one 'foo' should be deleted
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -332,7 +469,7 @@ describe("operators", function()
       local line1_range = Range.new(Location.new(0, 0), Location.new(0, 7)) -- First line only
 
       -- Apply delete with range restriction
-      operators.delete(occurrence, "d", line1_range, nil, '"')
+      operators.get_operator("delete")(occurrence, "d", line1_range, nil, '"')
 
       -- Only 'foo' in first line should be affected
       local final_lines = vim.api.nvim_buf_get_lines(test_bufnr, 0, -1, false)
@@ -355,7 +492,7 @@ describe("operators", function()
       local occurrence = Occurrence.new(bufnr, "foo", {})
       -- Don't mark any occurrences
 
-      operators.delete(occurrence, "d", nil, nil, '"')
+      operators.get_operator("delete")(occurrence, "d", nil, nil, '"')
 
       assert.spy(vim.notify).was_called_with(match.has_match("No occurrences"), vim.log.levels.ERROR, match._)
 
@@ -379,7 +516,7 @@ describe("operators", function()
 
       -- Should not error
       assert.has_no.errors(function()
-        operators.change(occurrence, "c", nil, nil, '"')
+        operators.get_operator("change")(occurrence, "c", nil, nil, '"')
       end)
 
       input_stub:revert()
@@ -402,7 +539,7 @@ describe("operators", function()
       end
 
       -- Apply yank operator (doesn't modify text)
-      operators.yank(occurrence, "y", nil, nil, '"')
+      operators.get_operator("yank")(occurrence, "y", nil, nil, '"')
 
       -- Cursor should be restored
       local final_pos = vim.api.nvim_win_get_cursor(0)

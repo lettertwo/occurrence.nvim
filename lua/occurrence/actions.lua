@@ -334,22 +334,17 @@ end
 ---@param config occurrence.Config
 actions.activate_opfunc = Action.new(function(occurrence, config)
   if not occurrence:has_matches() then
-    log.warn("No matches found for pattern:", occurrence.pattern, "skipping activation")
+    log.warn("No matches found for patterns:", table.concat(occurrence.patterns, ", "), "skipping activation")
     return
   end
 
   local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
 
-  local operator_action = operators[operator]
+  local operator_action = operators.get_operator(operator, config)
 
   if not operator_action then
-    -- Try generic fallback if available
-    if operators.get_operator then
-      operator_action = operators.get_operator(operator)
-    else
-      log.error("Unsupported operator for opfunc_motion:", operator)
-      return
-    end
+    log.error("Unsupported operator for opfunc_motion:", operator)
+    return
   end
 
   local clear_action = actions.unmark_all + actions.deactivate
