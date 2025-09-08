@@ -3,8 +3,25 @@ local log = require("occurrence.log")
 ---@module 'occurrence.Config'
 local config = {}
 
+---Options for configuring keymaps.
+---@class occurrence.KeymapOptions
+---@field normal string?
+---@field visual string?
+---@field operator_pending string?
+
+---Options for configuring search.
+---@class occurrence.SearchOptions
+---@field enabled boolean?
+---@field normal string?
+
+---Options for configuring occurrence.
+---@class occurrence.Options
+---@field keymap occurrence.KeymapOptions?
+---@field search occurrence.SearchOptions?
+
+-- Default keymap configuration
 ---@class occurrence.KeymapConfig
-local KeymapConfig = {
+local DEFAULT_KEYMAP_CONFIG = {
   ---@type string keymap to mark occurrences of the word under cursor to be targeted by the next operation. Default is 'go'.
   normal = "go",
   ---@type string keymap to mark occurrences of the visually selected subword to be targeted by the next operation. Default is 'go'.
@@ -13,8 +30,9 @@ local KeymapConfig = {
   operator_pending = "o",
 }
 
+-- Default search configuration
 ---@class occurrence.SearchConfig
-local SearchConfig = {
+local DEFAULT_SEARCH_CONFIG = {
   ---@type boolean enable search integration. Default is `true`.
   enabled = true,
   ---@type string? keymap to mark occurrences of the last search pattern to be targeted by the next operation.
@@ -23,79 +41,104 @@ local SearchConfig = {
   normal = nil,
 }
 
----@class occurrence.Config
-local Config = {
-  keymap = KeymapConfig,
-  search = SearchConfig,
+local DEFAULT_CONFIG = {
+  keymap = DEFAULT_KEYMAP_CONFIG,
+  search = DEFAULT_SEARCH_CONFIG,
 }
 
----Options for configuring occurrence.
----@class occurrence.Options: occurrence.Config
----@field operator_pending? string
----@field normal? string
----@field visual? string
----@field search? occurrence.SearchConfig
+---@class occurrence.Config
+---@field keymap fun(self: occurrence.Config): occurrence.KeymapConfig
+---@field search fun(self: occurrence.Config): occurrence.SearchConfig
+---@field validate fun(self: occurrence.Config, opts: occurrence.Options): string? error_message
+---@field get fun(self: occurrence.Config, key: string): occurrence.KeymapConfig|occurrence.SearchConfig|nil
+local Config = {}
 
----Create a deep read-only table
----@param tbl table
----@return table
-local function make_readonly(tbl)
-  return setmetatable({}, {
-    __index = function(_, key)
-      local value = tbl[key]
-      if type(value) == "table" then
-        return make_readonly(value)
-      end
-      return value
-    end,
-    __newindex = function()
-      error("cannot modify config")
-    end,
-    __pairs = function()
-      return pairs(tbl)
-    end,
-    __ipairs = function()
-      return ipairs(tbl)
-    end,
-  })
+---@param opts? occurrence.Options
+---@param key string
+---@return occurrence.KeymapConfig|occurrence.SearchConfig|nil
+---@overload fun(opts: occurrence.Options?, key: "keymap"): occurrence.KeymapConfig
+---@overload fun(opts: occurrence.Options?, key: "search"): occurrence.SearchConfig
+local function get(opts, key)
+  if opts ~= nil and opts[key] ~= nil and DEFAULT_CONFIG[key] ~= nil then
+    return vim.tbl_deep_extend("force", {}, DEFAULT_CONFIG[key], opts[key])
+  else
+    return vim.deepcopy(DEFAULT_CONFIG[key])
+  end
 end
 
 ---Validate the given options.
 ---Returns error message if the options represent an invalid configuration.
 ---@param opts occurrence.Options
 ---@return string? error_message
-function Config:validate(opts)
+local function validate(opts)
   if type(opts) ~= "table" then
     return "opts must be a table"
   end
   for k, v in pairs(opts) do
-    if self[k] == nil then
+    if DEFAULT_CONFIG[k] == nil then
       return "invalid option: " .. k
     end
-    if type(v) ~= type(self[k]) then
-      return "option " .. k .. " must be a " .. type(self[k])
+    if type(v) ~= type(DEFAULT_CONFIG[k]) then
+      return "option " .. k .. " must be a " .. type(DEFAULT_CONFIG[k])
     end
   end
   return nil
 end
 
+---Get a copy of the default configuration.
+function config.default()
+  return vim.deepcopy(DEFAULT_CONFIG)
+end
+
+---Check if the given options is already a config.
+---@param opts any
+---@return boolean
+local function is_config(opts)
+  return type(opts) == "table"
+    and type(opts.keymap) == "function"
+    and type(opts.search) == "function"
+    and type(opts.validate) == "function"
+    and type(opts.get) == "function"
+end
+
 ---Validate and parse the given options.
----@param opts? occurrence.Options
----@return occurrence.Config config The configuration parsed from the given options, with defaults applied.
+---@param opts? occurrence.Options | occurrence.Config
+---@return occurrence.Config
 function config.new(opts)
-  local result_config = vim.deepcopy(Config)
+  if is_config(opts) then
+    ---@cast opts occurrence.Config
+    return opts
+  end
+  ---@cast opts -occurrence.Config
 
   if opts ~= nil then
-    local err = Config:validate(opts)
+    local err = validate(opts)
     if err then
       log.warn_once(err)
-    else
-      result_config = vim.tbl_deep_extend("force", result_config, opts)
+      opts = nil
     end
   end
 
-  return make_readonly(result_config)
+  return setmetatable({}, {
+    __index = function(_, key)
+      if key == "validate" then
+        return function(_, o)
+          return validate(o or opts)
+        end
+      end
+      if key == "get" then
+        return function(_, k)
+          return get(opts, k)
+        end
+      end
+      return function()
+        return get(opts, key)
+      end
+    end,
+    __newindex = function()
+      error("cannot modify config")
+    end,
+  })
 end
 
 return config
-

@@ -1,4 +1,5 @@
 local Action = require("occurrence.Action")
+local Config = require("occurrence.Config")
 local Cursor = require("occurrence.Cursor")
 local Occurrence = require("occurrence.Occurrence")
 local Keymap = require("occurrence.Keymap")
@@ -243,8 +244,10 @@ actions.mark_last_search = actions.find_last_search + actions.mark_all
 
 -- Activate keybindings for the given configuration.
 ---@param occurrence occurrence.Occurrence
----@param config occurrence.Config
-actions.activate = Action.new(function(occurrence, config)
+---@param opts? occurrence.Config | occurrence.Options
+actions.activate = Action.new(function(occurrence, opts)
+  local config = Config.new(opts)
+
   if not occurrence:has_matches() then
     log.warn("No matches found for pattern(s):", table.concat(occurrence.patterns, ", "), "skipping activation")
     return
