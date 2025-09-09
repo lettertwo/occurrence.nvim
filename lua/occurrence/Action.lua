@@ -107,7 +107,7 @@ end
 -- Note that the resulting action does not expect to be called with
 -- an `Occurrence` argument.
 --
--- If this is action is combined with another action, it will forward
+-- If this action is combined with another action, it will forward
 -- the bound occurrence to the next action _unless_ that action
 -- is also bound to an `Occurrence`.
 --
@@ -164,7 +164,7 @@ function Action:bind(...)
       end
     else
       function bound:call(occurrence, ...)
-        return callback(occurrence, unpack(concat(args, ...)))
+        return callback(occurrence or Occurrence.new(), unpack(concat(args, ...)))
       end
     end
     getmetatable(bound).__call = bound.call
