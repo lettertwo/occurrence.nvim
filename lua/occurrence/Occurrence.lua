@@ -172,6 +172,7 @@ local OCCURRENCE_META = {
   end,
 }
 
+-- Create a new Occurrence for the given buffer and text.
 ---@param buffer? integer
 ---@param text? string
 ---@param opts? { is_word: boolean }
@@ -180,6 +181,19 @@ function occurrence.new(buffer, text, opts)
   local self = setmetatable({ buffer = buffer or vim.api.nvim_get_current_buf() }, OCCURRENCE_META)
   Occurrence.set(self, text, opts)
   return self
+end
+
+-- Get the Occurrence for the current buffer, or create a new one if it doesn't exist.
+---@param buffer? integer
+---@return occurrence.Occurrence
+function occurrence.get(buffer)
+  buffer = buffer or vim.api.nvim_get_current_buf()
+  for occ, state in pairs(STATE_CACHE) do
+    if occ.buffer == buffer and #state.patterns > 0 then
+      return occ
+    end
+  end
+  return occurrence.new(buffer)
 end
 
 -- Move the cursor to the nearest occurrence.

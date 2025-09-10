@@ -164,7 +164,7 @@ function Action:bind(...)
       end
     else
       function bound:call(occurrence, ...)
-        return callback(occurrence or Occurrence.new(), unpack(concat(args, ...)))
+        return callback(occurrence or Occurrence.get(), unpack(concat(args, ...)))
       end
     end
     getmetatable(bound).__call = bound.call
@@ -221,7 +221,7 @@ end
 ---@protected
 ---@param occurrence? occurrence.Occurrence
 function Action:call(occurrence, ...)
-  return self.callback(occurrence or Occurrence.new(), ...)
+  return self.callback(occurrence or Occurrence.get(), ...)
 end
 
 return action

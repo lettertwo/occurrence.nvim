@@ -161,6 +161,14 @@ describe("Action", function()
       action()
       assert.spy(cb).was_called_with(match.is_same(Occurrence.new()), 1, 2, 3)
     end)
+
+    it("uses the occurrence for the current buffer when possible", function()
+      local cb = spy.new(function() end)
+      local occ = Occurrence.new() -- current buffer occurrence
+      local action = Action.new(cb):bind(1, 2, 3)
+      action()
+      assert.spy(cb).was_called_with(occ, 1, 2, 3)
+    end)
   end)
 
   describe(":add", function()
