@@ -422,10 +422,12 @@ function Occurrence:marks(opts)
   return extmarks:iter(self.buffer, opts)
 end
 
--- Whether or not there is at least one marked occurrence in the buffer.
-function Occurrence:has_marks()
+-- Whether or not there is at least one marked occurrence in the range.
+-- If no `range` is provided, checks if there are any marked occurrences in the buffer.
+---@param range? occurrence.Range
+function Occurrence:has_marks(range)
   local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
-  return extmarks:has_any()
+  return extmarks:has_any(range)
 end
 
 -- Set the text to search for.

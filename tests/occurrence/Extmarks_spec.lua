@@ -87,6 +87,26 @@ describe("Extmarks", function()
       extmarks:del(buf, range2)
       assert.is_false(extmarks:has_any())
     end)
+
+    it("returns false when no extmarks are in the given range", function()
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
+      extmarks:add(buf, range1)
+
+      local search_range = Range.new(Location.new(1, 0), Location.new(1, 5))
+      assert.is_true(extmarks:has_any()) -- extmarks exist
+      assert.is_false(extmarks:has_any(search_range))
+    end)
+
+    it("returns true when at least one extmark is in the given range", function()
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
+      local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
+      extmarks:add(buf, range1)
+      extmarks:add(buf, range2)
+
+      local search_range = Range.new(Location.new(0, 3), Location.new(1, 2))
+      assert.is_true(extmarks:has_any()) -- extmarks exist
+      assert.is_true(extmarks:has_any(search_range))
+    end)
   end)
 
   describe("Extmarks:has", function()

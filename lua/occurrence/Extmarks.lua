@@ -31,9 +31,15 @@ function Extmarks:has(id_or_range)
   end
 end
 
--- Check if there are any extmarks.
+-- Check if there are any extmarks in the given range.
+-- If no range is given, checks if there are any extmarks at all.
+---@param range? occurrence.Range
 ---@return boolean
-function Extmarks:has_any()
+function Extmarks:has_any(range)
+  if range ~= nil then
+    local iter = self:iter(0, { range = range })
+    return iter() ~= nil
+  end
   return next(self) ~= nil
 end
 
