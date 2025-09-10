@@ -8,10 +8,6 @@ local Range = require("occurrence.Range")
 local log = require("occurrence.log")
 local operators = require("occurrence.operators")
 
--- A map of Buffer ids to their active keymaps.
----@type table<integer, occurrence.Keymap>
-local KEYMAP_CACHE = {}
-
 -- A map of Window ids to their cached cursor positions.
 ---@type table<integer, occurrence.Cursor>
 local CURSOR_CACHE = {}
@@ -253,12 +249,12 @@ actions.activate = Action.new(function(occurrence, opts)
     return
   end
   log.debug("Activating keybindings for buffer", occurrence.buffer)
-  if KEYMAP_CACHE[occurrence.buffer] then
+  local keymap = Keymap.get(occurrence.buffer)
+  if keymap then
     log.error("Keymap is already active!")
-    KEYMAP_CACHE[occurrence.buffer]:reset()
+    keymap:reset()
   end
-  local keymap = Keymap.new(occurrence.buffer)
-  KEYMAP_CACHE[occurrence.buffer] = keymap
+  keymap = Keymap.new(occurrence.buffer)
 
   local cancel_action = (actions.unmark_all + actions.deactivate):with(occurrence)
 
@@ -352,12 +348,12 @@ actions.activate_opfunc = Action.new(function(occurrence, config)
   operator_action = operator_action + clear_action
 
   log.debug("Activating operator-pending keybindings for buffer", occurrence.buffer)
-  if KEYMAP_CACHE[occurrence.buffer] then
+  local keymap = Keymap.get(occurrence.buffer)
+  if keymap then
     log.error("Keymap is already active!")
-    KEYMAP_CACHE[occurrence.buffer]:reset()
+    keymap:reset()
   end
-  local keymap = Keymap.new(occurrence.buffer)
-  KEYMAP_CACHE[occurrence.buffer] = keymap
+  keymap = Keymap.new(occurrence.buffer)
 
   local cancel_action = clear_action:with(occurrence)
   keymap:o("<Esc>", cancel_action, "Clear occurrence")
@@ -386,10 +382,7 @@ actions.deactivate = Action.new(function(occurrence)
     log.warn("Occurrence still has marks, not deactivating keymap")
     return
   end
-  local keymap = KEYMAP_CACHE[occurrence.buffer]
-  if keymap then
-    keymap:reset()
-    KEYMAP_CACHE[occurrence.buffer] = nil
+  if Keymap.del(occurrence.buffer) then
     log.debug("Deactivated keybindings for buffer", occurrence.buffer)
   end
 end)

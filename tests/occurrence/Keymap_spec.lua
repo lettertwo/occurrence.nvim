@@ -28,7 +28,180 @@ describe("Keymap", function()
       assert.equals(buf1, keymap1.buffer)
       assert.equals(buf2, keymap2.buffer)
 
+      Keymap.del(buf1)
+      Keymap.del(buf2)
       vim.api.nvim_buf_delete(buf2, { force = true })
+    end)
+
+    it("replaces existing instance for same buffer", function()
+      local buf = vim.api.nvim_get_current_buf()
+      local keymap1 = Keymap.new(buf)
+      keymap1:n("test_key", function() end, "Test keymap")
+
+      assert.is_true(
+        vim.iter(vim.api.nvim_buf_get_keymap(buf, "n")):any(function(k)
+          return k.lhs == "test_key"
+        end),
+        "test_key should be set in buffer"
+      )
+
+      local keymap2 = Keymap.new(buf)
+      keymap2:n("test_key2", function() end, "Test keymap 2")
+
+      assert.is_false(
+        vim.iter(vim.api.nvim_buf_get_keymap(buf, "n")):any(function(k)
+          return k.lhs == "test_key"
+        end),
+        "test_key should not be set in buffer"
+      )
+
+      assert.is_true(
+        vim.iter(vim.api.nvim_buf_get_keymap(buf, "n")):any(function(k)
+          return k.lhs == "test_key2"
+        end),
+        "test_key2 should be set in buffer"
+      )
+    end)
+
+    it("gets cleaned up when buffer is deleted", function()
+      local buf = vim.api.nvim_create_buf(true, true)
+      local keymap = Keymap.new(buf)
+      keymap:n("test_key", function() end, "Test keymap")
+
+      assert.equals(keymap, Keymap.get(buf), "Keymap instance should be retrievable")
+      assert.is_true(
+        vim.iter(vim.api.nvim_buf_get_keymap(buf, "n")):any(function(k)
+          return k.lhs == "test_key"
+        end),
+        "test_key should be set in buffer"
+      )
+
+      vim.api.nvim_buf_delete(buf, { force = true })
+      assert.is_nil(Keymap.get(buf), "Keymap instance should be removed after buffer deletion")
+    end)
+
+    it("defaults to current buffer if none provided", function()
+      local buf = vim.api.nvim_get_current_buf()
+      local keymap = Keymap.new()
+      assert.equals(buf, keymap.buffer)
+    end)
+
+    it("defaults to current buffer if 0 provided", function()
+      local buf = vim.api.nvim_get_current_buf()
+      local keymap = Keymap.new(0)
+      assert.equals(buf, keymap.buffer)
+    end)
+
+    it("errors if buffer is invalid", function()
+      assert.error(function()
+        Keymap.new(-1)
+      end)
+
+      assert.error(function()
+        Keymap.new(#vim.api.nvim_list_bufs() + 1)
+      end)
+
+      assert.error(function()
+        ---@diagnostic disable-next-line: param-type-mismatch
+        Keymap.new("invalid")
+      end)
+    end)
+  end)
+
+  describe("Keymap.get", function()
+    it("retrieves existing instance", function()
+      local buf = vim.api.nvim_get_current_buf()
+      local keymap = Keymap.new(buf)
+
+      local retrieved = Keymap.get(buf)
+      assert.equals(keymap, retrieved)
+    end)
+
+    it("returns nil for non-existent instance", function()
+      local buf = vim.api.nvim_create_buf(true, true)
+      assert.is_nil(Keymap.get(buf))
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+
+    it("defaults to current buffer if none provided", function()
+      local buf = vim.api.nvim_get_current_buf()
+      local keymap = Keymap.new()
+
+      local retrieved = assert(Keymap.get())
+      assert.equals(keymap, retrieved)
+      assert.equals(buf, keymap.buffer)
+      assert.equals(buf, retrieved.buffer)
+    end)
+
+    it("defaults to current buffer if 0 provided", function()
+      local buf = vim.api.nvim_get_current_buf()
+      local keymap = Keymap.new(0)
+
+      local retrieved = assert(Keymap.get(0))
+      assert.equals(keymap, retrieved)
+      assert.equals(buf, keymap.buffer)
+      assert.equals(buf, retrieved.buffer)
+    end)
+
+    it("handles invalid buffer gracefully", function()
+      ---@diagnostic disable-next-line: param-type-mismatch
+      assert.is_nil(Keymap.get("invalid"))
+      assert.is_nil(Keymap.get(-1))
+      assert.is_nil(Keymap.get(#vim.api.nvim_list_bufs() + 1))
+    end)
+  end)
+
+  describe("Keymap.del", function()
+    it("deletes existing instance and its keymaps", function()
+      local buf = vim.api.nvim_create_buf(true, true)
+      local keymap = Keymap.new(buf)
+      keymap:n("test_key", function() end, "Test keymap")
+
+      assert.equals(keymap, Keymap.get(buf), "Keymap instance should be retrievable")
+      assert.is_true(
+        vim.iter(vim.api.nvim_buf_get_keymap(buf, "n")):any(function(k)
+          return k.lhs == "test_key"
+        end),
+        "test_key should be set in buffer"
+      )
+
+      Keymap.del(buf)
+      assert.is_nil(Keymap.get(buf), "Keymap instance should be removed after deletion")
+      assert.is_false(
+        vim.iter(vim.api.nvim_buf_get_keymap(buf, "n")):any(function(k)
+          return k.lhs == "test_key"
+        end),
+        "test_key should be removed from buffer"
+      )
+
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+
+    it("handles non-existent instance gracefully", function()
+      local buf = vim.api.nvim_create_buf(true, true)
+      assert.is_false(Keymap.del(buf), "Should return false for non-existent instance")
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+
+    it("defaults to current buffer if none provided", function()
+      local keymap = Keymap.new()
+      assert.equals(keymap, Keymap.get(), "Keymap instance should be retrievable")
+      assert.is_true(Keymap.del(), "Keymap instance should be deletable")
+      assert.is_nil(Keymap.get(), "Keymap instance should be removed after deletion")
+    end)
+
+    it("defaults to current buffer if 0 provided", function()
+      local keymap = Keymap.new(0)
+      assert.equals(keymap, Keymap.get(0), "Keymap instance should be retrievable")
+      assert.is_true(Keymap.del(0), "Keymap instance should be deletable")
+      assert.is_nil(Keymap.get(0), "Keymap instance should be removed after deletion")
+    end)
+
+    it("handles invalid buffer gracefully", function()
+      ---@diagnostic disable-next-line: param-type-mismatch
+      assert.is_false(Keymap.del("invalid"), "Should return false for invalid buffer")
+      assert.is_false(Keymap.del(-1), "Should return false for invalid buffer")
+      assert.is_false(Keymap.del(#vim.api.nvim_list_bufs() + 1), "Should return false for invalid buffer")
     end)
   end)
 
@@ -234,6 +407,7 @@ describe("Keymap", function()
     after_each(function()
       keymap1:reset()
       keymap2:reset()
+      vim.api.nvim_buf_delete(buf1, { force = true })
       vim.api.nvim_buf_delete(buf2, { force = true })
     end)
 

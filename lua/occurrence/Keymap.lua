@@ -1,57 +1,79 @@
 local log = require("occurrence.log")
+local Modemap = require("occurrence.Modemap")
+
+local MODE = Modemap.MODE
+
+-- A map of Buffer ids to their active keymaps.
+---@type table<integer, occurrence.BufferKeymap>
+local KEYMAP_CACHE = {}
+
+---@param buffer? integer
+---@param validate? boolean
+local function resolve_buffer(buffer, validate)
+  local resolved = buffer
+  if resolved == nil or resolved == 0 then
+    resolved = vim.api.nvim_get_current_buf()
+  end
+  if validate then
+    assert(vim.api.nvim_buf_is_valid(resolved), "Invalid buffer: " .. tostring(buffer or resolved))
+  end
+  return resolved
+end
 
 ---@module 'occurrence.Keymap'
-
----@enum occurrence.KeymapMode
-local MODE = {
-  n = "n", ---Normal mode.
-  o = "o", ---Operator-pending mode.
-  x = "x", ---Visual or select mode.
-}
-
-local Modemap_mt = {
-  __index = function(self, key)
-    assert(MODE[key], "Invalid mode: " .. key)
-    local mode = rawget(self, key)
-    if mode == nil then
-      mode = {}
-      rawset(self, key, mode)
-    end
-    return mode
-  end,
-}
-
--- A table that maps modes to active keymaps.
----@class occurrence.Modemap: table<occurrence.KeymapMode, string[]>
-
----@return occurrence.Modemap
-local function create_modemap()
-  return setmetatable({}, Modemap_mt)
-end
 
 -- A keymap utility that can be used to bind keys to actions.
 -- It tracks active bindings and can be used to neatly deactivate all of them.
 ---@class occurrence.Keymap
----@field active_keymaps occurrence.Modemap
+---@field active_keymaps occurrence.Modemap<{ [string]: true }> A table that tracks active keymaps.
 ---@field buffer? integer The buffer the keymap is bound to. If `nil`, the keymap is global.
 local Keymap = {
-  active_keymaps = create_modemap(),
+  active_keymaps = Modemap.new(),
 }
 
 ---@class occurrence.BufferKeymap: occurrence.Keymap
 ---@field buffer integer The buffer this keymap is bound to.
 
 -- Creates a new keymap bound to a buffer.
----@param buffer integer The buffer to bind to.
+-- If a keymap for the buffer already exists, it is reset and replaced.
+---@param buffer? integer The buffer to bind to. Defaults to the current buffer.
 ---@return occurrence.BufferKeymap
 function Keymap.new(buffer)
+  buffer = resolve_buffer(buffer, true)
+  if KEYMAP_CACHE[buffer] ~= nil then
+    KEYMAP_CACHE[buffer]:reset()
+    KEYMAP_CACHE[buffer] = nil
+  end
   ---@type occurrence.BufferKeymap
   local bound_keymap = {
     buffer = buffer,
-    active_keymaps = create_modemap(),
+    active_keymaps = Modemap.new(),
   }
   setmetatable(bound_keymap, { __index = Keymap })
+  KEYMAP_CACHE[buffer] = bound_keymap
   return bound_keymap
+end
+
+-- Get the keymap for a buffer.
+---@param buffer? integer The buffer to get the keymap for. Defaults to the current buffer.
+---@return occurrence.BufferKeymap | nil
+function Keymap.get(buffer)
+  return KEYMAP_CACHE[resolve_buffer(buffer)]
+end
+
+-- Deletes the keymap for a buffer, if it exists.
+-- This also resets all active keymaps registered by the instance.
+---@param buffer? integer The buffer to delete the keymap for. Defaults to the current buffer.
+---@return boolean
+function Keymap.del(buffer)
+  buffer = resolve_buffer(buffer)
+  local keymap = KEYMAP_CACHE[buffer]
+  if keymap then
+    keymap:reset()
+    KEYMAP_CACHE[buffer] = nil
+    return true
+  end
+  return false
 end
 
 ---@param mode occurrence.KeymapMode
@@ -115,11 +137,19 @@ function Keymap:reset()
   for mode, bindings in pairs(self.active_keymaps) do
     for lhs in pairs(bindings) do
       if not pcall(vim.keymap.del, mode, lhs, { buffer = self.buffer }) then
-        log.warn("Failed to unmap " .. mode .. " " .. lhs)
+        log.warn_once("Failed to unmap " .. mode .. " " .. lhs)
       end
     end
     self.active_keymaps[mode] = nil
   end
 end
+
+-- Autocmd to cleanup keymaps when a buffer is deleted.
+vim.api.nvim_create_autocmd({ "BufDelete" }, {
+  -- group = vim.api.nvim_create_augroup("OccurrenceKeymapCleanup", { clear = true }),
+  callback = function(args)
+    Keymap.del(args.buf)
+  end,
+})
 
 return Keymap
