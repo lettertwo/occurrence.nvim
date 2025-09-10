@@ -5,33 +5,96 @@ local Register = require("occurrence.Register")
 
 local log = require("occurrence.log")
 
--- A map of operator names to their created Action instances.
----@type table<string, occurrence.Action>
-local OPERATOR_CACHE = {}
-
----@module 'occurrence.operators'
-local operators = {}
-
----@class occurrence.OperatorConfigBase
+---@class (exact) occurrence.OperatorConfigBase
 ---@field uses_register boolean Whether the operator uses a register.
 ---@field modifies_text boolean Whether the operator modifies text.
 ---@field desc? string Optional description of the operator. If defined, this will be used to describe keymaps.
 
----@class occurrence.VisualFeedkeysOperatorConfig: occurrence.OperatorConfigBase
+---@class (exact) occurrence.VisualFeedkeysOperatorConfig: occurrence.OperatorConfigBase
 ---@field method 'visual_feedkeys'
 
----@class occurrence.CommandOperatorConfig: occurrence.OperatorConfigBase
+---@class (exact) occurrence.CommandOperatorConfig: occurrence.OperatorConfigBase
 ---@field method 'command'
 
 -- Function to generate replacement text for direct_api method.
 -- If nil is returned on any n + 1 edits, the first edit replacement value is reused.
 ---@alias occurrence.ReplacementFunction fun(text?: string | string[], edit: occurrence.Location, index: integer): string | string[] | false | nil
 
----@class occurrence.DirectApiOperatorConfig: occurrence.OperatorConfigBase
+---@class (exact) occurrence.DirectApiOperatorConfig: occurrence.OperatorConfigBase
 ---@field method 'direct_api'
 ---@field replacement? string | string[] | occurrence.ReplacementFunction Text to replace the occurrence with, or a function that returns the replacement text.
 
 ---@alias occurrence.OperatorConfig occurrence.VisualFeedkeysOperatorConfig | occurrence.CommandOperatorConfig | occurrence.DirectApiOperatorConfig
+
+-- Generic operator with conservative defaults
+---@type occurrence.VisualFeedkeysOperatorConfig
+local FALLBACK_CONFIG = {
+  uses_register = false,
+  modifies_text = true,
+  method = "visual_feedkeys",
+}
+
+-- A map of operator names to their created Action instances.
+---@type { [string]: occurrence.Action }
+local OPERATOR_CACHE = {}
+
+-- Supported operators
+---@enum (key) occurrence.SupportedOperators
+local supported_operators = {
+  change = {
+    desc = "Change marked occurrences",
+    method = "direct_api",
+    uses_register = true,
+    modifies_text = true,
+    replacement = function(text, _, index)
+      -- For the first edit, capture user input
+      if index == 1 then
+        local ok, input = pcall(vim.fn.input, {
+          prompt = "Change to: ",
+          default = type(text) == "table" and table.concat(text) or (text or ""),
+          cancelreturn = false,
+        })
+        if not ok then
+          -- User cancelled with Ctrl-C - return false to abort operation
+          return false
+        end
+        return input
+      end
+      -- For subsequent edits, return the cached replacement value
+      return nil
+    end,
+  },
+
+  delete = {
+    desc = "Delete marked occurrences",
+    method = "direct_api",
+    uses_register = true,
+    modifies_text = true,
+    replacement = {},
+  },
+
+  yank = {
+    desc = "Yank marked occurrences",
+    method = "direct_api",
+    uses_register = true,
+    modifies_text = false,
+  },
+
+  indent_left = {
+    method = "command",
+    uses_register = false,
+    modifies_text = true,
+  },
+
+  indent_right = {
+    method = "command",
+    uses_register = false,
+    modifies_text = true,
+  },
+}
+
+---@module 'occurrence.operators'
+local operators = {}
 
 ---@param config occurrence.OperatorConfig
 local function create_operator(config)
@@ -174,68 +237,6 @@ local function create_operator(config)
   end)
 end
 
--- Supported operators
----@enum (key) occurrence.SupportedOperators
-local supported_operators = {
-  change = {
-    desc = "Change marked occurrences",
-    method = "direct_api",
-    uses_register = true,
-    modifies_text = true,
-    replacement = function(text, _, index)
-      -- For the first edit, capture user input
-      if index == 1 then
-        local ok, input = pcall(vim.fn.input, {
-          prompt = "Change to: ",
-          default = type(text) == "table" and table.concat(text) or (text or ""),
-          cancelreturn = false,
-        })
-        if not ok then
-          -- User cancelled with Ctrl-C - return false to abort operation
-          return false
-        end
-        return input
-      end
-      -- For subsequent edits, return the cached replacement value
-      return nil
-    end,
-  },
-
-  delete = {
-    desc = "Delete marked occurrences",
-    method = "direct_api",
-    uses_register = true,
-    modifies_text = true,
-    replacement = {},
-  },
-
-  yank = {
-    desc = "Yank marked occurrences",
-    method = "direct_api",
-    uses_register = true,
-    modifies_text = false,
-  },
-
-  indent_left = {
-    method = "command",
-    uses_register = false,
-    modifies_text = true,
-  },
-
-  indent_right = {
-    method = "command",
-    uses_register = false,
-    modifies_text = true,
-  },
-}
-
--- Generic operator with conservative defaults
-local FALLBACK_CONFIG = {
-  uses_register = false,
-  modifies_text = true,
-  method = "visual_feedkeys",
-}
-
 ---@param operator string
 ---@param operators_config? occurrence.OperatorKeymapConfig
 ---@return occurrence.OperatorConfig|false|nil
@@ -288,7 +289,16 @@ function operators.resolve_name(name, operators_config)
   return name
 end
 
---- Generic fallback for unknown operators
+--- Check if an operator is supported
+---@param operator string
+---@param config? occurrence.Config
+---@return boolean
+function operators.is_supported(operator, config)
+  local operator_config = operators.get_operator_config(operator, config and config:keymap().operators or nil)
+  return operator_config ~= false
+end
+
+-- Get a normal operator action, creating it if needed.
 ---@param operator string
 ---@param config? occurrence.Config
 ---@return occurrence.Action
@@ -315,15 +325,6 @@ function operators.get_operator(operator, config)
   end
 
   return operator_action
-end
-
---- Check if an operator is supported
----@param operator string
----@param config? occurrence.Config
----@return boolean
-function operators.is_supported(operator, config)
-  local operator_config = operators.get_operator_config(operator, config and config:keymap().operators or nil)
-  return operator_config ~= false
 end
 
 return operators

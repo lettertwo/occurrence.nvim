@@ -145,7 +145,7 @@ describe("occurrence module", function()
       require("occurrence").setup({})
       assert.spy(keymap_n_spy).was_called()
       assert.spy(keymap_x_spy).was_called()
-      assert.spy(keymap_o_spy).was_called()
+      assert.spy(keymap_o_spy).was_not_called()
 
       keymap_n_spy:revert()
       keymap_x_spy:revert()
@@ -164,7 +164,7 @@ describe("occurrence module", function()
 
       assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "go", match._, {
         expr = true,
-        desc = "Find occurrences of active search or word under cursor",
+        desc = "Find occurrences of search or word",
       })
 
       keymap_spy:revert()
@@ -182,7 +182,7 @@ describe("occurrence module", function()
 
       assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "go", match._, {
         expr = true,
-        desc = "Find occurrences of word under cursor",
+        desc = "Find occurrences of word",
       })
 
       keymap_spy:revert()
@@ -204,7 +204,7 @@ describe("occurrence module", function()
 
       assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "<leader>o", match._, {
         expr = true,
-        desc = "Find occurrences of active search or word under cursor",
+        desc = "Find occurrences of search or word",
       })
 
       keymap_spy:revert()
@@ -224,7 +224,7 @@ describe("occurrence module", function()
 
       assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "<leader>o", match._, {
         expr = true,
-        desc = "Find occurrences of active search or word under cursor",
+        desc = "Find occurrences of search or word",
       })
 
       keymap_spy:revert()
@@ -246,7 +246,7 @@ describe("occurrence module", function()
 
       assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "<leader>o", match._, {
         expr = true,
-        desc = "Find occurrences of word under cursor",
+        desc = "Find occurrences of word",
       })
 
       assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "<leader>s", match._, {

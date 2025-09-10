@@ -7,37 +7,7 @@ local Range = require("occurrence.Range")
 
 local log = require("occurrence.log")
 local operators = require("occurrence.operators")
-
--- A map of Window ids to their cached cursor positions.
----@type table<integer, occurrence.Cursor>
-local CURSOR_CACHE = {}
-
----@type integer?
-local watching_dot_repeat
-
-local function watch_dot_repeat()
-  if watching_dot_repeat == nil then
-    watching_dot_repeat = vim.on_key(function(char)
-      if char == "." then
-        local win = vim.api.nvim_get_current_win()
-        CURSOR_CACHE[win] = Cursor.save()
-        log.debug("Updating cached cursor position for dot-repeat to", CURSOR_CACHE[win].location)
-      end
-    end)
-  end
-  log.debug("Watching for dot-repeat to cache cursor position")
-end
-
--- Based on https://github.com/neovim/neovim/issues/14157#issuecomment-1320787927
-local set_opfunc = vim.fn[vim.api.nvim_exec2(
-  [[
-  func! s:set_opfunc(val)
-    let &opfunc = a:val
-  endfunc
-  echon get(function('s:set_opfunc'), 'name')
-]],
-  { output = true }
-).output]
+local set_opfunc = require("occurrence.set_opfunc")
 
 ---@param mode string
 local function setmode(mode)
@@ -110,6 +80,8 @@ end)
 -- otherwise use the word under the cursor.
 actions.find_active_search_or_cursor_word = Action.new(function(occurrence)
   if vim.v.hlsearch == 1 then
+    -- clear the hlsearch as we're going to to replace it with occurrence highlights.
+    vim.cmd.nohlsearch()
     return actions.find_last_search:with(occurrence)()
   end
   return actions.find_cursor_word:with(occurrence)()
@@ -238,6 +210,72 @@ actions.mark_active_search_or_cursor_word = actions.find_active_search_or_cursor
 
 actions.mark_last_search = actions.find_last_search + actions.mark_all
 
+---@param operator string
+---@param config? occurrence.Config
+actions.operate_motion = Action.new(function(occurrence, operator, config)
+  local operators_config = config and config:keymap().operators or nil
+  local operator_name = operators.resolve_name(operator, operators_config)
+  local normal_action = operators.get_operator(operator, config)
+
+  log.debug("Setting up operator:", operator, "->", operator_name)
+
+  set_opfunc({
+    operator = operator_name,
+    occurrence = occurrence,
+    count = vim.v.count,
+    register = vim.v.register,
+  }, function(state)
+    state.count = vim.v.count > 0 and vim.v.count or state.count
+    state.register = vim.v.register
+
+    normal_action(
+      state.occurrence,
+      state.operator,
+      Range.of_motion(state.type),
+      state.count,
+      state.register,
+      state.type
+    )
+
+    if not occurrence:has_marks() then
+      log.debug("Occurrence has no marks after operation; deactivating")
+      actions.deactivate(occurrence)
+    end
+  end)
+
+  -- send g@ to trigger custom opfunc
+  return "g@"
+end)
+
+---@param operator string
+---@param config? occurrence.Config
+actions.operate_selection = Action.new(function(occurrence, operator, config)
+  local selection_range = Range.of_selection()
+
+  if not selection_range then
+    log.error("No visual selection found for operator", operator)
+    return
+  end
+
+  local normal_action = operators.get_operator(operator, config)
+  local count, register = vim.v.count, vim.v.register
+
+  -- Run the operator
+  normal_action(occurrence, operator, selection_range, count, register, nil)
+
+  -- Clear visual selection
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
+
+  -- Move the cursor back to the start of the selection.
+  -- This seems to be what nvim does after a visual operation?
+  Cursor.move(selection_range.start)
+
+  if not occurrence:has_marks() then
+    log.debug("Occurrence has no marks after operation; deactivating")
+    actions.deactivate(occurrence)
+  end
+end)
+
 -- Activate keybindings for the given configuration.
 ---@param occurrence occurrence.Occurrence
 ---@param opts? occurrence.Config | occurrence.Options
@@ -248,17 +286,12 @@ actions.activate = Action.new(function(occurrence, opts)
     log.warn("No matches found for pattern(s):", table.concat(occurrence.patterns, ", "), "skipping activation")
     return
   end
-  log.debug("Activating keybindings for buffer", occurrence.buffer)
-  local keymap = Keymap.get(occurrence.buffer)
-  if keymap then
-    log.error("Keymap is already active!")
-    keymap:reset()
-  end
-  keymap = Keymap.new(occurrence.buffer)
 
   local cancel_action = (actions.unmark_all + actions.deactivate):with(occurrence)
 
   -- TODO: derive keymaps from config
+  log.debug("Activating keybindings for buffer", occurrence.buffer)
+  local keymap = Keymap.new(occurrence.buffer)
 
   -- Cancel the pending occurrence operation.
   keymap:n("<Esc>", cancel_action, "Clear occurrence")
@@ -281,106 +314,107 @@ actions.activate = Action.new(function(occurrence, opts)
   keymap:x("ga", actions.mark_selection:with(occurrence), "Mark occurrences")
   keymap:x("gx", actions.unmark_selection:with(occurrence), "Unmark occurrences")
 
-  -- Delete marked occurrences.
-  -- TODO: add shortcuts like "dd", "dp", etc.
-  -- keymap:n("d", create_opfunc(M.delete_motion:with(occurrence)), { expr = true, desc = "Delete marked occurrences" })
-  -- keymap:x("d", (A.delete_in_selection):with(occurrence), "Delete marked occurrences")
-end)
+  local operators_keymap = config:keymap().operators
 
----@class occurrence.OpFuncState
----@field operator string The operator that triggered the opfunc.
----@field count integer The count given to the operator.
----@field register string The register given to the operator.
----@field cursor occurrence.Cursor? The cursor position before invoking the operator.
----@field occurrence occurrence.Occurrence? The occurrence being operated on.
+  if vim.iter(operators_keymap):any(function(_, v)
+    return v ~= false
+  end) then
+    for operator_key in pairs(operators_keymap) do
+      local operator_config = operators.get_operator_config(operator_key, operators_keymap)
+      if operator_config == false then
+        log.debug("Skipping operator key:", operator_key, "as it is disabled in the config")
+        goto continue
+      end
+      local desc = "'" .. operator_key .. "' on marked occurrences"
+      if type(operator_config) == "table" and operator_config.desc then
+        desc = operator_config.desc
+      end
 
--- Create a function to be used as 'opfunc' that performs the given action.
----@param operator occurrence.Action
----@param state occurrence.OpFuncState
----@return fun(type: string)
-local function create_opfunc(operator, state)
-  local function opfunc(type)
-    if not state.cursor then
-      local win = vim.api.nvim_get_current_win()
-      state.cursor = CURSOR_CACHE[win] or Cursor.save()
-      state.cursor:restore()
+      log.debug("Setting up operator key:", operator_key, "->", desc)
+      keymap:n(
+        operator_key,
+        actions.operate_motion:bind(operator_key, config):with(occurrence),
+        { desc = desc, expr = true }
+      )
+      desc = desc .. " in selection"
+      keymap:x(operator_key, actions.operate_selection:bind(operator_key, config):with(occurrence), { desc = desc })
+
+      ::continue::
     end
-
-    if not state.occurrence then
-      state.occurrence = Occurrence.new()
-      actions.find_cursor_word(state.occurrence)
-      actions.mark_all(state.occurrence)
-    end
-
-    operator(state.occurrence, state.operator, Range.of_motion(type), state.count, state.register, type)
-    state.cursor:restore()
-
-    -- Reset state to allow dot-repatable operation on a different occurrence.
-    state.occurrence = nil
-    state.cursor = nil
-
-    -- Watch for dot-repeat to cache cursor position prior to repeating the operation.
-    watch_dot_repeat()
   end
-  return opfunc
-end
+end)
 
 -- Activate operator-pending keybindings for the given configuration.
 ---@param occurrence occurrence.Occurrence
 ---@param config occurrence.Config
 actions.activate_opfunc = Action.new(function(occurrence, config)
-  if not occurrence:has_matches() then
-    log.warn("No matches found for patterns:", table.concat(occurrence.patterns, ", "), "skipping activation")
+  local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
+  if not operators.is_supported(operator, config) then
+    log.warn("Operator not supported:", operator)
     return
   end
 
-  local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
+  if not occurrence:has_matches() then
+    actions.mark_cursor_word(occurrence)
+  end
+
+  if not occurrence:has_marks() then
+    actions.mark_all(occurrence)
+  end
 
   local operator_action = operators.get_operator(operator, config)
-
-  if not operator_action then
-    log.error("Unsupported operator for opfunc_motion:", operator)
-    return
-  end
-
   local clear_action = actions.unmark_all + actions.deactivate
-
+  local cancel_action = clear_action:with(occurrence)
   operator_action = operator_action + clear_action
 
   log.debug("Activating operator-pending keybindings for buffer", occurrence.buffer)
-  local keymap = Keymap.get(occurrence.buffer)
-  if keymap then
-    log.error("Keymap is already active!")
-    keymap:reset()
-  end
-  keymap = Keymap.new(occurrence.buffer)
-
-  local cancel_action = clear_action:with(occurrence)
+  local keymap = Keymap.new(occurrence.buffer)
   keymap:o("<Esc>", cancel_action, "Clear occurrence")
   keymap:o("<C-c>", cancel_action, "Clear occurrence")
   keymap:o("<C-[>", cancel_action, "Clear occurrence")
-  keymap:o(config.keymap.operator_pending, "<cmd>normal! ^v$<cr>", "Operate on occurrences linewise")
 
-  log.debug("Caching cursor position for opfunc in buffer", occurrence.buffer)
-  CURSOR_CACHE[occurrence.buffer] = Cursor.save()
+  -- Repeat operator_pending key to apply operator to the occurrences in the current line
+  -- TODO: should this be configurable? Also, should it apply to all occurrences instead?
+  keymap:o(config:keymap().operator_pending, "<cmd>normal! ^v$<cr>", "Operate on occurrences linewise")
 
-  set_opfunc(create_opfunc(operator_action, {
+  set_opfunc({
     operator = operator,
     count = count,
     register = register,
-    cursor = Cursor.save(),
     occurrence = occurrence,
-  }))
+  }, function(state)
+    state.count = vim.v.count > 0 and vim.v.count or state.count
+    state.register = vim.v.register
 
-  -- send ctrl-c to cancel pending op, followed by g@ to trigger custom opfunc
-  return vim.api.nvim_replace_termcodes("<C-c>g@", true, false, true)
+    if not state.occurrence then
+      state.occurrence = Occurrence.new()
+      actions.mark_cursor_word(state.occurrence)
+    end
+
+    operator_action(
+      state.occurrence,
+      state.operator,
+      Range.of_motion(state.type),
+      state.count,
+      state.register,
+      state.type
+    )
+  end)
+
+  -- send <C-\><C\n> to cancel pending op, followed by g@ to trigger custom opfunc
+  -- see `:h CTRL-\_CTRL-N` and `:h g@`
+  vim.schedule(function()
+    -- enter operator-pending mode
+    vim.api.nvim_feedkeys("g@", "n", true)
+  end)
+  return vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true)
 end)
 
 -- Deactivate the keymap for the given occurrence.
 actions.deactivate = Action.new(function(occurrence)
   if occurrence:has_marks() then
-    log.warn("Occurrence still has marks, not deactivating keymap")
-    return
+    log.debug("Occurrence still has marks during deactivate")
+    occurrence:unmark()
   end
   if Keymap.del(occurrence.buffer) then
     log.debug("Deactivated keybindings for buffer", occurrence.buffer)

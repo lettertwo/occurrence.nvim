@@ -324,35 +324,6 @@ describe("operators", function()
       end, "Circular operator alias detected: 'delete' <-> 'change'")
     end)
 
-    it("supports custom operators", function()
-      local config = Config.new({
-        keymap = {
-          operators = {
-            ["custom_op"] = {
-              method = "direct_api",
-              uses_register = true,
-              modifies_text = true,
-              replacement = function()
-                return "test"
-              end,
-            },
-          },
-        },
-      })
-
-      assert.is_true(operators.is_supported("custom_op", config))
-      local custom_op = operators.get_operator("custom_op", config)
-
-      assert.is_true(custom_op:is_action())
-      bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
-      occurrence:mark()
-      -- Apply custom operator
-      custom_op(occurrence, "custom_op", nil, nil, '"')
-      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      assert.same({ "test bar test", "baz test bar" }, final_lines)
-    end)
-
     it("creates default configs for enabled operators", function()
       local config = Config.new({
         keymap = {

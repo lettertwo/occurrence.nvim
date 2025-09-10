@@ -4,6 +4,8 @@ local spy = require("luassert.spy")
 local util = require("tests.util")
 
 local actions = require("occurrence.actions")
+local operators = require("occurrence.operators")
+local Config = require("occurrence.Config")
 local Occurrence = require("occurrence.Occurrence")
 
 local NS = vim.api.nvim_create_namespace("Occurrence")
@@ -30,22 +32,6 @@ describe("integration tests", function()
       actions.activate(occurrence, {})
 
       assert.spy(vim.notify).was_called_with(match.is_match("No matches found"), vim.log.levels.WARN, match._)
-
-      -- restore original notify
-      vim.notify = original_notify
-    end)
-
-    it("succeeds when matches are found", function()
-      -- mock vim.notify to capture warnings
-      local original_notify = vim.notify
-      vim.notify = spy.new(function() end)
-
-      bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
-
-      actions.activate(occurrence, {})
-
-      assert.spy(vim.notify).was_not_called()
 
       -- restore original notify
       vim.notify = original_notify
@@ -392,35 +378,135 @@ describe("integration tests", function()
   end)
 
   describe("deactivate", function()
-    it("does not deactivate if marks are present", function()
+    it("removes marks if present", function()
       bufnr = util.buffer("foo bar baz foo")
       local occurrence = Occurrence.new(bufnr, "foo", {})
 
       actions.activate(occurrence)
+      actions.mark(occurrence)
 
-      occurrence:mark() -- Mark an occurrence to prevent deactivation
-
-      -- mock vim.notify to capture warnings
-      local original_notify = vim.notify
-      vim.notify = spy.new(function() end)
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({ { 1, 0, 0 } }, marks, "One mark should be present before deactivation")
 
       actions.deactivate(occurrence)
 
-      assert.spy(vim.notify).was_called_with(match.is_match("Occurrence still has marks"), vim.log.levels.WARN, match._)
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after deactivation")
+    end)
+  end)
 
-      -- Check that keymap for cancelling still exists
+  describe("operators", function()
+    it("applies operator to all marked occurrences", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      local occurrence = Occurrence.new(bufnr, nil, {})
+
+      actions.find_cursor_word(occurrence)
+      actions.mark_all(occurrence)
+      actions.activate(occurrence)
+
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
-      local cancel_key = nil
+      local delete_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Clear occurrence" then
-          cancel_key = map.lhs
+        if map.lhs ~= nil and map.desc == "Delete marked occurrences" then
+          delete_key = map.lhs
           break
         end
       end
-      assert(cancel_key, "Cancel key should still be mapped since marks are present")
+      assert.equals("d", delete_key, "Delete key should be mapped")
 
-      -- restore original notify
-      vim.notify = original_notify
+      -- Simulate applying delete operator to delete marked occurrences
+      vim.api.nvim_feedkeys(delete_key .. "$", "mx", true)
+
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals(" bar baz ", lines[1], "Both 'foo' occurrences should be deleted")
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying operator")
+
+      actions.deactivate(occurrence)
+    end)
+
+    it("supports custom operators", function()
+      local config = Config.new({
+        keymap = {
+          operators = {
+            ["q"] = {
+              desc = "Custom operator: replace with 'test'",
+              method = "direct_api",
+              uses_register = true,
+              modifies_text = true,
+              replacement = function()
+                return "test"
+              end,
+            },
+          },
+        },
+      })
+
+      assert.is_true(operators.is_supported("q", config))
+
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.new(bufnr, nil, {})
+
+      actions.find_cursor_word(occurrence)
+      actions.mark_all(occurrence)
+      actions.activate(occurrence, config)
+
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local custom_key = nil
+      for _, map in ipairs(mappings) do
+        if map.lhs ~= nil and map.desc == "Custom operator: replace with 'test'" then
+          custom_key = map.lhs
+          break
+        end
+      end
+      assert.equals("q", custom_key, "Custom operator key should be mapped")
+
+      -- Simulate custom operator keymap
+      vim.api.nvim_feedkeys("q$", "mx", true)
+
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "test bar test", "baz foo bar" }, final_lines)
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({ { 3, 1, 4 } }, marks, "last mark should remain after custom operator")
+
+      -- Should still be active since one mark remains
+      mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
+      custom_key = nil
+      for _, map in ipairs(mappings) do
+        if map.lhs ~= nil and map.desc == "Custom operator: replace with 'test' in selection" then
+          custom_key = map.lhs
+          break
+        end
+      end
+      assert.equals("q", custom_key, "Custom operator key should still be mapped since marks remain")
+
+      -- Simulate visual selection
+      vim.api.nvim_feedkeys("Vj", "mx", true)
+      -- Simulate pressing custom operator keymap in visual mode to replace marked occurrences in selection
+      vim.api.nvim_feedkeys("q", "mx", true)
+
+      final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "test bar test", "baz test bar" }, final_lines)
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying custom operator to last mark")
+
+      -- Should be fully deactivated now
+      assert.same("n", vim.api.nvim_get_mode().mode, "Should be back in normal mode")
+
+      mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
+      custom_key = nil
+      for _, map in ipairs(mappings) do
+        if map.lhs ~= nil and map.desc == "Custom operator: replace with 'test' in selection" then
+          custom_key = map.lhs
+          break
+        end
+      end
+      assert.is_nil(custom_key, "Custom operator key should be unmapped after all marks are gone")
+
+      actions.deactivate(occurrence)
     end)
   end)
 end)
