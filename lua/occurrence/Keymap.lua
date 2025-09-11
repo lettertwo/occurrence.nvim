@@ -23,7 +23,7 @@ end
 ---@module 'occurrence.Keymap'
 
 -- A keymap utility that can be used to bind keys to actions.
--- It tracks active bindings and can be used to neatly deactivate all of them.
+-- It tracks active keymaps and can be used to neatly deactivate all of them.
 ---@class occurrence.Keymap
 ---@field active_keymaps occurrence.Modemap<{ [string]: true }> A table that tracks active keymaps.
 ---@field buffer? integer The buffer the keymap is bound to. If `nil`, the keymap is global.
@@ -134,8 +134,8 @@ end
 
 -- Resets all active keymaps registered by this instance.
 function Keymap:reset()
-  for mode, bindings in pairs(self.active_keymaps) do
-    for lhs in pairs(bindings) do
+  for mode, keymaps in pairs(self.active_keymaps) do
+    for lhs in pairs(keymaps) do
       if not pcall(vim.keymap.del, mode, lhs, { buffer = self.buffer }) then
         log.warn_once("Failed to unmap " .. mode .. " " .. lhs)
       end

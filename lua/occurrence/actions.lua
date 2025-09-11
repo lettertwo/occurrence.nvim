@@ -210,6 +210,7 @@ actions.mark_active_search_or_cursor_word = actions.find_active_search_or_cursor
 
 actions.mark_last_search = actions.find_last_search + actions.mark_all
 
+-- Operate on all marked occurrences within the motion given to the operator.
 ---@param operator string
 ---@param config? occurrence.Config
 actions.operate_motion = Action.new(function(occurrence, operator, config)
@@ -247,6 +248,7 @@ actions.operate_motion = Action.new(function(occurrence, operator, config)
   return "g@"
 end)
 
+-- Operate on all marked occurrences within the current visual selection.
 ---@param operator string
 ---@param config? occurrence.Config
 actions.operate_selection = Action.new(function(occurrence, operator, config)
@@ -276,7 +278,7 @@ actions.operate_selection = Action.new(function(occurrence, operator, config)
   end
 end)
 
--- Activate keybindings for the given configuration.
+-- Activate keymaps for managing preset occurrences in the current buffer.
 ---@param occurrence occurrence.Occurrence
 ---@param opts? occurrence.Config | occurrence.Options
 actions.activate_preset = Action.new(function(occurrence, opts)
@@ -290,7 +292,7 @@ actions.activate_preset = Action.new(function(occurrence, opts)
   local cancel_action = (actions.unmark_all + actions.deactivate):with(occurrence)
 
   -- TODO: derive keymaps from config
-  log.debug("Activating keybindings for buffer", occurrence.buffer)
+  log.debug("Activating keymaps for buffer", occurrence.buffer)
   local keymap = Keymap.new(occurrence.buffer)
 
   -- Cancel the pending occurrence operation.
@@ -344,7 +346,7 @@ actions.activate_preset = Action.new(function(occurrence, opts)
   end
 end)
 
--- Activate operator-pending keybindings for the given configuration.
+-- Activate operator-pending keymaps for the given configuration.
 ---@param occurrence occurrence.Occurrence
 ---@param config occurrence.Config
 actions.activate_operator_pending = Action.new(function(occurrence, config)
@@ -367,7 +369,7 @@ actions.activate_operator_pending = Action.new(function(occurrence, config)
   local cancel_action = clear_action:with(occurrence)
   operator_action = operator_action + clear_action
 
-  log.debug("Activating operator-pending keybindings for buffer", occurrence.buffer)
+  log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
   local keymap = Keymap.new(occurrence.buffer)
   keymap:o("<Esc>", cancel_action, "Clear occurrence")
   keymap:o("<C-c>", cancel_action, "Clear occurrence")
@@ -410,14 +412,14 @@ actions.activate_operator_pending = Action.new(function(occurrence, config)
   return vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true)
 end)
 
--- Deactivate the keymap for the given occurrence.
+-- Deactivate keymaps for the current buffer and clear all marks.
 actions.deactivate = Action.new(function(occurrence)
   if occurrence:has_marks() then
     log.debug("Occurrence still has marks during deactivate")
     occurrence:unmark()
   end
   if Keymap.del(occurrence.buffer) then
-    log.debug("Deactivated keybindings for buffer", occurrence.buffer)
+    log.debug("Deactivated keymaps for buffer", occurrence.buffer)
   end
 end)
 

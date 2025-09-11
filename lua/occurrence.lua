@@ -42,7 +42,7 @@ function occurrence.setup(opts)
         local operator = vim.v.operator
         if operators.is_supported(operator, config) then
           -- If a keymap exists, we assume that a preset occurrence is active.
-          -- NOTE: Bindings for operators on preset occurrences
+          -- NOTE: Keymaps for operators on preset occurrences
           -- are defined in `activate_preset` action.
           if not Keymap.get() then
             -- Bind the `activate_operator_pending` action to the operator pending keymap.
