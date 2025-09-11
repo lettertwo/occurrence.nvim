@@ -97,7 +97,7 @@ local supported_operators = {
 local operators = {}
 
 ---@param config occurrence.OperatorConfig
-local function create_operator(config)
+local function create_operator_action(config)
   ---@param occurrence occurrence.Occurrence
   ---@param operator string
   ---@param range? occurrence.Range
@@ -302,7 +302,7 @@ end
 ---@param operator string
 ---@param config? occurrence.Config
 ---@return occurrence.Action
-function operators.get_operator(operator, config)
+function operators.get_operator_action(operator, config)
   local operators_config = config and config:keymap().operators or nil
   local operator_name = operators.resolve_name(operator, operators_config)
   local operator_action = OPERATOR_CACHE[operator_name]
@@ -316,10 +316,10 @@ function operators.get_operator(operator, config)
         error("Operator '" .. operator .. "' is disabled in the configuration.")
       end
     elseif operator_config then
-      operator_action = create_operator(operator_config)
+      operator_action = create_operator_action(operator_config)
     else
       log.debug("Creating generic fallback for operator:", operator_name)
-      operator_action = create_operator(FALLBACK_CONFIG)
+      operator_action = create_operator_action(FALLBACK_CONFIG)
     end
     OPERATOR_CACHE[operator_name] = operator_action
   end

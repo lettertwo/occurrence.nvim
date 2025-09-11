@@ -216,7 +216,7 @@ actions.mark_last_search = actions.find_last_search + actions.mark_all
 actions.operate_motion = Action.new(function(occurrence, operator, config)
   local operators_config = config and config:keymap().operators or nil
   local operator_name = operators.resolve_name(operator, operators_config)
-  local normal_action = operators.get_operator(operator, config)
+  local normal_action = operators.get_operator_action(operator, config)
 
   log.debug("Setting up operator:", operator, "->", operator_name)
 
@@ -259,7 +259,7 @@ actions.operate_selection = Action.new(function(occurrence, operator, config)
     return
   end
 
-  local normal_action = operators.get_operator(operator, config)
+  local normal_action = operators.get_operator_action(operator, config)
   local count, register = vim.v.count, vim.v.register
 
   -- Run the operator
@@ -364,7 +364,7 @@ actions.activate_operator_pending = Action.new(function(occurrence, config)
     actions.mark_all(occurrence)
   end
 
-  local operator_action = operators.get_operator(operator, config)
+  local operator_action = operators.get_operator_action(operator, config)
   local clear_action = actions.unmark_all + actions.deactivate
   local cancel_action = clear_action:with(occurrence)
   operator_action = operator_action + clear_action
