@@ -79,7 +79,7 @@ end)
 -- Find all occurrences using the current search pattern if available,
 -- otherwise use the word under the cursor.
 actions.find_active_search_or_cursor_word = Action.new(function(occurrence)
-  if vim.v.hlsearch == 1 then
+  if vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "" then
     -- clear the hlsearch as we're going to to replace it with occurrence highlights.
     vim.cmd.nohlsearch()
     return actions.find_last_search:with(occurrence)()
@@ -289,7 +289,7 @@ actions.activate_preset = Action.new(function(occurrence, opts)
     return
   end
 
-  local cancel_action = (actions.unmark_all + actions.deactivate):with(occurrence)
+  local cancel_action = actions.deactivate:with(occurrence)
 
   -- TODO: derive keymaps from config
   log.debug("Activating keymaps for buffer", occurrence.buffer)
@@ -364,10 +364,8 @@ actions.activate_operator_pending = Action.new(function(occurrence, config)
     actions.mark_all(occurrence)
   end
 
-  local operator_action = operators.get_operator_action(operator, config)
-  local clear_action = actions.unmark_all + actions.deactivate
-  local cancel_action = clear_action:with(occurrence)
-  operator_action = operator_action + clear_action
+  local operator_action = operators.get_operator_action(operator, config) + actions.deactivate
+  local cancel_action = actions.deactivate:with(occurrence)
 
   log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
   local keymap = Keymap.new(occurrence.buffer)
@@ -412,15 +410,16 @@ actions.activate_operator_pending = Action.new(function(occurrence, config)
   return vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true)
 end)
 
--- Deactivate keymaps for the current buffer and clear all marks.
+-- Deactivate keymaps for the current buffer and clear all marks and patterns.
 actions.deactivate = Action.new(function(occurrence)
+  if Keymap.del(occurrence.buffer) then
+    log.debug("Deactivated keymaps for buffer", occurrence.buffer)
+  end
   if occurrence:has_marks() then
     log.debug("Occurrence still has marks during deactivate")
     occurrence:unmark()
   end
-  if Keymap.del(occurrence.buffer) then
-    log.debug("Deactivated keymaps for buffer", occurrence.buffer)
-  end
+  occurrence:set()
 end)
 
 return actions

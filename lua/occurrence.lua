@@ -8,7 +8,15 @@ local log = require("occurrence.log")
 -- TODO: look at :h command-preview. Can we get inc updating this way?
 
 function occurrence.reset()
-  require("occurrence.Keymap"):reset()
+  -- We want to allow setup to be called multiple times to reconfigure the plugin.
+  -- That means we need to clean up any existing state first:
+  -- 1. Clear any existing keymaps.
+  local Keymap = require("occurrence.Keymap")
+  Keymap:reset()
+  -- 2. Clear any buffer-local keymaps.
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    Keymap.del(buf)
+  end
 end
 
 ---@param opts occurrence.Options

@@ -871,4 +871,63 @@ describe("Occurrence", function()
       assert.same({ 1, 12 }, vim.api.nvim_win_get_cursor(0)) -- first 'bar'
     end)
   end)
+
+  describe("set", function()
+    it("resets the occurrence", function()
+      bufnr = util.buffer("foo bar foo")
+      local foo = Occurrence.new(bufnr, "foo", {})
+
+      assert.is_false(foo:has_marks())
+      foo:mark()
+      assert.is_true(foo:has_marks())
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({
+        { 1, 0, 0 },
+        { 2, 0, 8 },
+      }, marks)
+
+      foo:set()
+      assert.is_false(foo:has_marks())
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks)
+
+      local matches = vim.iter(foo:matches()):map(tostring):totable()
+      assert.same({}, matches)
+    end)
+
+    it("resets the occurrence for multiple patterns", function()
+      bufnr = util.buffer("foo bar baz foo bar baz")
+      local occ = Occurrence.new(bufnr, "foo", {})
+      occ:add("bar", {})
+      occ:add("baz", {})
+
+      assert.is_false(occ:has_marks())
+      occ:mark()
+      assert.is_true(occ:has_marks())
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({
+        { 1, 0, 0 },
+        { 2, 0, 4 },
+        { 3, 0, 8 },
+        { 4, 0, 12 },
+        { 5, 0, 16 },
+        { 6, 0, 20 },
+      }, marks)
+
+      occ:set("bar")
+      assert.is_false(occ:has_marks())
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks)
+
+      local matches = vim.iter(occ:matches()):map(tostring):totable()
+      assert.same({
+        "Range(start: Location(0, 4), stop: Location(0, 7))",
+        "Range(start: Location(0, 16), stop: Location(0, 19))",
+      }, matches)
+    end)
+  end)
 end)

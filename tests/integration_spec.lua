@@ -7,6 +7,7 @@ local actions = require("occurrence.actions")
 local operators = require("occurrence.operators")
 local Config = require("occurrence.Config")
 local Occurrence = require("occurrence.Occurrence")
+local plugin = require("occurrence")
 
 local NS = vim.api.nvim_create_namespace("Occurrence")
 
@@ -17,9 +18,8 @@ describe("integration tests", function()
     if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
       vim.api.nvim_buf_delete(bufnr, { force = true })
     end
-    vim.fn.setreg("/", "")
-    vim.v.hlsearch = 0
     bufnr = nil
+    plugin.reset()
   end)
 
   describe("activate_preset", function()
@@ -378,20 +378,52 @@ describe("integration tests", function()
   end)
 
   describe("deactivate", function()
-    it("removes marks if present", function()
+    it("it clears previous patterns and marks", function()
       bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
 
-      actions.activate_preset(occurrence)
-      actions.mark(occurrence)
+      local feedkeys = function(keys)
+        keys = vim.api.nvim_replace_termcodes(keys, true, false, true)
+        vim.api.nvim_feedkeys(keys, "mx", true)
+      end
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
-      assert.same({ { 1, 0, 0 } }, marks, "One mark should be present before deactivation")
+      local normal_key = "q"
+      plugin.setup({ keymap = { normal = normal_key } })
 
-      actions.deactivate(occurrence)
+      -- simulate pressing normal keymap to find 'foo'
+      feedkeys(normal_key)
+      assert.same(
+        { { 1, 0, 0 }, { 2, 0, 12 } },
+        vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}),
+        "Marks for 'foo' should be present"
+      )
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
-      assert.same({}, marks, "No marks should remain after deactivation")
+      -- Move to 'bar'
+      feedkeys("w")
+      -- simulate pressing normal keymap to find 'foo'
+      feedkeys(normal_key)
+      assert.same(
+        { { 1, 0, 0 }, { 3, 0, 4 }, { 2, 0, 12 } },
+        vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}),
+        "Marks for 'foo' and 'bar' should be present"
+      )
+
+      -- simulate pressing escape to exit any pending mappings
+      feedkeys("<Esc>")
+      assert.same({}, vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}), "No marks should remain after deactivation")
+
+      -- Move to start of line
+      feedkeys("^")
+      -- simulate pressing normal keymap to find 'foo'
+      feedkeys(normal_key)
+      assert.same(
+        { { 1, 0, 0 }, { 2, 0, 12 } },
+        vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}),
+        "Only 'foo' marks should be present after re-marking cursor word"
+      )
+
+      -- simulate pressing escape to exit any pending mappings
+      feedkeys("<Esc>")
+      assert.same({}, vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}), "No marks should remain after deactivation")
     end)
   end)
 
