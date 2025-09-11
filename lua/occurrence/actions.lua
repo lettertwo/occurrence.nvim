@@ -279,7 +279,7 @@ end)
 -- Activate keybindings for the given configuration.
 ---@param occurrence occurrence.Occurrence
 ---@param opts? occurrence.Config | occurrence.Options
-actions.activate = Action.new(function(occurrence, opts)
+actions.activate_preset = Action.new(function(occurrence, opts)
   local config = Config.new(opts)
 
   if not occurrence:has_matches() then

@@ -22,14 +22,14 @@ describe("integration tests", function()
     bufnr = nil
   end)
 
-  describe("activate", function()
+  describe("activate_preset", function()
     it("warns when no matches found", function()
       -- mock vim.notify to capture warnings
       local original_notify = vim.notify
       vim.notify = spy.new(function() end)
       local occurrence = Occurrence.new(bufnr, "nonexistent", {})
 
-      actions.activate(occurrence, {})
+      actions.activate_preset(occurrence, {})
 
       assert.spy(vim.notify).was_called_with(match.is_match("No matches found"), vim.log.levels.WARN, match._)
 
@@ -41,7 +41,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
       local occurrence = Occurrence.new(bufnr, "foo", {})
 
-      actions.activate(occurrence)
+      actions.activate_preset(occurrence)
 
       -- Check that a key is mapped in normal mode to deactivate
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
@@ -73,7 +73,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
       local occurrence = Occurrence.new(bufnr, "foo", {})
 
-      actions.activate(occurrence)
+      actions.activate_preset(occurrence)
 
       -- Check that keys are mapped in normal mode to mark and unmark occurrences
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
@@ -126,7 +126,7 @@ describe("integration tests", function()
       local occurrence = Occurrence.new(bufnr, "foo", {})
 
       occurrence:mark()
-      actions.activate(occurrence)
+      actions.activate_preset(occurrence)
 
       local marked_count = #vim.iter(occurrence:marks()):totable()
       assert.equals(2, marked_count, "Occurrence at cursor should be marked")
@@ -183,7 +183,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
       local occurrence = Occurrence.new(bufnr, "foo", {})
 
-      actions.activate(occurrence)
+      actions.activate_preset(occurrence)
 
       -- Check that keys are mapped in normal mode to navigate
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
@@ -303,7 +303,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
       local occurrence = Occurrence.new(bufnr, "bar", {})
 
-      actions.activate(occurrence)
+      actions.activate_preset(occurrence)
 
       -- Check that keys are mapped in visual mode to narrow marks
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
@@ -382,7 +382,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
       local occurrence = Occurrence.new(bufnr, "foo", {})
 
-      actions.activate(occurrence)
+      actions.activate_preset(occurrence)
       actions.mark(occurrence)
 
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
@@ -403,7 +403,7 @@ describe("integration tests", function()
 
       actions.find_cursor_word(occurrence)
       actions.mark_all(occurrence)
-      actions.activate(occurrence)
+      actions.activate_preset(occurrence)
 
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       local delete_key = nil
@@ -451,7 +451,7 @@ describe("integration tests", function()
 
       actions.find_cursor_word(occurrence)
       actions.mark_all(occurrence)
-      actions.activate(occurrence, config)
+      actions.activate_preset(occurrence, config)
 
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       local custom_key = nil

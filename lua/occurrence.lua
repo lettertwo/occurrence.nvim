@@ -22,13 +22,13 @@ function occurrence.setup(opts)
 
   Keymap:n(
     keymap_config.normal,
-    actions.mark_cursor_word + actions.activate:bind(config),
+    actions.mark_cursor_word + actions.activate_preset:bind(config),
     { expr = true, desc = "Find occurrences of word" }
   )
 
   Keymap:x(
     keymap_config.visual,
-    actions.mark_visual_subword + actions.activate:bind(config),
+    actions.mark_visual_subword + actions.activate_preset:bind(config),
     { expr = true, desc = "Find occurrences of selection" }
   )
 
@@ -68,13 +68,13 @@ function occurrence.setup(opts)
       -- will use the word under the cursor.
       Keymap:n(
         search_config.normal or keymap_config.normal,
-        actions.mark_active_search_or_cursor_word + actions.activate:bind(config),
+        actions.mark_active_search_or_cursor_word + actions.activate_preset:bind(config),
         { expr = true, desc = "Find occurrences of search or word" }
       )
     else
       Keymap:n(
         search_config.normal,
-        actions.mark_last_search + actions.activate:bind(config),
+        actions.mark_last_search + actions.activate_preset:bind(config),
         { expr = true, desc = "Find occurrences of last search" }
       )
     end
