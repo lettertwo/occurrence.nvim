@@ -347,7 +347,7 @@ end)
 -- Activate operator-pending keybindings for the given configuration.
 ---@param occurrence occurrence.Occurrence
 ---@param config occurrence.Config
-actions.activate_opfunc = Action.new(function(occurrence, config)
+actions.activate_operator_pending = Action.new(function(occurrence, config)
   local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
   if not operators.is_supported(operator, config) then
     log.warn("Operator not supported:", operator)

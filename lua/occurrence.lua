@@ -45,14 +45,14 @@ function occurrence.setup(opts)
           -- NOTE: Bindings for operators on preset occurrences
           -- are defined in `activate_preset` action.
           if not Keymap.get() then
-            -- Bind the `activate_opfunc` action to the operator pending keymap.
+            -- Bind the `activate_operator_pending` action to the operator pending keymap.
             -- The assumption here is that, since there is no active keymap,
             -- there are no preset occurrences for the operator to use,
             -- so we want to activate occurrences of the cursor word and
             -- trigger the opfunc in one go.
             Keymap.new():o(
               keymap_config.operator_pending,
-              actions.activate_opfunc:bind(config),
+              actions.activate_operator_pending:bind(config),
               { desc = "Occurrences of word", expr = true }
             )
           end
