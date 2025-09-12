@@ -41,7 +41,7 @@ end)
 
 -- Find all occurrences of the visually selected text in the given buffer.
 -- If no buffer is given, mark occurrences in the current buffer.
-actions.find_visual_subword = Action.new(function(occurrence)
+actions.find_selection = Action.new(function(occurrence)
   assert(occurrence.buffer == vim.api.nvim_get_current_buf(), "bufnr not matching the current buffer not yet supported")
   local range = Range.of_selection()
   assert(range, "no visual selection")
@@ -204,7 +204,7 @@ actions.mark_cursor_word_or_toggle_mark = Action.new(function(occurrence)
   end
 end)
 
-actions.mark_visual_subword = actions.find_visual_subword + actions.mark_all
+actions.mark_selection = actions.find_selection + actions.mark_all
 
 actions.mark_active_search_or_cursor_word = actions.find_active_search_or_cursor_word + actions.mark_all
 

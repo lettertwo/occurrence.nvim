@@ -31,7 +31,7 @@ describe("actions", function()
     end)
   end)
 
-  describe("find_visual_subword", function()
+  describe("find_selection", function()
     it("finds occurrences of visually selected text", function()
       bufnr = util.buffer("foo bar baz foo")
       -- Position cursor and create visual selection
@@ -39,7 +39,7 @@ describe("actions", function()
       vim.cmd("normal! viw") -- Select the word 'bar'
 
       local occurrence = Occurrence.new(bufnr, nil, {})
-      actions.find_visual_subword(occurrence)
+      actions.find_selection(occurrence)
 
       assert.is_true(occurrence:has_matches())
 
@@ -255,7 +255,7 @@ describe("actions", function()
       assert.equals(4, marked_count) -- All 'foo' and 'bar' occurrences marked
     end)
 
-    it("mark_visual_subword finds and marks all occurrences of selection", function()
+    it("mark_selection finds and marks all occurrences of selection", function()
       bufnr = util.buffer("foo bar baz foo bar")
       vim.api.nvim_win_set_cursor(0, { 1, 5 }) -- Position at 'bar'
       vim.cmd("normal! viw") -- Select the word 'bar'
@@ -263,7 +263,7 @@ describe("actions", function()
       local occurrence = Occurrence.new(bufnr, nil, {})
       assert.is_false(occurrence:has_matches())
 
-      actions.mark_visual_subword(occurrence)
+      actions.mark_selection(occurrence)
       assert.is_true(occurrence:has_matches())
 
       local marked_count = #vim.iter(occurrence:marks()):totable()
