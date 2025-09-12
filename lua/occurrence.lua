@@ -25,67 +25,70 @@ function occurrence.setup(opts)
   local actions = require("occurrence.actions")
   local operators = require("occurrence.operators")
   local config = require("occurrence.Config").new(opts)
-  local keymap_config = config:keymap()
-  local search_config = config:search()
+  local actions_config = config:actions()
 
-  Keymap:n(
-    keymap_config.normal,
-    actions.mark_cursor_word + actions.activate_preset:bind(config),
-    { expr = true, desc = "Find occurrences of word" }
-  )
+  -- Setup keymaps for normal mode actions.
+  for key, action in pairs(actions_config.n) do
+    local resolved_action = actions.resolve(action)
+    if resolved_action then
+      Keymap:n(key, resolved_action:bind(config), { desc = actions.get_desc(resolved_action, "n") })
+    elseif action ~= false then
+      if type(action) == "string" then
+        log.warn_once("No action '" .. action .. "' found for keymap '" .. key .. "' in normal mode")
+      else
+        log.warn_once("Invalid action for keymap '" .. key .. "' in normal mode")
+      end
+    end
+  end
 
-  Keymap:v(
-    keymap_config.visual,
-    actions.mark_selection + actions.activate_preset:bind(config),
-    { expr = true, desc = "Find occurrences of selection" }
-  )
+  -- Setup keymaps for visual mode actions.
+  for key, action in pairs(actions_config.v) do
+    ---@type occurrence.Action?
+    local resolved_action = actions.resolve(action)
+    if resolved_action then
+      Keymap:v(key, resolved_action:bind(config), { desc = actions.get_desc(resolved_action, "v") })
+    elseif action ~= false then
+      if type(action) == "string" then
+        log.warn_once("No action '" .. action .. "' found for keymap '" .. key .. "' in visual mode")
+      else
+        log.warn_once("Invalid action for keymap '" .. key .. "' in visual mode")
+      end
+    end
+  end
 
-  if vim.iter(keymap_config.operators):any(function(_, v)
+  -- Setup keymaps for operator-pending mode actions.
+  -- Note that these are dynamically bound for supported operators
+  -- when entering operator-pending mode.
+  if vim.iter(actions_config.o):any(function(_, v)
     return v ~= false
   end) then
     vim.api.nvim_create_autocmd("ModeChanged", {
       pattern = "*:*o",
-      callback = function()
+      callback = function(evt)
         log.debug("ModeChanged to operator-pending")
-        local operator = vim.v.operator
-        if operators.is_supported(operator, config) then
-          -- If a keymap exists, we assume that a preset occurrence is active.
-          -- NOTE: Keymaps for operators on preset occurrences
-          -- are defined in `activate_preset` action.
-          if not Keymap.get() then
-            -- Bind the `activate_operator_pending` action to the operator pending keymap.
-            -- The assumption here is that, since there is no active keymap,
-            -- there are no preset occurrences for the operator to use,
-            -- so we want to activate occurrences of the cursor word and
-            -- trigger the opfunc in one go.
-            Keymap.new():o(
-              keymap_config.operator_pending,
-              actions.activate_operator_pending:bind(config),
-              { desc = "Occurrences of word", expr = true }
-            )
+        -- If a keymap exists, we assume that a preset occurrence is active, so we do nothing.
+        if not Keymap.get(evt.buf) then
+          local keymap = Keymap.new(evt.buf)
+          local operator = vim.v.operator
+          if operators.is_supported(operator, config) then
+            for key, action in pairs(actions_config.o) do
+              local resolved_action = actions.resolve(action)
+              if resolved_action then
+                keymap:o(key, resolved_action:bind(config), { desc = actions.get_desc(resolved_action, "o") })
+              elseif action ~= false then
+                if type(action) == "string" then
+                  log.warn_once(
+                    "No action '" .. action .. "' found for keymap '" .. key .. "' in operator-pending mode"
+                  )
+                else
+                  log.warn_once("Invalid action for keymap '" .. key .. "' in operator-pending mode")
+                end
+              end
+            end
           end
         end
       end,
     })
-  end
-
-  if search_config.enabled then
-    if search_config.normal == nil or search_config.normal == keymap_config.normal then
-      -- If the search key is the same as the normal key, we will only use
-      -- the search pattern if there is an active search, otherwise we
-      -- will use the word under the cursor.
-      Keymap:n(
-        search_config.normal or keymap_config.normal,
-        actions.mark_active_search_or_cursor_word + actions.activate_preset:bind(config),
-        { expr = true, desc = "Find occurrences of search or word" }
-      )
-    else
-      Keymap:n(
-        search_config.normal,
-        actions.mark_last_search + actions.activate_preset:bind(config),
-        { expr = true, desc = "Find occurrences of last search" }
-      )
-    end
   end
 end
 

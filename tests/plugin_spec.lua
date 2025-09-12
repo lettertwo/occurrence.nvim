@@ -1,5 +1,4 @@
 local assert = require("luassert")
-local match = require("luassert.match")
 local spy = require("luassert.spy")
 
 -- Test the plugin entry point
@@ -104,7 +103,7 @@ describe("occurrence module", function()
     it("handles partial config", function()
       assert.has_no.errors(function()
         require("occurrence").setup({
-          keymap = { normal = "<leader>test" },
+          actions = { n = { ["<leader>test"] = "activate_preset_with_cursor_word" } },
         })
       end)
     end)
@@ -113,7 +112,7 @@ describe("occurrence module", function()
       assert.has_no.errors(function()
         local occurrence = require("occurrence")
         occurrence.setup({})
-        occurrence.setup({ keymap = { normal = "<leader>test" } })
+        occurrence.setup({ actions = { n = { ["<leader>test"] = "activate_preset_with_cursor_word" } } })
         occurrence.setup({})
       end)
     end)
@@ -123,8 +122,8 @@ describe("occurrence module", function()
       local config_spy = spy.on(Config, "new")
 
       local test_opts = {
-        keymap = { normal = "<leader>test" },
-        search = { enabled = false },
+        actions = { n = { ["<leader>test"] = "activate_preset_with_cursor_word" } },
+        operators = { c = "change" },
       }
 
       require("occurrence").setup(test_opts)
@@ -153,108 +152,112 @@ describe("occurrence module", function()
     end)
   end)
 
-  describe("search integration", function()
-    it("sets up search by default", function()
+  describe("action integration", function()
+    it("sets up default actions", function()
       local Keymap = require("occurrence.Keymap")
       local keymap_spy = spy.on(Keymap, "n")
 
       require("occurrence").setup({})
 
-      -- TODO: Figure out how to match on the action bound to the key.
-
-      assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "go", match._, {
-        expr = true,
-        desc = "Find occurrences of search or word",
-      })
-
-      keymap_spy:revert()
-    end)
-
-    it("disables search keymap when disabled", function()
-      local Keymap = require("occurrence.Keymap")
-      local keymap_spy = spy.on(Keymap, "n")
-
-      require("occurrence").setup({
-        search = { enabled = false },
-      })
-
-      -- TODO: Figure out how to match on the action bound to the key.
-
-      assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "go", match._, {
-        expr = true,
-        desc = "Find occurrences of word",
-      })
+      -- The default configuration uses "activate_preset_with_search_or_cursor_word" for the "go" key
+      assert.spy(keymap_spy).was_called()
+      local found_go = false
+      for _, call in ipairs(keymap_spy.calls) do
+        if call.vals[2] == "go" then
+          found_go = true
+          break
+        end
+      end
+      assert.is_true(found_go, "Should set up 'go' keymap")
 
       keymap_spy:revert()
     end)
 
-    it("handles search keymap same as normal keymap", function()
+    it("handles custom action mappings", function()
       local Keymap = require("occurrence.Keymap")
       local keymap_spy = spy.on(Keymap, "n")
 
       require("occurrence").setup({
-        keymap = {
-          normal = "<leader>o",
-        },
-        search = {
-          enabled = true,
-          normal = "<leader>o", -- Same as normal keymap
+        actions = {
+          n = {
+            ["<leader>o"] = "activate_preset_with_cursor_word",
+          },
         },
       })
 
-      assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "<leader>o", match._, {
-        expr = true,
-        desc = "Find occurrences of search or word",
-      })
+      assert.spy(keymap_spy).was_called()
+      local found_leader_o = false
+      for _, call in ipairs(keymap_spy.calls) do
+        if call.vals[2] == "<leader>o" then
+          found_leader_o = true
+          break
+        end
+      end
+      assert.is_true(found_leader_o, "Should set up '<leader>o' keymap")
 
       keymap_spy:revert()
     end)
 
-    it("sets up search keymap when enabled with nil normal key", function()
+    it("handles disabled actions", function()
       local Keymap = require("occurrence.Keymap")
-      local keymap_spy = spy.on(Keymap, "n")
+      local keymap_n_spy = spy.on(Keymap, "n")
 
       require("occurrence").setup({
-        keymap = { normal = "<leader>o" },
-        search = {
-          enabled = true,
-          normal = nil,
+        actions = {
+          n = {
+            go = false, -- Disable the default "go" mapping
+          },
         },
       })
 
-      assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "<leader>o", match._, {
-        expr = true,
-        desc = "Find occurrences of search or word",
-      })
+      -- Should not be called with "go" since it's disabled
+      for _, call in ipairs(keymap_n_spy.calls) do
+        assert.is_not.equal("go", call.vals[2])
+      end
 
-      keymap_spy:revert()
+      keymap_n_spy:revert()
     end)
 
-    it("sets up search keymap with a different normal key", function()
+    it("sets up visual mode actions", function()
       local Keymap = require("occurrence.Keymap")
-      local keymap_spy = spy.on(Keymap, "n")
+      local keymap_v_spy = spy.on(Keymap, "v")
 
       require("occurrence").setup({
-        keymap = {
-          normal = "<leader>o",
-        },
-        search = {
-          enabled = true,
-          normal = "<leader>s", -- Different from normal keymap
+        actions = {
+          v = {
+            ["<leader>v"] = "activate_preset_with_selection",
+          },
         },
       })
 
-      assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "<leader>o", match._, {
-        expr = true,
-        desc = "Find occurrences of word",
+      assert.spy(keymap_v_spy).was_called()
+      local found_leader_v = false
+      for _, call in ipairs(keymap_v_spy.calls) do
+        if call.vals[2] == "<leader>v" then
+          found_leader_v = true
+          break
+        end
+      end
+      assert.is_true(found_leader_v, "Should set up '<leader>v' keymap")
+
+      keymap_v_spy:revert()
+    end)
+
+    it("sets up operator-pending mode actions", function()
+      local actions_config = {
+        o = {
+          o = "modify_operator_pending",
+          oo = "modify_operator_pending_linewise",
+        },
+      }
+
+      require("occurrence").setup({
+        actions = actions_config,
       })
 
-      assert.spy(keymap_spy).was_called_with(match.is_ref(Keymap), "<leader>s", match._, {
-        expr = true,
-        desc = "Find occurrences of last search",
-      })
-
-      keymap_spy:revert()
+      -- Operator-pending mode keymaps are set up via autocmd, so we just verify the autocmd is created
+      local autocmds = vim.api.nvim_get_autocmds({ event = "ModeChanged", pattern = "*:*o" })
+      assert.is_true(#autocmds > 0, "Should create ModeChanged autocmd for operator-pending mode")
     end)
   end)
 end)

@@ -3,70 +3,88 @@ local log = require("occurrence.log")
 ---@module 'occurrence.Config'
 local config = {}
 
----Options for configuring operators.
----@class occurrence.OperatorKeymapOptions: { [string]: occurrence.OperatorConfig | occurrence.SupportedOperators | boolean | nil }
----@field ["c"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["d"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["y"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["<"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field [">"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["gu"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["gU"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["g~"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["g?"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["dd"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["cc"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["yy"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["C"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["D"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["Y"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["gq"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["gw"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["zf"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["="] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["!"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
----@field ["g@"] occurrence.OperatorConfig | occurrence.SupportedOperators | boolean?
+---@alias occurrence.KeymapAction occurrence.Action | occurrence.SupportedActions | false
 
----Options for configuring keymaps.
+---@class occurrence.KeymapConfig
+---@field n { [string]: occurrence.KeymapAction } normal mode keymaps
+---@field v { [string]: occurrence.KeymapAction } visual mode keymaps
+---@field o { [string]: occurrence.KeymapAction } operator-pending mode keymaps
+
 ---@class occurrence.KeymapOptions
----@field normal string?
----@field visual string?
----@field operator_pending string?
----@field operators occurrence.OperatorKeymapOptions?
+---@field n? { [string]?: occurrence.KeymapAction } normal mode keymaps
+---@field v? { [string]?: occurrence.KeymapAction } visual mode keymaps
+---@field o? { [string]?: occurrence.KeymapAction } operator-pending mode keymaps
 
----Options for configuring search.
----@class occurrence.SearchOptions
----@field enabled boolean?
----@field normal string?
+---@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.SupportedOperators | false
+---@class occurrence.OperatorKeymapConfig: { [string]: occurrence.OperatorKeymapEntry }
+---@class occurrence.OperatorKeymapOptions: { [string]?: occurrence.OperatorKeymapEntry }
 
----Options for configuring occurrence.
+---@alias occurrence.ActivePresetKeymapAction occurrence.Action | occurrence.SupportedActions | occurrence.SupportedOperators | false
+
+---@class occurrence.ActivePresetKeymapConfig
+---@field n { [string]: occurrence.KeymapAction } normal mode keymaps
+---@field v { [string]: occurrence.KeymapAction } visual mode keymaps
+
+---@class occurrence.ActivePresetKeymapOptions
+---@field n? { [string]?: occurrence.KeymapAction } normal mode keymaps
+---@field v? { [string]?: occurrence.KeymapAction } visual mode keymaps
+
 ---@class occurrence.Options
----@field keymap occurrence.KeymapOptions?
----@field search occurrence.SearchOptions?
+---@field actions? occurrence.KeymapOptions
+---@field operators? occurrence.OperatorKeymapOptions
+---@field preset_actions? occurrence.ActivePresetKeymapOptions
 
--- Default operator mappings :h operator
----@class occurrence.OperatorKeymapConfig: { [string]: occurrence.OperatorConfig | occurrence.SupportedOperators | boolean }
+---@type occurrence.KeymapConfig
+local DEFAULT_KEYMAP_CONFIG = {
+  n = {
+    go = "activate_preset_with_search_or_cursor_word",
+    -- go = "activate_preset_with_cursor_word",
+  },
+  v = {
+    go = "activate_preset_with_selection",
+  },
+  o = {
+    o = "modify_operator_pending",
+    oo = "modify_operator_pending_linewise",
+  },
+}
+
+---@type occurrence.OperatorKeymapConfig
 local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
+  -- operators
   ["c"] = "change",
   ["d"] = "delete",
   ["y"] = "yank",
   ["<"] = "indent_left",
   [">"] = "indent_right",
 
-  ["gu"] = true, -- make lowercase
-  ["gU"] = true, -- make uppercase
-  ["g~"] = true, -- swap case
-  ["g?"] = true, -- ROT13 encoding
+  ["gu"] = {
+    desc = "Make marked occurrences lowercase",
+    uses_register = false,
+    modifies_text = true,
+    method = "visual_feedkeys",
+  },
+  ["gU"] = {
+    desc = "Make marked occurrences uppercase",
+    uses_register = false,
+    modifies_text = true,
+    method = "visual_feedkeys",
+  },
+  ["g~"] = {
+    desc = "Swap case of marked occurrences",
+    uses_register = false,
+    modifies_text = true,
+    method = "visual_feedkeys",
+  },
+  ["g?"] = {
+    desc = "ROT13 encode marked occurrences",
+    uses_register = false,
+    modifies_text = true,
+    method = "visual_feedkeys",
+  },
 
   -- TODO: implement these
-  ["dd"] = false, -- delete line
-  ["cc"] = false, -- change line
-  ["yy"] = false, -- yank line
-  ["C"] = false, -- change to end of line
-  ["D"] = false, -- delete to end of line
-  ["Y"] = false, -- yank to end of line
-
-  -- TODO: implement these
+  ["p"] = false, -- put
   ["gq"] = false, -- text formatting
   ["gw"] = false, -- text formatting with no cursor movement
   ["zf"] = false, -- define a fold
@@ -75,47 +93,62 @@ local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
   ["g@"] = false, -- call function set with 'operatorfunc'
 }
 
--- Default keymap configuration
----@class occurrence.KeymapConfig
-local DEFAULT_KEYMAP_CONFIG = {
-  ---@type string keymap to mark occurrences of the word under cursor to be targeted by the next operation. Default is 'go'.
-  normal = "go",
-  ---@type string keymap to mark occurrences of the visually selected subword to be targeted by the next operation. Default is 'go'.
-  visual = "go",
-  ---@type string keymap to modify a pending operation to target occurrences of the word under cursor. Default is 'o'.
-  operator_pending = "o",
-  ---@type occurrence.OperatorKeymapConfig configuration for operators.
-  operators = DEFAULT_OPERATOR_KEYMAP_CONFIG,
-}
+---@type occurrence.ActivePresetKeymapConfig
+local DEFAULT_ACTIVE_PRESET_KEYMAP_CONFIG = {
+  n = {
+    -- deactivate
+    ["<Esc>"] = "deactivate",
+    -- ["<C-c>"] = "deactivate",
+    -- ["<C-[>"] = "deactivate",
 
--- Default search configuration
----@class occurrence.SearchConfig
-local DEFAULT_SEARCH_CONFIG = {
-  ---@type boolean enable search integration. Default is `true`.
-  enabled = true,
-  ---@type string? keymap to mark occurrences of the last search pattern to be targeted by the next operation.
-  ---If this is `nil` or the same as `config.normal`, the word under cursor will be used if there is no active search.
-  ---Default is `nil` (same as `config.normal`)
-  normal = nil,
+    -- navigate
+    n = "goto_next_mark",
+    N = "goto_previous_mark",
+    gn = "goto_next",
+    gN = "goto_previous",
+
+    -- mark/unmark
+    go = "mark_cursor_word_or_toggle_mark",
+    ga = "mark_cursor_word",
+    gx = "unmark",
+
+    -- operators
+    -- TODO: implement these
+    ["dd"] = false, -- delete line
+    ["cc"] = false, -- change line
+    ["yy"] = false, -- yank line
+    ["C"] = false, -- change to end of line
+    ["D"] = false, -- delete to end of line
+    ["Y"] = false, -- yank to end of line
+  },
+  v = {
+    -- mark/unmark
+    go = "mark_selection_or_toggle_marks",
+    ga = "mark_selection",
+    gx = "unmark",
+  },
 }
 
 local DEFAULT_CONFIG = {
-  keymap = DEFAULT_KEYMAP_CONFIG,
-  search = DEFAULT_SEARCH_CONFIG,
+  actions = DEFAULT_KEYMAP_CONFIG,
+  operators = DEFAULT_OPERATOR_KEYMAP_CONFIG,
+  preset_actions = DEFAULT_ACTIVE_PRESET_KEYMAP_CONFIG,
 }
 
 ---@class occurrence.Config
----@field keymap fun(self: occurrence.Config): occurrence.KeymapConfig
----@field search fun(self: occurrence.Config): occurrence.SearchConfig
+---@field actions fun(self: occurrence.Config): occurrence.KeymapConfig
+---@field operators fun(self: occurrence.Config): occurrence.OperatorKeymapConfig
+---@field preset_actions fun(self: occurrence.Config): occurrence.ActivePresetKeymapConfig
 ---@field validate fun(self: occurrence.Config, opts: occurrence.Options): string? error_message
----@field get fun(self: occurrence.Config, key: string): occurrence.KeymapConfig|occurrence.SearchConfig|nil
+---@field get fun(self: occurrence.Config, key: string): occurrence.KeymapConfig|occurrence.OperatorKeymapConfig|occurrence.ActivePresetKeymapConfig|nil
 local Config = {}
 
 ---@param opts? occurrence.Options
 ---@param key string
----@return occurrence.KeymapConfig|occurrence.SearchConfig|nil
----@overload fun(opts: occurrence.Options?, key: "keymap"): occurrence.KeymapConfig
----@overload fun(opts: occurrence.Options?, key: "search"): occurrence.SearchConfig
+---@return occurrence.KeymapConfig|occurrence.OperatorKeymapConfig|occurrence.ActivePresetKeymapConfig|nil
+---@overload fun(opts: occurrence.Options?, key: "actions"): occurrence.KeymapConfig
+---@overload fun(opts: occurrence.Options?, key: "operators"): occurrence.OperatorKeymapConfig
+---@overload fun(opts: occurrence.Options?, key: "preset_actions"): occurrence.ActivePresetKeymapConfig
 local function get(opts, key)
   if opts ~= nil and opts[key] ~= nil and DEFAULT_CONFIG[key] ~= nil then
     return vim.tbl_deep_extend("force", {}, DEFAULT_CONFIG[key], opts[key])
@@ -152,11 +185,7 @@ end
 ---@param opts any
 ---@return boolean
 local function is_config(opts)
-  return type(opts) == "table"
-    and type(opts.keymap) == "function"
-    and type(opts.search) == "function"
-    and type(opts.validate) == "function"
-    and type(opts.get) == "function"
+  return type(opts) == "table" and type(opts.get) == "function" and type(opts.validate) == "function"
 end
 
 ---Validate and parse the given options.

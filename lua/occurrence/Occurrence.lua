@@ -324,11 +324,18 @@ function Occurrence:unmark(range)
 end
 
 -- Whether or not the buffer contains at least one match for the occurrence.
-function Occurrence:has_matches()
+---@param range? occurrence.Range
+---@return boolean
+function Occurrence:has_matches(range)
   local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   if #state.patterns == 0 then
     return false
   end
+
+  if range then
+    return self:matches(range)() ~= nil
+  end
+
   for _, pattern in ipairs(state.patterns) do
     if vim.fn.search(pattern, "ncw") ~= 0 then
       return true

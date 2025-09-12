@@ -25,6 +25,7 @@ local function setmode(mode)
 end
 
 ---@module 'occurrence.actions'
+
 local actions = {}
 
 -- Find all occurrences of the word under the cursor in the given buffer.
@@ -82,9 +83,9 @@ actions.find_active_search_or_cursor_word = Action.new(function(occurrence)
   if vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "" then
     -- clear the hlsearch as we're going to to replace it with occurrence highlights.
     vim.cmd.nohlsearch()
-    return actions.find_last_search:with(occurrence)()
+    return actions.find_last_search(occurrence)
   end
-  return actions.find_cursor_word:with(occurrence)()
+  return actions.find_cursor_word(occurrence)
 end)
 
 -- Go to the next occurrence.
@@ -206,6 +207,18 @@ end)
 
 actions.mark_selection = actions.find_selection + actions.mark_all
 
+actions.mark_selection_or_toggle_marks = Action.new(function(occurrence)
+  if occurrence.patterns == nil or #occurrence.patterns == 0 then
+    return actions.mark_selection(occurrence)
+  end
+  local selection_range = Range.of_selection()
+  if selection_range and occurrence:has_matches(selection_range) then
+    return actions.toggle_mark_selection(occurrence)
+  else
+    return actions.mark_selection(occurrence)
+  end
+end)
+
 actions.mark_active_search_or_cursor_word = actions.find_active_search_or_cursor_word + actions.mark_all
 
 actions.mark_last_search = actions.find_last_search + actions.mark_all
@@ -214,7 +227,7 @@ actions.mark_last_search = actions.find_last_search + actions.mark_all
 ---@param operator string
 ---@param config? occurrence.Config
 actions.operate_motion = Action.new(function(occurrence, operator, config)
-  local operators_config = config and config:keymap().operators or nil
+  local operators_config = config and config:operators() or nil
   local operator_name = operators.resolve_name(operator, operators_config)
   local normal_action = operators.get_operator_action(operator, config)
 
@@ -289,59 +302,71 @@ actions.activate_preset = Action.new(function(occurrence, opts)
     return
   end
 
-  local cancel_action = actions.deactivate:with(occurrence)
+  local preset_actions = config:preset_actions()
 
-  -- TODO: derive keymaps from config
-  log.debug("Activating keymaps for buffer", occurrence.buffer)
   local keymap = Keymap.new(occurrence.buffer)
 
-  -- Cancel the pending occurrence operation.
-  keymap:n("<Esc>", cancel_action, "Clear occurrence")
-  -- keymap:n("<C-c>", cancel_action, "Clear occurrence")
-  -- keymap:n("<C-[>", cancel_action, "Clear occurrence")
+  for key, action in pairs(preset_actions.n) do
+    local resolved_action = actions.resolve(action)
+    if resolved_action then
+      local desc = actions.get_desc(resolved_action, "n")
+      keymap:n(key, resolved_action:with(occurrence), { desc = desc })
+    elseif action ~= false then
+      if type(action) == "string" then
+        log.warn_once("No action '" .. action .. "' found for keymap '" .. key .. "' in normal mode")
+      else
+        log.warn_once("Invalid action for keymap '" .. key .. "' in normal mode")
+      end
+    end
+  end
 
-  -- Navigate between occurrence matches
-  keymap:n("n", actions.goto_next_mark:with(occurrence), "Next marked occurrence")
-  keymap:n("N", actions.goto_previous_mark:with(occurrence), "Previous marked occurrence")
-  keymap:n("gn", actions.goto_next:with(occurrence), "Next occurrence")
-  keymap:n("gN", actions.goto_previous:with(occurrence), "Previous occurrence")
+  for key, action in pairs(preset_actions.v) do
+    local resolved_action = actions.resolve(action)
+    if resolved_action then
+      local desc = actions.get_desc(resolved_action, "v")
+      keymap:v(key, resolved_action:with(occurrence), { desc = desc })
+    elseif action ~= false then
+      if type(action) == "string" then
+        log.warn_once("No action '" .. action .. "' found for keymap '" .. key .. "' in visual mode")
+      else
+        log.warn_once("Invalid action for keymap '" .. key .. "' in visual mode")
+      end
+    end
+  end
 
-  -- Manage occurrence marks.
-  keymap:n("go", actions.mark_cursor_word_or_toggle_mark:with(occurrence), "Toggle occurrence mark")
-  keymap:n("ga", actions.mark:with(occurrence), "Mark occurrence")
-  keymap:n("gx", actions.unmark:with(occurrence), "Unmark occurrence")
+  local operators_keymap = config:operators()
 
-  -- Use visual/select to narrow occurrence marks.
-  keymap:v("go", actions.toggle_mark_selection:with(occurrence), "Toggle occurrence marks")
-  keymap:v("ga", actions.mark_selection:with(occurrence), "Mark occurrences")
-  keymap:v("gx", actions.unmark_selection:with(occurrence), "Unmark occurrences")
+  for operator_key in pairs(operators_keymap) do
+    local operator_config = operators.get_operator_config(operator_key, operators_keymap)
 
-  local operators_keymap = config:keymap().operators
+    if not preset_actions.n[operator_key] then
+      if operator_config ~= false and preset_actions.n[operator_key] ~= false then
+        local desc = "'" .. operator_key .. "' on marked occurrences"
+        if type(operator_config) == "table" and operator_config.desc then
+          desc = operator_config.desc
+        end
 
-  if vim.iter(operators_keymap):any(function(_, v)
-    return v ~= false
-  end) then
-    for operator_key in pairs(operators_keymap) do
-      local operator_config = operators.get_operator_config(operator_key, operators_keymap)
-      if operator_config == false then
+        keymap:n(
+          operator_key,
+          actions.operate_motion:bind(operator_key, config):with(occurrence),
+          { desc = desc, expr = true }
+        )
+      else
         log.debug("Skipping operator key:", operator_key, "as it is disabled in the config")
-        goto continue
       end
-      local desc = "'" .. operator_key .. "' on marked occurrences"
-      if type(operator_config) == "table" and operator_config.desc then
-        desc = operator_config.desc
+    end
+
+    if not preset_actions.v[operator_key] then
+      if operator_config ~= false and preset_actions.v[operator_key] ~= false then
+        local desc = "'" .. operator_key .. "' on marked occurrences in selection"
+        if type(operator_config) == "table" and operator_config.desc then
+          desc = operator_config.desc .. " in selection"
+        end
+
+        keymap:v(operator_key, actions.operate_selection:bind(operator_key, config):with(occurrence), { desc = desc })
+      else
+        log.debug("Skipping operator key:", operator_key, "as it is disabled in the config")
       end
-
-      log.debug("Setting up operator key:", operator_key, "->", desc)
-      keymap:n(
-        operator_key,
-        actions.operate_motion:bind(operator_key, config):with(occurrence),
-        { desc = desc, expr = true }
-      )
-      desc = desc .. " in selection"
-      keymap:v(operator_key, actions.operate_selection:bind(operator_key, config):with(occurrence), { desc = desc })
-
-      ::continue::
     end
   end
 end)
@@ -365,17 +390,17 @@ actions.activate_operator_pending = Action.new(function(occurrence, config)
   end
 
   local operator_action = operators.get_operator_action(operator, config) + actions.deactivate
+
+  -- TODO: derive keymaps from config
+  log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
+
+  local keymap = Keymap.new(occurrence.buffer)
+
   local cancel_action = actions.deactivate:with(occurrence)
 
-  log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
-  local keymap = Keymap.new(occurrence.buffer)
   keymap:o("<Esc>", cancel_action, "Clear occurrence")
   keymap:o("<C-c>", cancel_action, "Clear occurrence")
   keymap:o("<C-[>", cancel_action, "Clear occurrence")
-
-  -- Repeat operator_pending key to apply operator to the occurrences in the current line
-  -- TODO: should this be configurable? Also, should it apply to all occurrences instead?
-  keymap:o(config:keymap().operator_pending, "<cmd>normal! ^v$<cr>", "Operate on occurrences linewise")
 
   set_opfunc({
     operator = operator,
@@ -421,5 +446,59 @@ actions.deactivate = Action.new(function(occurrence)
   end
   occurrence:set()
 end)
+
+-- Supported actions
+---@enum (key) occurrence.SupportedActions
+local supported_actions = {
+  activate_preset_with_search_or_cursor_word = actions.mark_active_search_or_cursor_word + actions.activate_preset,
+  activate_preset_with_cursor_word = actions.mark_cursor_word + actions.activate_preset,
+  activate_preset_with_selection = actions.mark_selection + actions.activate_preset,
+  modify_operator_pending = actions.activate_operator_pending,
+  modify_operator_pending_linewise = actions.activate_operator_pending, -- TODO: linewise
+
+  -- active preset actions
+  deactivate = actions.deactivate,
+  goto_next = actions.goto_next,
+  goto_previous = actions.goto_previous,
+  goto_next_mark = actions.goto_next_mark,
+  goto_previous_mark = actions.goto_previous_mark,
+  mark_cursor_word_or_toggle_mark = actions.mark_cursor_word_or_toggle_mark,
+  mark_cursor_word = actions.mark_cursor_word,
+  mark_selection_or_toggle_marks = actions.mark_selection_or_toggle_marks,
+  mark_selection = actions.mark_selection,
+  unmark = actions.unmark,
+}
+
+-- Get an action by name.
+---@param name occurrence.SupportedActions
+---@return occurrence.Action?
+function actions.get(name)
+  return supported_actions[name]
+end
+
+-- Resolve an action from a string or occurrence.Action.
+---@param action? occurrence.SupportedActions | occurrence.Action | false
+---@return occurrence.Action?
+function actions.resolve(action)
+  if type(action) == "string" then
+    return actions.get(action)
+  elseif action then
+    ---@cast action -occurrence.SupportedActions
+    return action
+  end
+end
+
+-- Get a description for an action.
+---@param action occurrence.Action
+---@param mode? 'n' | 'v' | 'o'
+---@return string
+function actions.get_desc(action, mode)
+  -- TODO: get description from action
+  -- if action and action.desc then
+  --   return action.desc
+  -- else
+  return "Occurrence action"
+  -- end
+end
 
 return actions

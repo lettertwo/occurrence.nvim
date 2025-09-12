@@ -267,12 +267,10 @@ describe("operators", function()
 
     it("supports aliasing operators", function()
       local config = Config.new({
-        keymap = {
-          operators = {
-            ["del"] = "delete",
-            ["yd"] = "yank",
-            ["ch"] = "change",
-          },
+        operators = {
+          ["del"] = "delete",
+          ["yd"] = "yank",
+          ["ch"] = "change",
         },
       })
 
@@ -299,11 +297,9 @@ describe("operators", function()
 
     it("errors for recursive aliasing", function()
       local config = Config.new({
-        keymap = {
-          operators = {
-            ["change"] = "delete",
-            ["delete"] = "change",
-          },
+        operators = {
+          ["change"] = "delete",
+          ["delete"] = "change",
         },
       })
 
@@ -326,10 +322,9 @@ describe("operators", function()
 
     it("creates default configs for enabled operators", function()
       local config = Config.new({
-        keymap = {
-          operators = {
-            ["custom1"] = true,
-          },
+        operators = {
+          ---@diagnostic disable-next-line: assign-type-mismatch
+          ["custom1"] = true,
         },
       })
       assert.is_true(operators.is_supported("custom1", config))
@@ -341,10 +336,8 @@ describe("operators", function()
 
     it("errors for disabled operators", function()
       local config = Config.new({
-        keymap = {
-          operators = {
-            ["nonexistent_op"] = false,
-          },
+        operators = {
+          ["nonexistent_op"] = false,
         },
       })
       assert.is_false(operators.is_supported("nonexistent_op", config))

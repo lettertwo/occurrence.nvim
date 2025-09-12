@@ -73,6 +73,20 @@ local supported_operators = {
     replacement = {},
   },
 
+  delete_line = {
+    desc = "Delete marked occurrences on [count] lines",
+    method = "command",
+    uses_register = true,
+    modifies_text = true,
+  },
+
+  delete_to_end_of_line = {
+    desc = "Delete marked occurrences to end of line and [count] additional lines",
+    method = "command",
+    uses_register = true,
+    modifies_text = true,
+  },
+
   yank = {
     desc = "Yank marked occurrences",
     method = "direct_api",
@@ -241,7 +255,7 @@ end
 ---@param operators_config? occurrence.OperatorKeymapConfig
 ---@return occurrence.OperatorConfig|false|nil
 function operators.get_operator_config(operator, operators_config)
-  operators_config = operators_config or Config.new():keymap().operators
+  operators_config = operators_config or Config.new():operators()
   operator = operators.resolve_name(operator, operators_config)
 
   local operator_config = operators_config[operator]
@@ -275,7 +289,7 @@ end
 ---@param operators_config? occurrence.OperatorKeymapConfig
 ---@return string
 function operators.resolve_name(name, operators_config)
-  operators_config = operators_config or Config.new():keymap().operators
+  operators_config = operators_config or Config.new():operators()
   local resolved = operators_config[name]
   local seen = {}
   while type(resolved) == "string" do
@@ -294,7 +308,7 @@ end
 ---@param config? occurrence.Config
 ---@return boolean
 function operators.is_supported(operator, config)
-  local operator_config = operators.get_operator_config(operator, config and config:keymap().operators or nil)
+  local operator_config = operators.get_operator_config(operator, config and config:operators() or nil)
   return operator_config ~= false
 end
 
@@ -303,7 +317,7 @@ end
 ---@param config? occurrence.Config
 ---@return occurrence.Action
 function operators.get_operator_action(operator, config)
-  local operators_config = config and config:keymap().operators or nil
+  local operators_config = config and config:operators() or nil
   local operator_name = operators.resolve_name(operator, operators_config)
   local operator_action = OPERATOR_CACHE[operator_name]
 
