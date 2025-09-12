@@ -13,7 +13,7 @@ describe("Keymap", function()
       assert.is_table(keymap.active_keymaps)
       assert.is_function(keymap.n)
       assert.is_function(keymap.o)
-      assert.is_function(keymap.x)
+      assert.is_function(keymap.v)
       assert.is_function(keymap.reset)
     end)
 
@@ -216,7 +216,7 @@ describe("Keymap", function()
       end)
 
       assert.has_no.errors(function()
-        Keymap.validate_mode("x")
+        Keymap.validate_mode("v")
       end)
     end)
 
@@ -378,12 +378,12 @@ describe("Keymap", function()
       end)
     end)
 
-    describe("keymap:x", function()
+    describe("keymap:v", function()
       it("sets visual mode keymap", function()
         local cb = spy.new(function() end)
-        keymap:x("test_key", cb, "Test visual")
+        keymap:v("test_key", cb, "Test visual")
 
-        assert.is_true(keymap.active_keymaps.x["test_key"])
+        assert.is_true(keymap.active_keymaps.v["test_key"])
         assert.spy(cb).was_not_called()
 
         -- Enter visual mode and press the key
@@ -415,12 +415,12 @@ describe("Keymap", function()
       -- Set multiple keymaps
       keymap1:n("test_n", function() end, "Normal test")
       keymap1:o("test_o", function() end, "Operator test")
-      keymap1:x("test_x", function() end, "Visual test")
+      keymap1:v("test_x", function() end, "Visual test")
 
       -- Verify they're tracked
       assert.is_true(keymap1.active_keymaps.n["test_n"])
       assert.is_true(keymap1.active_keymaps.o["test_o"])
-      assert.is_true(keymap1.active_keymaps.x["test_x"])
+      assert.is_true(keymap1.active_keymaps.v["test_x"])
 
       -- Reset
       keymap1:reset()
@@ -428,7 +428,7 @@ describe("Keymap", function()
       -- Verify tracking is cleared - accessing them should create empty tables
       assert.same({}, keymap1.active_keymaps.n)
       assert.same({}, keymap1.active_keymaps.o)
-      assert.same({}, keymap1.active_keymaps.x)
+      assert.same({}, keymap1.active_keymaps.v)
     end)
 
     it("handles reset with no active keymaps", function()

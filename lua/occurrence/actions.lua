@@ -312,9 +312,9 @@ actions.activate_preset = Action.new(function(occurrence, opts)
   keymap:n("gx", actions.unmark:with(occurrence), "Unmark occurrence")
 
   -- Use visual/select to narrow occurrence marks.
-  keymap:x("go", actions.toggle_mark_selection:with(occurrence), "Toggle occurrence marks")
-  keymap:x("ga", actions.mark_selection:with(occurrence), "Mark occurrences")
-  keymap:x("gx", actions.unmark_selection:with(occurrence), "Unmark occurrences")
+  keymap:v("go", actions.toggle_mark_selection:with(occurrence), "Toggle occurrence marks")
+  keymap:v("ga", actions.mark_selection:with(occurrence), "Mark occurrences")
+  keymap:v("gx", actions.unmark_selection:with(occurrence), "Unmark occurrences")
 
   local operators_keymap = config:keymap().operators
 
@@ -339,7 +339,7 @@ actions.activate_preset = Action.new(function(occurrence, opts)
         { desc = desc, expr = true }
       )
       desc = desc .. " in selection"
-      keymap:x(operator_key, actions.operate_selection:bind(operator_key, config):with(occurrence), { desc = desc })
+      keymap:v(operator_key, actions.operate_selection:bind(operator_key, config):with(occurrence), { desc = desc })
 
       ::continue::
     end

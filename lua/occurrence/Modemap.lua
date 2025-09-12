@@ -5,7 +5,7 @@ local modemap = {}
 local MODE = {
   n = "n", ---Normal mode.
   o = "o", ---Operator-pending mode.
-  x = "x", ---Visual or select mode.
+  v = "v", ---Visual mode.
 }
 
 modemap.MODE = MODE

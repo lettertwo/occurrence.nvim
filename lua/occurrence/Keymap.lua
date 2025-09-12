@@ -123,13 +123,13 @@ function Keymap:o(lhs, rhs, opts)
   self.active_keymaps[MODE.o][lhs] = true
 end
 
--- Register a visual or select mode keymap.
+-- Register a visual mode keymap.
 ---@param lhs string
 ---@param rhs string | function | occurrence.Action
 ---@param opts table | string
-function Keymap:x(lhs, rhs, opts)
-  vim.keymap.set(MODE.x, lhs, self.wrap_action(rhs), self:parse_opts(opts))
-  self.active_keymaps[MODE.x][lhs] = true
+function Keymap:v(lhs, rhs, opts)
+  vim.keymap.set(MODE.v, lhs, self.wrap_action(rhs), self:parse_opts(opts))
+  self.active_keymaps[MODE.v][lhs] = true
 end
 
 -- Resets all active keymaps registered by this instance.

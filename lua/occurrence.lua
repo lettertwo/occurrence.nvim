@@ -34,7 +34,7 @@ function occurrence.setup(opts)
     { expr = true, desc = "Find occurrences of word" }
   )
 
-  Keymap:x(
+  Keymap:v(
     keymap_config.visual,
     actions.mark_selection + actions.activate_preset:bind(config),
     { expr = true, desc = "Find occurrences of selection" }
