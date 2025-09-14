@@ -406,9 +406,17 @@ describe("Action", function()
       local a1 = Action.new(cb1):with(o1):bind(1)
       local a2 = Action.new(cb2):with(o1):bind(2, 3):with(o2)
       local action = a1 + a2
+      -- expect 6 from `cb2()`
       assert.equal(action(4), 6)
+      -- expect o1 from `a1:with(o1)`
+      -- expect 1 from `a1:bind(1)`
+      -- expect 4 from `action(4)`
       assert.spy(cb1).was_called_with(match.is_ref(o1), 1, 4)
-      assert.spy(cb2).was_called_with(match.is_ref(o2), 2, 3, 5)
+      -- expect o2 from `a2:with(o2)`
+      -- expect 2, 3 from `a2:bind(2, 3)`
+      -- expect 4 from `action(4)`
+      -- expect 5 from `cb1()`
+      assert.spy(cb2).was_called_with(match.is_ref(o2), 2, 3, 4, 5)
     end)
   end)
 

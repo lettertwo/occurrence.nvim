@@ -187,7 +187,7 @@ function Action.add(left, right)
     if is_occurrence_action(left) and is_occurrence_action(right) then
       local combined = action.new(left)
       function combined:call(...)
-        return right(unpack({ left(...) }))
+        return right(unpack(concat({ ... }, { left(...) })))
       end
       getmetatable(combined).__call = combined.call
       return combined
@@ -195,17 +195,17 @@ function Action.add(left, right)
       local combined = action.new(left)
       function combined:call(...)
         ---@diagnostic disable-next-line: undefined-field
-        return right(left.occurrence, unpack({ left(...) }))
+        return right(left.occurrence, unpack(concat({ ... }, { left(...) })))
       end
       getmetatable(combined).__call = combined.call
       return combined
     elseif is_occurrence_action(right) then
       return action.new(function(occurrence, ...)
-        return right(unpack({ left(occurrence, ...) }))
+        return right(unpack(concat({ ... }, { left(occurrence, ...) })))
       end)
     else
       return action.new(function(occurrence, ...)
-        return right(occurrence, unpack({ left(occurrence, ...) }))
+        return right(occurrence, unpack(concat({ ... }, { left(occurrence, ...) })))
       end)
     end
   end
