@@ -238,42 +238,6 @@ describe("Keymap", function()
     end)
   end)
 
-  describe("Keymap.wrap_action", function()
-    it("wraps table actions in function", function()
-      local action = {
-        call = function()
-          return "called"
-        end,
-      }
-      setmetatable(action, {
-        __call = function(self)
-          return self.call()
-        end,
-      })
-
-      local wrapped = Keymap.wrap_action(action)
-
-      assert.is_function(wrapped)
-      assert.equals("called", wrapped())
-    end)
-
-    it("returns functions unchanged", function()
-      local func = function()
-        return "test"
-      end
-      local wrapped = Keymap.wrap_action(func)
-
-      assert.equals(func, wrapped)
-    end)
-
-    it("returns strings unchanged", function()
-      local str = ":echo 'test'"
-      local wrapped = Keymap.wrap_action(str)
-
-      assert.equals(str, wrapped)
-    end)
-  end)
-
   describe("keymap:parse_opts", function()
     local keymap
 
@@ -329,19 +293,6 @@ describe("Keymap", function()
 
         vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("test_key", true, false, true), "x", true)
         assert.spy(cb).was_called()
-      end)
-
-      it("handles string action", function()
-        _G.cb = spy.new(function() end)
-        keymap:n("test_key", "<cmd>lua _G.cb()<cr>", "Test command")
-
-        assert.is_true(keymap.active_keymaps.n["test_key"])
-        assert.spy(_G.cb).was_not_called()
-
-        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("test_key", true, false, true), "x", true)
-        assert.spy(_G.cb).was_called()
-
-        _G.cb = nil
       end)
 
       it("handles table action", function()

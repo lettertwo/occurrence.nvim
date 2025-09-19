@@ -3,6 +3,8 @@ local match = require("luassert.match")
 local stub = require("luassert.stub")
 local util = require("tests.util")
 
+local builtins = require("occurrence.actions")
+local builtin_ops = require("occurrence.operators")
 local plugin = require("occurrence")
 
 local NS = vim.api.nvim_create_namespace("Occurrence")
@@ -36,7 +38,7 @@ describe("integration tests", function()
       -- Create buffer with a unique word that won't have multiple occurrences
       bufnr = util.buffer("unique_word_that_appears_only_once")
 
-      plugin.setup({ keymap = { normal = "q" } })
+      plugin.setup({ actions = { n = { q = "mark_search_or_word" } } })
 
       vim.cmd([[silent! /nonexistent_pattern<CR>]]) -- Search for a pattern that won't match anything
 
@@ -49,7 +51,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ keymap = { normal = normal_key } })
+      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
 
       -- Activate occurrence on 'foo'
       feedkeys(normal_key)
@@ -62,7 +64,7 @@ describe("integration tests", function()
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       local cancel_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Clear occurrence" then
+        if map.lhs ~= nil and map.desc == builtins.deactivate.desc then
           cancel_key = map.lhs
           break
         end
@@ -80,7 +82,7 @@ describe("integration tests", function()
       mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       cancel_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Clear occurrence" then
+        if map.lhs ~= nil and map.desc == builtins.deactivate.desc then
           cancel_key = map.lhs
           break
         end
@@ -92,7 +94,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ keymap = { normal = normal_key } })
+      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
 
       -- Activate occurrence on 'foo'
       feedkeys(normal_key)
@@ -102,9 +104,9 @@ describe("integration tests", function()
       local mark_key = nil
       local unmark_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Mark occurrence" then
+        if map.lhs ~= nil and map.desc == builtins.mark.desc then
           mark_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == "Unmark occurrence" then
+        elseif map.lhs ~= nil and map.desc == builtins.unmark.desc then
           unmark_key = map.lhs
         end
       end
@@ -136,9 +138,9 @@ describe("integration tests", function()
       mark_key = nil
       unmark_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Mark occurrence" then
+        if map.lhs ~= nil and map.desc == builtins.mark.desc then
           mark_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == "Unmark occurrence" then
+        elseif map.lhs ~= nil and map.desc == builtins.unmark.desc then
           unmark_key = map.lhs
         end
       end
@@ -150,7 +152,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ keymap = { normal = normal_key } })
+      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
 
       -- Activate occurrence on 'foo' (marks all occurrences)
       feedkeys(normal_key)
@@ -162,7 +164,7 @@ describe("integration tests", function()
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       local toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Toggle occurrence mark" then
+        if map.lhs ~= nil and map.desc == builtins.mark_word_or_toggle_mark.desc then
           toggle_key = map.lhs
           break
         end
@@ -193,7 +195,7 @@ describe("integration tests", function()
       mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Toggle occurrence mark" then
+        if map.lhs ~= nil and map.desc == builtins.mark_word_or_toggle_mark.desc then
           toggle_key = map.lhs
           break
         end
@@ -205,7 +207,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ keymap = { normal = normal_key } })
+      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
 
       -- Activate occurrence on 'foo' (cursor at position 0)
       feedkeys(normal_key)
@@ -217,13 +219,13 @@ describe("integration tests", function()
       local next_marked_key = nil
       local prev_marked_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Next occurrence" then
+        if map.lhs ~= nil and map.desc == builtins.goto_next.desc then
           next_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == "Previous occurrence" then
+        elseif map.lhs ~= nil and map.desc == builtins.goto_previous.desc then
           prev_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == "Next marked occurrence" then
+        elseif map.lhs ~= nil and map.desc == builtins.goto_next_mark.desc then
           next_marked_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == "Previous marked occurrence" then
+        elseif map.lhs ~= nil and map.desc == builtins.goto_previous_mark.desc then
           prev_marked_key = map.lhs
         end
       end
@@ -259,9 +261,9 @@ describe("integration tests", function()
       next_key = nil
       prev_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Next occurrence" then
+        if map.lhs ~= nil and map.desc == builtins.goto_next.desc then
           next_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == "Previous occurrence" then
+        elseif map.lhs ~= nil and map.desc == builtins.goto_previous.desc then
           prev_key = map.lhs
         end
       end
@@ -273,7 +275,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ keymap = { normal = normal_key } })
+      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
 
       -- Move to 'bar' and activate occurrence
       feedkeys("w") -- Move to 'bar'
@@ -289,9 +291,9 @@ describe("integration tests", function()
       local mark_key = nil
       local toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Mark occurrences" then
+        if map.lhs ~= nil and map.desc == builtins.mark.desc then
           mark_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == "Toggle occurrence marks" then
+        elseif map.lhs ~= nil and map.desc == builtins.mark_selection_or_toggle_marks_in_selection.desc then
           toggle_key = map.lhs
         end
       end
@@ -323,9 +325,9 @@ describe("integration tests", function()
       mark_key = nil
       toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Mark occurrences" then
+        if map.lhs ~= nil and map.desc == builtins.mark.desc then
           mark_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == "Toggle occurrence marks" then
+        elseif map.lhs ~= nil and map.desc == builtins.mark_selection_or_toggle_marks_in_selection.desc then
           toggle_key = map.lhs
         end
       end
@@ -339,7 +341,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ keymap = { normal = normal_key } })
+      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
 
       -- simulate pressing normal keymap to find 'foo'
       feedkeys(normal_key)
@@ -379,12 +381,210 @@ describe("integration tests", function()
     end)
   end)
 
+  describe("modify_operator", function()
+    it("warns when trying to modify unsupported operator", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({
+        actions = { o = { q = "modify_operator" } },
+        operators = { c = false },
+      })
+
+      -- Enter change operator-pending mode, modify operator
+      feedkeys("cq")
+
+      vim.wait(0) -- The operator-modifier action is async.
+
+      assert
+        .spy(notify_stub)
+        .was_called_with(match.is_match("Operator 'c' is not supported"), vim.log.levels.WARN, match._)
+
+      -- There should be no marks since operator was unsupported.
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(0, #marks, "No 'foo' occurrences should be marked")
+    end)
+
+    it("modifies supported operator", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({
+        actions = { o = { q = "modify_operator" } },
+        operators = {
+          d = {
+            desc = "Delete on marked occurrences",
+            method = "direct_api",
+            uses_register = true,
+            modifies_text = true,
+            replacement = function()
+              return ""
+            end,
+          },
+        },
+      })
+
+      -- Enter delete operator-pending mode, modify operator
+      feedkeys("dq")
+
+      vim.wait(0) -- The operator-modifier action is async.
+
+      -- Verify no changes have been made yet.
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("foo bar baz foo", lines[1], "No 'foo' occurrences should be deleted yet")
+
+      -- Verify marks are created for all 'foo' occurrences
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      -- Complete a motion to apply delete operator
+      feedkeys("$")
+
+      lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals(" bar baz ", lines[1], "Both 'foo' occurrences should be deleted")
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying operator")
+    end)
+
+    it("cancels operator modification if there are no marked occurrences", function()
+      bufnr = util.buffer({ "", "foo bar baz foo" })
+
+      plugin.setup({
+        actions = { o = { q = "modify_operator" } },
+        operators = {
+          d = {
+            desc = "Delete on marked occurrences",
+            method = "direct_api",
+            uses_register = true,
+            modifies_text = true,
+            replacement = function()
+              return ""
+            end,
+          },
+        },
+      })
+
+      local listener = stub.new()
+
+      local listener_id = vim.api.nvim_create_autocmd("ModeChanged", {
+        pattern = "*",
+        callback = function(...)
+          listener(...)
+        end,
+      })
+
+      -- Enter delete operator-pending mode, modify operator
+      feedkeys("dq")
+
+      vim.wait(0) -- The operator-modifier action is async.
+
+      -- Verify no marks are created
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(0, #marks, "No occurrences should be marked")
+
+      -- Verify mode change events were triggered
+      assert.spy(listener).was_called_at_least(2)
+      -- should've been called first to enter operator-pending mode
+      assert.is_same(listener.calls[1].vals[1], {
+        buf = bufnr,
+        event = "ModeChanged",
+        file = "",
+        id = listener_id,
+        match = "n:no",
+      })
+
+      -- should've been called last to enter normal mode
+      assert.is_same(listener.calls[#listener.calls].vals[1], {
+        buf = bufnr,
+        event = "ModeChanged",
+        file = "",
+        id = listener_id,
+        match = "no:n",
+      })
+
+      listener:clear()
+
+      vim.api.nvim_del_autocmd(listener_id)
+    end)
+
+    it("cancels operator modification on escape", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({
+        actions = { o = { q = "modify_operator" } },
+        operators = {
+          d = {
+            desc = "Delete on marked occurrences",
+            method = "direct_api",
+            uses_register = true,
+            modifies_text = true,
+            replacement = function()
+              return ""
+            end,
+          },
+        },
+      })
+
+      local listener = stub.new()
+
+      local listener_id = vim.api.nvim_create_autocmd("ModeChanged", {
+        pattern = "*",
+        callback = function(...)
+          listener(...)
+        end,
+      })
+
+      -- Enter delete operator-pending mode, modify operator
+      feedkeys("dq")
+
+      vim.wait(0) -- The operator-modifier action is async.
+
+      -- Verify marks are created for all 'foo' occurrences
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      -- Simulate pressing escape to cancel operator modification
+      feedkeys("<Esc>")
+
+      -- Verify marks are cleared
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after cancelling operator modification")
+
+      -- Verify no changes have been made to buffer
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("foo bar baz foo", lines[1], "No 'foo' occurrences should be deleted")
+
+      -- Verify mode change events were triggered
+      assert.spy(listener).was_called_at_least(2)
+      -- should've been called first to enter operator-pending mode
+      assert.is_same(listener.calls[1].vals[1], {
+        buf = bufnr,
+        event = "ModeChanged",
+        file = "",
+        id = listener_id,
+        match = "n:no",
+      })
+
+      -- should've been called last to enter normal mode
+      assert.is_same(listener.calls[#listener.calls].vals[1], {
+        buf = bufnr,
+        event = "ModeChanged",
+        file = "",
+        id = listener_id,
+        match = "no:n",
+      })
+
+      listener:clear()
+
+      vim.api.nvim_del_autocmd(listener_id)
+    end)
+  end)
+
   describe("operators", function()
     it("applies operator to all marked occurrences", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ keymap = { normal = normal_key } })
+      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -397,7 +597,7 @@ describe("integration tests", function()
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       local delete_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == "Delete marked occurrences" then
+        if map.lhs ~= nil and map.desc == builtin_ops.delete.desc then
           delete_key = map.lhs
           break
         end
@@ -418,26 +618,23 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
 
       -- Setup plugin with custom operator
-      local normal_key = "z" -- Use different key to avoid conflict with custom op
       plugin.setup({
-        keymap = {
-          normal = normal_key,
-          operators = {
-            ["q"] = {
-              desc = "Custom operator: replace with 'test'",
-              method = "direct_api",
-              uses_register = true,
-              modifies_text = true,
-              replacement = function()
-                return "test"
-              end,
-            },
+        actions = { n = { z = "mark_search_or_word" } },
+        operators = {
+          q = {
+            desc = "Custom operator: replace with 'test'",
+            method = "direct_api",
+            uses_register = true,
+            modifies_text = true,
+            replacement = function()
+              return "test"
+            end,
           },
         },
       })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
-      feedkeys(normal_key)
+      feedkeys("z")
 
       -- Verify marks are created for all 'foo' occurrences
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})

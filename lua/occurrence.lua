@@ -22,39 +22,14 @@ end
 ---@param opts occurrence.Options
 function occurrence.setup(opts)
   local Keymap = require("occurrence.Keymap")
-  local actions = require("occurrence.actions")
-  local operators = require("occurrence.operators")
   local config = require("occurrence.Config").new(opts)
   local actions_config = config:actions()
 
   -- Setup keymaps for normal mode actions.
-  for key, action in pairs(actions_config.n) do
-    local resolved_action = actions.resolve(action)
-    if resolved_action then
-      Keymap:n(key, resolved_action:bind(config), { desc = actions.get_desc(resolved_action, "n") })
-    elseif action ~= false then
-      if type(action) == "string" then
-        log.warn_once("No action '" .. action .. "' found for keymap '" .. key .. "' in normal mode")
-      else
-        log.warn_once("Invalid action for keymap '" .. key .. "' in normal mode")
-      end
-    end
-  end
+  Keymap:map_actions("n", config)
 
   -- Setup keymaps for visual mode actions.
-  for key, action in pairs(actions_config.v) do
-    ---@type occurrence.Action?
-    local resolved_action = actions.resolve(action)
-    if resolved_action then
-      Keymap:v(key, resolved_action:bind(config), { desc = actions.get_desc(resolved_action, "v") })
-    elseif action ~= false then
-      if type(action) == "string" then
-        log.warn_once("No action '" .. action .. "' found for keymap '" .. key .. "' in visual mode")
-      else
-        log.warn_once("Invalid action for keymap '" .. key .. "' in visual mode")
-      end
-    end
-  end
+  Keymap:map_actions("v", config)
 
   -- Setup keymaps for operator-pending mode actions.
   -- Note that these are dynamically bound for supported operators
@@ -64,27 +39,17 @@ function occurrence.setup(opts)
   end) then
     vim.api.nvim_create_autocmd("ModeChanged", {
       pattern = "*:*o",
+      group = vim.api.nvim_create_augroup("OccurrenceOperatorPending", { clear = true }),
       callback = function(evt)
         log.debug("ModeChanged to operator-pending")
         -- If a keymap exists, we assume that a preset occurrence is active, so we do nothing.
         if not Keymap.get(evt.buf) then
-          local keymap = Keymap.new(evt.buf)
+          local keymap = Keymap.new(evt.buf, config)
           local operator = vim.v.operator
-          if operators.is_supported(operator, config) then
-            for key, action in pairs(actions_config.o) do
-              local resolved_action = actions.resolve(action)
-              if resolved_action then
-                keymap:o(key, resolved_action:bind(config), { desc = actions.get_desc(resolved_action, "o") })
-              elseif action ~= false then
-                if type(action) == "string" then
-                  log.warn_once(
-                    "No action '" .. action .. "' found for keymap '" .. key .. "' in operator-pending mode"
-                  )
-                else
-                  log.warn_once("Invalid action for keymap '" .. key .. "' in operator-pending mode")
-                end
-              end
-            end
+          if config:operator_is_supported(operator) then
+            keymap:map_actions("o")
+          else
+            log.warn_once("Operator '" .. operator .. "' is not supported")
           end
         end
       end,

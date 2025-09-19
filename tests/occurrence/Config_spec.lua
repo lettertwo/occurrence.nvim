@@ -1,16 +1,27 @@
 local assert = require("luassert")
-local spy = require("luassert.spy")
+local stub = require("luassert.stub")
 local match = require("luassert.match")
 local Config = require("occurrence.Config")
 
 describe("Config", function()
+  local notify_stub
+
+  before_each(function()
+    -- stub out notify to avoid polluting test output
+    notify_stub = stub(vim, "notify")
+  end)
+
+  after_each(function()
+    notify_stub:revert()
+  end)
+
   describe("config.new validation", function()
     it("validates valid options", function()
       local valid_opts = {
         actions = {
-          n = { go = "activate_preset_with_cursor_word" },
-          v = { go = "activate_preset_with_selection" },
-          o = { o = "modify_operator_pending" },
+          n = { go = "mark_word" },
+          v = { go = "mark_selection" },
+          o = { o = "modify_operator" },
         },
         operators = {
           c = "change",
@@ -28,10 +39,6 @@ describe("Config", function()
     end)
 
     it("handles invalid options gracefully with warning", function()
-      -- mock vim.notify to capture warnings
-      local original_notify = vim.notify
-      vim.notify = spy.new(function() end)
-
       -- These should warn but not error (based on log.warn_once usage)
       local conf1 = Config.new({ invalid_option = "value" })
       assert.spy(vim.notify).was_called_with(match.has_match("invalid_option"), vim.log.levels.WARN, match._)
@@ -54,63 +61,54 @@ describe("Config", function()
       assert.is_table(conf1)
       assert.is_table(conf2)
       assert.is_table(conf3)
-      assert.equals("activate_preset_with_search_or_cursor_word", conf1:actions().n.go)
-      assert.equals("activate_preset_with_search_or_cursor_word", conf2:actions().n.go)
-      assert.equals("activate_preset_with_search_or_cursor_word", conf3:actions().n.go)
-
-      -- restore original notify
-      vim.notify = original_notify
     end)
   end)
 
   describe("config.new", function()
     it("creates config with default values when no options provided", function()
       local conf = Config.new()
-
-      assert.is_table(conf)
-      assert.equals("activate_preset_with_search_or_cursor_word", conf:actions().n.go)
-      assert.equals("activate_preset_with_selection", conf:actions().v.go)
-      assert.equals("modify_operator_pending", conf:actions().o.o)
-      assert.equals("modify_operator_pending_linewise", conf:actions().o.oo)
+      for key, value in pairs(Config.default()) do
+        assert.is_same(value, conf:get(key))
+      end
     end)
 
     it("creates config with nil options", function()
       local conf = Config.new(nil)
-
-      assert.is_table(conf)
-      assert.equals("activate_preset_with_search_or_cursor_word", conf:actions().n.go)
-      assert.equals("activate_preset_with_selection", conf:actions().v.go)
-      assert.equals("modify_operator_pending", conf:actions().o.o)
+      for key, value in pairs(Config.default()) do
+        assert.is_same(value, conf:get(key))
+      end
     end)
 
     it("overrides defaults with provided options", function()
       local opts = {
         actions = {
-          n = { gn = "mark_cursor_word" },
+          n = { gn = "mark_word" },
           v = { gv = "mark_selection" },
         },
         operators = {
-          p = false,
-          y = "yank",
+          p = "other",
+          y = "fake",
         },
         preset_actions = {
           n = { ["<Esc>"] = false },
         },
       }
 
+      local defaults = Config.default()
       local conf = Config.new(opts)
 
-      assert.equals("mark_cursor_word", conf:actions().n.gn)
-      assert.equals("mark_selection", conf:actions().v.gv)
-      assert.equals(false, conf:operators().p)
-      assert.equals("yank", conf:operators().y)
-      assert.equals(false, conf:preset_actions().n["<Esc>"])
+      assert.is_not_same(defaults.actions, conf:actions())
+      assert.is_same(vim.tbl_deep_extend("force", defaults.actions, opts.actions), conf:actions())
+      assert.is_not_same(defaults.preset_actions, conf:preset_actions())
+      assert.is_same(vim.tbl_deep_extend("force", defaults.preset_actions, opts.preset_actions), conf:preset_actions())
+      assert.is_not_same(defaults.operators, conf:operators())
+      assert.is_same(vim.tbl_deep_extend("force", defaults.operators, opts.operators), conf:operators())
     end)
 
     it("passes through an existing config", function()
       local opts = {
         actions = {
-          n = { gn = "mark_cursor_word" },
+          n = { gn = "mark_word" },
         },
       }
 
@@ -118,19 +116,6 @@ describe("Config", function()
       local conf2 = Config.new(conf1)
 
       assert.equals(conf1, conf2)
-      assert.equals("mark_cursor_word", conf2:actions().n.gn)
-      assert.equals("activate_preset_with_selection", conf2:actions().v.go) -- default
-      assert.equals("modify_operator_pending", conf2:actions().o.o) -- default
-    end)
-  end)
-
-  describe("default configuration values", function()
-    it("has correct action defaults", function()
-      local conf = Config.new()
-
-      assert.equals("activate_preset_with_search_or_cursor_word", conf:actions().n.go)
-      assert.equals("activate_preset_with_selection", conf:actions().v.go)
-      assert.equals("modify_operator_pending", conf:actions().o.o)
     end)
 
     it("has correct operator defaults", function()
@@ -140,31 +125,210 @@ describe("Config", function()
       assert.equals("delete", conf:operators().d)
       assert.equals("yank", conf:operators().y)
     end)
+  end)
 
-    it("preserves option types correctly", function()
-      local opts = {
-        operators = {
-          p = false,
-          y = "yank",
-        },
-      }
-
-      local conf = Config.new(opts)
-
-      assert.is_boolean(conf:operators().p)
-      assert.is_string(conf:operators().y)
-      assert.is_table(conf:actions())
+  describe("Config:get_action_config", function()
+    it("returns nil for unsupported modes", function()
+      local conf = Config.new()
+      ---@diagnostic disable-next-line: param-type-mismatch
+      assert.is_nil(conf:get_action_config("some_action", "x"))
+      assert.spy(vim.notify).was_called_with(match.has_match("Invalid mode"), vim.log.levels.WARN, match._)
     end)
 
-    it("handles empty options table", function()
-      local conf = Config.new({})
+    it("returns nil for unsupported actions", function()
+      local conf = Config.new()
+      assert.is_nil(conf:get_action_config("nonexistent_action", "n"))
+    end)
 
-      -- Should use all defaults
-      assert.equals("activate_preset_with_search_or_cursor_word", conf:actions().n.go)
-      assert.equals("activate_preset_with_selection", conf:actions().v.go)
-      assert.equals("modify_operator_pending", conf:actions().o.o)
-      assert.equals("change", conf:operators().c)
-      assert.equals("deactivate", conf:preset_actions().n["<Esc>"])
+    it("resolves builtin actions without a mode", function()
+      local conf = Config.new()
+
+      local action =
+        assert(conf:get_action_config("deactivate"), "Expected action config for 'deactivate' in normal mode")
+      assert.is_function(action.callback)
+      assert.is_string(action.desc)
+      assert.equals("preset", action.type)
+    end)
+
+    it("returns the correct action config for valid mode and action", function()
+      local opts = {
+        actions = {
+          n = { q = "mark_word" },
+          v = { q = "mark_selection" },
+        },
+      }
+      local conf = Config.new(opts)
+
+      local action_n = assert(conf:get_action_config("q", "n"), "Expected action config for 'q' in normal mode")
+      assert.is_function(action_n.callback)
+      assert.is_string(action_n.desc)
+      assert.equals("preset", action_n.type)
+
+      local action_v = assert(conf:get_action_config("q", "v"), "Expected action config for 'q' in visual mode")
+      assert.is_function(action_v.callback)
+      assert.is_string(action_v.desc)
+      assert.equals("preset", action_v.type)
+    end)
+  end)
+
+  describe("Config:get_operator_config", function()
+    it("returns nil for unsupported operators", function()
+      local conf = Config.new()
+      assert.is_nil(conf:get_operator_config("nonexistent_operator"))
+    end)
+
+    it("returns nil for aliased to unsupported operators", function()
+      local opts = {
+        operators = {
+          x = "nonexistent_operator",
+        },
+      }
+      local conf = Config.new(opts)
+      assert.is_nil(conf:get_operator_config("x"))
+    end)
+
+    it("returns builtin operator configs", function()
+      local conf = Config.new()
+      local op = assert(conf:get_operator_config("delete"), "Expected operator config for 'p'")
+      assert.same(require("occurrence.operators").delete, op)
+    end)
+
+    it("returns the correct operator config for aliased operators", function()
+      local opts = {
+        operators = {
+          x = "delete",
+        },
+      }
+      local conf = Config.new(opts)
+      local op = assert(conf:get_operator_config("x"), "Expected operator config for 'p'")
+      assert.same(require("occurrence.operators").delete, op)
+    end)
+
+    it("returns custom operator configs", function()
+      local custom_op = {
+        desc = "Custom operator",
+        method = "command",
+        uses_register = false,
+        modifies_text = true,
+      }
+      local opts = {
+        operators = {
+          custom = custom_op,
+        },
+      }
+      local conf = Config.new(opts)
+      local op = assert(conf:get_operator_config("custom"), "Expected operator config for 'custom'")
+      assert.equals(custom_op, op)
+    end)
+
+    it("returns default operator config when none specified", function()
+      local conf = Config.new({
+        operators = {
+          custom = true,
+        },
+      })
+      local op = assert(conf:get_operator_config("custom"), "Expected operator config for 'change'")
+      assert.equals("visual_feedkeys", op.method)
+      assert.is_false(op.uses_register)
+      assert.is_true(op.modifies_text)
+    end)
+  end)
+
+  describe("Config:operator_is_supported", function()
+    it("returns false for unsupported operators", function()
+      local conf = Config.new()
+      assert.is_false(conf:operator_is_supported("nonexistent_operator"))
+    end)
+
+    it("returns true for supported builtin operators", function()
+      local conf = Config.new()
+      assert.is_true(conf:operator_is_supported("change"))
+      assert.is_true(conf:operator_is_supported("delete"))
+      assert.is_true(conf:operator_is_supported("yank"))
+    end)
+
+    it("returns true for supported aliased operators", function()
+      local opts = {
+        operators = {
+          x = "delete",
+        },
+      }
+      local conf = Config.new(opts)
+      assert.is_true(conf:operator_is_supported("x"))
+    end)
+
+    it("returns true for supported custom operators", function()
+      local custom_op = {
+        desc = "Custom operator",
+        method = "command",
+        uses_register = false,
+        modifies_text = true,
+      }
+      local opts = {
+        operators = {
+          custom = custom_op,
+        },
+      }
+      local conf = Config.new(opts)
+      assert.is_true(conf:operator_is_supported("custom"))
+    end)
+
+    it("returns false for disabled operators", function()
+      local opts = {
+        operators = {
+          delete = false,
+        },
+      }
+      local conf = Config.new(opts)
+      assert.is_false(conf:operator_is_supported("delete"))
+    end)
+
+    it("returns false for aliased disabled operators", function()
+      local opts = {
+        operators = {
+          x = "delete",
+          delete = false,
+        },
+      }
+      local conf = Config.new(opts)
+      assert.is_false(conf:operator_is_supported("x"))
+    end)
+  end)
+
+  describe("Config:wrap_action", function()
+    it("wraps table actions", function()
+      local action = {
+        call = function()
+          return "called"
+        end,
+      }
+      setmetatable(action, {
+        __call = function(self)
+          return self.call()
+        end,
+      })
+
+      local wrapped = Config.new():wrap_action(action)
+
+      assert.is_function(wrapped)
+      assert.equals("called", wrapped())
+    end)
+
+    it("wraps functions", function()
+      local func = function()
+        return "test"
+      end
+      local wrapped = Config.new():wrap_action(func)
+      assert.equals("test", wrapped())
+    end)
+
+    it("resolves builtin action strings", function()
+      local str = "deactivate"
+      local deactivate_spy = spy.on(require("occurrence.actions").deactivate, "callback")
+      local wrapped = Config.new():wrap_action(str)
+      wrapped()
+      assert.spy(deactivate_spy).was_called()
+      deactivate_spy:revert()
     end)
   end)
 end)
