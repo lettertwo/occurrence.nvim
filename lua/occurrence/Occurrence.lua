@@ -1,30 +1,10 @@
-local Location = require("occurrence.Location")
+local BufferState = require("occurrence.BufferState")
 local Cursor = require("occurrence.Cursor")
+local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
-local Extmarks = require("occurrence.Extmarks")
 
 ---@module 'occurrence.Occurrence'
 local occurrence = {}
-
-local NS = vim.api.nvim_create_namespace("Occurrence")
-
--- A weak-key map of Occurrence instances to their internal state stores.
----@type table<occurrence.Occurrence, occurrence.OccurrenceState>
-local STATE_CACHE = setmetatable({}, {
-  __mode = "k",
-  __index = function()
-    error("Occurrence has not been initialized")
-  end,
-})
-
--- A weak-key map of Occurrence instances to their extmarks.
----@type table<occurrence.Occurrence, occurrence.Extmarks>
-local EXTMARKS_CACHE = setmetatable({}, {
-  __mode = "k",
-  __index = function()
-    error("Occurrence has not been initialized")
-  end,
-})
 
 ---@class occurrence.SearchFlags
 ---@field cursor? boolean Whether to accept a match at the cursor position.
@@ -95,7 +75,7 @@ local function char_dist(loc1, loc2)
   return chars
 end
 
----@param state occurrence.OccurrenceState
+---@param state occurrence.Occurrence
 ---@param flags occurrence.SearchFlags
 ---@param cursor? occurrence.Location
 ---@param bounds? occurrence.Range
@@ -107,7 +87,7 @@ local function closest(state, flags, cursor, bounds)
   if #state.patterns > 1 then
     local closest_match = nil
     cursor = assert(cursor or Location.of_cursor(), "cursor location not found")
-    for i, pattern in ipairs(state.patterns) do
+    for _, pattern in ipairs(state.patterns) do
       local match = search(pattern, flags)
       if match and not closest_match then
         closest_match = match
@@ -140,60 +120,35 @@ local function closest(state, flags, cursor, bounds)
   end
 end
 
--- The internal state store for an Occurrence.
----@class occurrence.OccurrenceState
----@field patterns string[] The patterns tracked by this occurrence.
-
 -- A stateful representation of an occurrence of a pattern in a buffer.
----@class occurrence.Occurrence: occurrence.OccurrenceState
----@field buffer integer The buffer in which the occurrence was found.
+---@class occurrence.Occurrence: occurrence.BufferState
 local Occurrence = {}
 
-local OCCURRENCE_META = {
-  __index = function(self, key)
-    if rawget(self, key) ~= nil then
-      return rawget(self, key)
-    elseif Occurrence[key] ~= nil then
-      return Occurrence[key]
-    else
-      local state = STATE_CACHE[self]
-      if state[key] ~= nil then
-        return state[key]
-      end
-    end
-  end,
-  __newindex = function(self, key, value)
-    local state = STATE_CACHE[self]
-    if rawget(self, key) == nil and state[key] ~= nil then
-      error("Cannot set readonly field " .. key)
-    else
-      rawset(self, key, value)
-    end
-  end,
-}
-
 -- Create a new Occurrence for the given buffer and text.
+-- If no `buffer` is provided, the current buffer will be used.
+-- If a `text` pattern is provided, it will be added to the active occurrence patterns.
+-- Optional `opts` are the same as for `Occurrence:add`.
 ---@param buffer? integer
 ---@param text? string
 ---@param opts? { is_word: boolean }
 ---@return occurrence.Occurrence
 function occurrence.new(buffer, text, opts)
-  local self = setmetatable({ buffer = buffer or vim.api.nvim_get_current_buf() }, OCCURRENCE_META)
-  Occurrence.set(self, text, opts)
-  return self
-end
-
--- Get the Occurrence for the current buffer, or create a new one if it doesn't exist.
----@param buffer? integer
----@return occurrence.Occurrence
-function occurrence.get(buffer)
-  buffer = buffer or vim.api.nvim_get_current_buf()
-  for occ, state in pairs(STATE_CACHE) do
-    if occ.buffer == buffer and #state.patterns > 0 then
-      return occ
-    end
+  local state = BufferState.get(buffer)
+  local self = setmetatable({}, {
+    __index = function(tbl, key)
+      if Occurrence[key] ~= nil then
+        return Occurrence[key]
+      end
+      if state[key] ~= nil then
+        return state[key]
+      end
+      return rawget(tbl, key)
+    end,
+  })
+  if text ~= nil then
+    Occurrence.add(self, text, opts)
   end
-  return occurrence.new(buffer)
+  return self
 end
 
 -- Move the cursor to the nearest occurrence.
@@ -211,8 +166,7 @@ end
 ---@return occurrence.Range | nil
 function Occurrence:match_cursor(opts)
   opts = vim.tbl_extend("force", { direction = nil, marked = false, wrap = false }, opts or {})
-  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
-  assert(#state.patterns > 0, "Occurrence has not been initialized with a pattern")
+  assert(#self.patterns > 0, "Occurrence has not been initialized with a pattern")
   assert(self.buffer == vim.api.nvim_get_current_buf(), "buffer not matching the current buffer not yet supported")
   local cursor = Cursor.save() -- store cursor position before searching.
 
@@ -224,30 +178,30 @@ function Occurrence:match_cursor(opts)
   local flags = SearchFlags({ wrap = opts.wrap })
 
   if opts.direction == "forward" then
-    next_match = closest(state, flags, cursor.location, bounds)
+    next_match = closest(self, flags, cursor.location, bounds)
   elseif opts.direction == "backward" then
-    prev_match = closest(state, flags({ backward = true }), cursor.location, bounds)
+    prev_match = closest(self, flags({ backward = true }), cursor.location, bounds)
   else
-    next_match = closest(state, flags({ cursor = true }), cursor.location, bounds)
-    prev_match = closest(state, flags({ backward = true }), cursor.location, bounds)
+    next_match = closest(self, flags({ cursor = true }), cursor.location, bounds)
+    prev_match = closest(self, flags({ backward = true }), cursor.location, bounds)
   end
 
   -- If `marked` is `true`, keep searching until
   -- we find a marked occurrence in each direction.
   if opts.marked then
-    local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
+    local extmarks = self.extmarks
     if next_match and not extmarks:has(next_match) then
       local start = next_match
       repeat
         cursor:move(next_match.start)
-        next_match = closest(state, flags, cursor.location, bounds)
+        next_match = closest(self, flags, cursor.location, bounds)
       until not next_match or extmarks:has(next_match) or next_match == start
     end
     if prev_match and not extmarks:has(prev_match) then
       local start = prev_match
       repeat
         cursor:move(prev_match.start)
-        prev_match = closest(state, flags({ backward = true }), cursor.location, bounds)
+        prev_match = closest(self, flags({ backward = true }), cursor.location, bounds)
       until not prev_match or extmarks:has(prev_match) or prev_match == start
     end
   end
@@ -298,10 +252,10 @@ end
 ---@param range? occurrence.Range
 ---@return boolean marked Whether occurrences were marked.
 function Occurrence:mark(range)
-  local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
+  local extmarks = self.extmarks
   local success = false
   for match in self:matches(range) do
-    if extmarks:add(self.buffer, match) then
+    if extmarks:add(match) then
       success = true
     end
   end
@@ -313,10 +267,9 @@ end
 ---@param range? occurrence.Range
 ---@return boolean unmarked Whether occurrences were unmarked.
 function Occurrence:unmark(range)
-  local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
   local success = false
   for match in self:matches(range) do
-    if extmarks:del(self.buffer, match) then
+    if self.extmarks:del(match) then
       success = true
     end
   end
@@ -327,8 +280,7 @@ end
 ---@param range? occurrence.Range
 ---@return boolean
 function Occurrence:has_matches(range)
-  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
-  if #state.patterns == 0 then
+  if #self.patterns == 0 then
     return false
   end
 
@@ -336,7 +288,7 @@ function Occurrence:has_matches(range)
     return self:matches(range)() ~= nil
   end
 
-  for _, pattern in ipairs(state.patterns) do
+  for _, pattern in ipairs(self.patterns) do
     if vim.fn.search(pattern, "ncw") ~= 0 then
       return true
     end
@@ -351,18 +303,17 @@ end
 ---@param patterns? string | string[]
 ---@return fun(): occurrence.Range next_match
 function Occurrence:matches(range, patterns)
-  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local start_location = range and range.start or Location.new(0, 0)
   local last_location = start_location
 
   if patterns == nil then
-    patterns = state.patterns
+    patterns = self.patterns
   elseif type(patterns) == "string" then
     patterns = { patterns }
   end
 
   ---@type occurrence.PatternMatchState[]
-  local pattern_matchers = vim.iter(ipairs(patterns)):fold({}, function(acc, i, pattern)
+  local pattern_matchers = vim.iter(ipairs(patterns)):fold({}, function(acc, _, pattern)
     ---@class occurrence.PatternMatchState
     local match_state = {
       ---@type string
@@ -438,17 +389,15 @@ end
 ---@param opts? { range?: occurrence.Range, reverse?: boolean }
 ---@return fun(): occurrence.Range?, occurrence.Range? next_mark
 function Occurrence:marks(opts)
-  local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
   ---@diagnostic disable-next-line: param-type-mismatch
-  return extmarks:iter(self.buffer, opts)
+  return self.extmarks:iter(opts)
 end
 
 -- Whether or not there is at least one marked occurrence in the range.
 -- If no `range` is provided, checks if there are any marked occurrences in the buffer.
 ---@param range? occurrence.Range
 function Occurrence:has_marks(range)
-  local extmarks = assert(EXTMARKS_CACHE[self], "Occurrence has not been initialized")
-  return extmarks:has_any(range)
+  return self.extmarks:has_any(range)
 end
 
 -- Set the text to search for.
@@ -457,16 +406,18 @@ end
 ---@param opts? { is_word: boolean }
 function Occurrence:set(text, opts)
   -- (re-)initialize the internal state store for this Occurrence.
-  local state = { patterns = {} }
-  STATE_CACHE[self] = state
-
-  -- Clear all extmarks and highlights.
-  EXTMARKS_CACHE[self] = Extmarks.new()
-  vim.api.nvim_buf_clear_namespace(self.buffer, NS, 0, -1)
-
+  for i = 1, #self.patterns do
+    self.patterns[i] = nil
+  end
+  self.extmarks:reset()
   if text ~= nil then
     self:add(text, opts)
   end
+end
+
+--- Clear all patterns and extmarks.
+function Occurrence:reset()
+  self:set()
 end
 
 -- Add an additional text pattern to search for.
@@ -474,10 +425,9 @@ end
 ---@param text string
 ---@param opts? { is_word: boolean }
 function Occurrence:add(text, opts)
-  local state = assert(STATE_CACHE[self], "Occurrence has not been initialized")
   local escaped = text:gsub("\n", "\\n")
   local pattern = opts and opts.is_word and string.format([[\V\C\<%s\>]], escaped) or string.format([[\V\C%s]], escaped)
-  table.insert(state.patterns, pattern)
+  table.insert(self.patterns, pattern)
 end
 
 return occurrence

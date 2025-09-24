@@ -63,9 +63,9 @@ describe("occurrence module", function()
       assert.is_function(require("occurrence").reset)
     end)
 
-    it("resets keymap state", function()
-      local Keymap = require("occurrence.Keymap")
-      local reset_spy = spy.on(Keymap, "reset")
+    it("resets buffer state", function()
+      local BufferState = require("occurrence.BufferState")
+      local reset_spy = spy.on(BufferState, "del")
       assert.spy(reset_spy).was_not_called()
 
       require("occurrence").reset()

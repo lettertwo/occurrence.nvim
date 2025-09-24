@@ -38,7 +38,10 @@ local function modify_operator(occurrence, occurrence_config)
 
   log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
   local keymap = Keymap.new(occurrence.buffer, occurrence_config)
-  local deactivate = occurrence_config:wrap_action("deactivate")
+  occurrence.keymap = keymap
+  local deactivate = function()
+    occurrence:dispose()
+  end
   keymap:o("<Esc>", deactivate, "Clear occurrence")
   keymap:o("<C-c>", deactivate, "Clear occurrence")
   keymap:o("<C-[>", deactivate, "Clear occurrence")
@@ -67,7 +70,7 @@ local function modify_operator(occurrence, occurrence_config)
       state.type
     )
 
-    deactivate(state.occurrence)
+    state.occurrence:dispose()
   end)
 
   -- Schedule sending `g@` to trigger custom opfunc on the next frame.
@@ -89,10 +92,11 @@ end
 ---@return function
 local function create_operator_modifier(config, occurrence_config)
   return function()
-    local occurrence = Occurrence.get()
+    local occurrence = Occurrence.new()
     local ok, result = pcall(config.callback, occurrence, occurrence_config)
-    if ok and result == false then
+    if not ok or result == false then
       log.debug("Operator modifier cancelled")
+      occurrence:dispose()
       return
     end
 

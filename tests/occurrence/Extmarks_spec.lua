@@ -46,20 +46,19 @@ describe("Extmarks", function()
 
       -- Adding to one shouldn't affect the other
       local range = Range.new(Location.new(0, 0), Location.new(0, 5))
-      local buf = vim.api.nvim_get_current_buf()
 
-      extmarks1:add(buf, range)
+      extmarks1:add(range)
       assert.is_true(extmarks1:has(range))
       assert.is_false(extmarks2:has(range))
     end)
   end)
 
   describe("Extmarks:has_any", function()
-    local extmarks, buf
+    ---@type occurrence.Extmarks
+    local extmarks
 
     before_each(function()
       extmarks = Extmarks.new()
-      buf = vim.api.nvim_get_current_buf()
     end)
 
     it("returns false when no extmarks exist", function()
@@ -68,7 +67,7 @@ describe("Extmarks", function()
 
     it("returns true when at least one extmark exists", function()
       local range = Range.new(Location.new(0, 0), Location.new(0, 5))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
       assert.is_true(extmarks:has_any())
     end)
@@ -76,21 +75,21 @@ describe("Extmarks", function()
     it("returns false after all extmarks are deleted", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
-      extmarks:add(buf, range1)
-      extmarks:add(buf, range2)
+      extmarks:add(range1)
+      extmarks:add(range2)
 
       assert.is_true(extmarks:has_any())
 
-      extmarks:del(buf, range1)
+      extmarks:del(range1)
       assert.is_true(extmarks:has_any())
 
-      extmarks:del(buf, range2)
+      extmarks:del(range2)
       assert.is_false(extmarks:has_any())
     end)
 
     it("returns false when no extmarks are in the given range", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
-      extmarks:add(buf, range1)
+      extmarks:add(range1)
 
       local search_range = Range.new(Location.new(1, 0), Location.new(1, 5))
       assert.is_true(extmarks:has_any()) -- extmarks exist
@@ -100,8 +99,8 @@ describe("Extmarks", function()
     it("returns true when at least one extmark is in the given range", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
-      extmarks:add(buf, range1)
-      extmarks:add(buf, range2)
+      extmarks:add(range1)
+      extmarks:add(range2)
 
       local search_range = Range.new(Location.new(0, 3), Location.new(1, 2))
       assert.is_true(extmarks:has_any()) -- extmarks exist
@@ -110,11 +109,11 @@ describe("Extmarks", function()
   end)
 
   describe("Extmarks:has", function()
-    local extmarks, buf
+    ---@type occurrence.Extmarks
+    local extmarks
 
     before_each(function()
       extmarks = Extmarks.new()
-      buf = vim.api.nvim_get_current_buf()
     end)
 
     it("returns false for nil", function()
@@ -132,32 +131,32 @@ describe("Extmarks", function()
 
     it("returns true for existing range", function()
       local range = Range.new(Location.new(0, 5), Location.new(0, 10))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
       assert.is_true(extmarks:has(range))
     end)
 
     it("returns true for existing id", function()
       local range = Range.new(Location.new(1, 0), Location.new(1, 8))
-      extmarks:add(buf, range)
-      local id = vim.api.nvim_buf_get_extmarks(buf, NS, 0, -1, {})[1][1]
+      extmarks:add(range)
+      local id = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})[1][1]
       assert.is_not_nil(id)
       assert.is_true(extmarks:has(id))
     end)
   end)
 
   describe("Extmarks:add", function()
-    local extmarks, buf
+    ---@type occurrence.Extmarks
+    local extmarks
 
     before_each(function()
       extmarks = Extmarks.new()
-      buf = vim.api.nvim_get_current_buf()
     end)
 
     it("adds extmark for range and returns true", function()
       local range = Range.new(Location.new(0, 5), Location.new(0, 10))
 
-      local added = extmarks:add(buf, range)
+      local added = extmarks:add(range)
 
       assert.is_true(added)
       assert.is_true(extmarks:has(range))
@@ -166,8 +165,8 @@ describe("Extmarks", function()
     it("does not add duplicate extmarks", function()
       local range = Range.new(Location.new(1, 2), Location.new(1, 8))
 
-      local added1 = extmarks:add(buf, range)
-      local added2 = extmarks:add(buf, range)
+      local added1 = extmarks:add(range)
+      local added2 = extmarks:add(range)
 
       assert.is_true(added1)
       assert.is_false(added2) -- second add should return false
@@ -177,8 +176,8 @@ describe("Extmarks", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
 
-      local added1 = extmarks:add(buf, range1)
-      local added2 = extmarks:add(buf, range2)
+      local added1 = extmarks:add(range1)
+      local added2 = extmarks:add(range2)
 
       assert.is_true(added1)
       assert.is_true(added2)
@@ -188,10 +187,10 @@ describe("Extmarks", function()
 
     it("creates extmarks with correct properties", function()
       local range = Range.new(Location.new(0, 5), Location.new(0, 15))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
       -- Check that vim extmark was created
-      local marks = vim.api.nvim_buf_get_extmarks(buf, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
       assert.is_true(#marks > 0)
 
       -- Check extmark properties
@@ -205,7 +204,7 @@ describe("Extmarks", function()
     it("handles multi-line ranges", function()
       local range = Range.new(Location.new(1, 5), Location.new(3, 10))
 
-      local added = extmarks:add(buf, range)
+      local added = extmarks:add(range)
 
       assert.is_true(added)
       assert.is_true(extmarks:has(range))
@@ -214,7 +213,7 @@ describe("Extmarks", function()
     it("handles zero-width ranges", function()
       local range = Range.new(Location.new(1, 5), Location.new(1, 5))
 
-      local added = extmarks:add(buf, range)
+      local added = extmarks:add(range)
       assert.is_true(added)
       assert.is_true(extmarks:has(range))
     end)
@@ -222,11 +221,11 @@ describe("Extmarks", function()
     it("handles ranges at buffer boundaries", function()
       -- Start of buffer
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
-      assert.is_true(extmarks:add(buf, range1))
+      assert.is_true(extmarks:add(range1))
 
       -- End of buffer (approximately)
       local range2 = Range.new(Location.new(4, 30), Location.new(4, 35))
-      assert.is_true(extmarks:add(buf, range2))
+      assert.is_true(extmarks:add(range2))
 
       assert.is_true(extmarks:has(range1))
       assert.is_true(extmarks:has(range2))
@@ -234,28 +233,28 @@ describe("Extmarks", function()
   end)
 
   describe("Extmarks:get", function()
-    local extmarks, buf
+    ---@type occurrence.Extmarks
+    local extmarks
 
     before_each(function()
       extmarks = Extmarks.new()
-      buf = vim.api.nvim_get_current_buf()
     end)
 
     it("returns current range for existing extmark by range", function()
       local original_range = Range.new(Location.new(1, 5), Location.new(1, 15))
-      extmarks:add(buf, original_range)
+      extmarks:add(original_range)
 
-      local current_range = extmarks:get(buf, original_range)
+      local current_range = extmarks:get(original_range)
 
       assert.same({ 1, 5, 1, 15 }, current_range)
     end)
 
     it("returns current range for existing extmark by id", function()
       local range = Range.new(Location.new(0, 8), Location.new(0, 18))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
-      local id = vim.api.nvim_buf_get_extmarks(buf, NS, 0, -1, {})[1][1]
-      local current_range = extmarks:get(buf, id)
+      local id = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})[1][1]
+      local current_range = extmarks:get(id)
 
       assert.same({ 0, 8, 0, 18 }, current_range)
     end)
@@ -263,50 +262,50 @@ describe("Extmarks", function()
     it("returns nil for non-existent extmark", function()
       local range = Range.new(Location.new(2, 0), Location.new(2, 5))
 
-      local current_range = extmarks:get(buf, range)
+      local current_range = extmarks:get(range)
 
       assert.is_nil(current_range)
     end)
 
     it("returns updated range after buffer modifications", function()
       local range = Range.new(Location.new(1, 0), Location.new(1, 6))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
-      local current_range = extmarks:get(buf, range)
+      local current_range = extmarks:get(range)
 
       assert.is_true(range == current_range)
       assert.same({ 1, 0, 1, 6 }, current_range)
 
       -- Modify buffer to shift the extmark
-      vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "new first line content" })
+      vim.api.nvim_buf_set_lines(0, 0, 0, false, { "new first line content" })
 
-      current_range = extmarks:get(buf, range)
+      current_range = extmarks:get(range)
 
       assert.is_false(range == current_range)
 
       assert.same({ 2, 0, 2, 6 }, current_range) -- should have shifted down
 
       -- Further modify buffer to insert text before the extmark to shift it right
-      vim.api.nvim_buf_set_text(buf, 2, 0, 2, 0, { "old " })
+      vim.api.nvim_buf_set_text(0, 2, 0, 2, 0, { "old " })
 
-      current_range = extmarks:get(buf, range)
+      current_range = extmarks:get(range)
       assert.same({ 2, 4, 2, 10 }, current_range) -- should have shifted right
     end)
   end)
 
   describe("Extmarks:del", function()
-    local extmarks, buf
+    ---@type occurrence.Extmarks
+    local extmarks
 
     before_each(function()
       extmarks = Extmarks.new()
-      buf = vim.api.nvim_get_current_buf()
     end)
 
     it("deletes extmark by range and returns true", function()
       local range = Range.new(Location.new(0, 3), Location.new(0, 8))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
-      local deleted = extmarks:del(buf, range)
+      local deleted = extmarks:del(range)
 
       assert.is_true(deleted)
       assert.is_false(extmarks:has(range))
@@ -314,11 +313,11 @@ describe("Extmarks", function()
 
     it("deletes extmark by id and returns true", function()
       local range = Range.new(Location.new(1, 5), Location.new(1, 12))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
-      local id = vim.api.nvim_buf_get_extmarks(buf, NS, 0, -1, {})[1][1]
+      local id = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})[1][1]
 
-      local deleted = extmarks:del(buf, id)
+      local deleted = extmarks:del(id)
 
       assert.is_true(deleted)
       assert.is_false(extmarks:has(range))
@@ -328,23 +327,23 @@ describe("Extmarks", function()
     it("returns false for non-existent extmark", function()
       local range = Range.new(Location.new(2, 0), Location.new(2, 5))
 
-      local deleted = extmarks:del(buf, range)
+      local deleted = extmarks:del(range)
 
       assert.is_false(deleted)
     end)
 
     it("removes extmark from buffer", function()
       local range = Range.new(Location.new(0, 0), Location.new(0, 10))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
       -- Verify extmark exists in vim
-      local marks_before = vim.api.nvim_buf_get_extmarks(buf, NS, 0, -1, {})
+      local marks_before = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
       local count_before = #marks_before
 
-      extmarks:del(buf, range)
+      extmarks:del(range)
 
       -- Verify extmark was removed from vim
-      local marks_after = vim.api.nvim_buf_get_extmarks(buf, NS, 0, -1, {})
+      local marks_after = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
       local count_after = #marks_after
 
       assert.is_true(count_after < count_before)
@@ -352,12 +351,12 @@ describe("Extmarks", function()
 
     it("cleans up internal tracking", function()
       local range = Range.new(Location.new(2, 3), Location.new(2, 8))
-      extmarks:add(buf, range)
+      extmarks:add(range)
 
       local key = range:serialize()
       local id = extmarks[key]
 
-      extmarks:del(buf, range)
+      extmarks:del(range)
 
       -- Internal tracking should be cleaned up
       assert.is_nil(extmarks[key])
@@ -366,11 +365,11 @@ describe("Extmarks", function()
   end)
 
   describe("Extmarks:iter", function()
-    local extmarks, buf
+    ---@type occurrence.Extmarks
+    local extmarks
 
     before_each(function()
       extmarks = Extmarks.new()
-      buf = vim.api.nvim_get_current_buf()
     end)
 
     it("iterates over all extmarks when no range specified", function()
@@ -378,12 +377,12 @@ describe("Extmarks", function()
       local range2 = Range.new(Location.new(1, 5), Location.new(1, 10))
       local range3 = Range.new(Location.new(2, 10), Location.new(2, 15))
 
-      extmarks:add(buf, range1)
-      extmarks:add(buf, range2)
-      extmarks:add(buf, range3)
+      extmarks:add(range1)
+      extmarks:add(range2)
+      extmarks:add(range3)
 
       local count = 0
-      for original, current in extmarks:iter(buf) do
+      for original, current in extmarks:iter() do
         count = count + 1
         assert.is_not_nil(original)
         assert.is_not_nil(current)
@@ -399,15 +398,15 @@ describe("Extmarks", function()
       local range2 = Range.new(Location.new(1, 5), Location.new(1, 10))
       local range3 = Range.new(Location.new(3, 10), Location.new(3, 15))
 
-      extmarks:add(buf, range1)
-      extmarks:add(buf, range2)
-      extmarks:add(buf, range3)
+      extmarks:add(range1)
+      extmarks:add(range2)
+      extmarks:add(range3)
 
       -- Only iterate over lines 0-2
       local search_range = Range.new(Location.new(0, 0), Location.new(2, 0))
 
       local count = 0
-      for original in extmarks:iter(buf, { range = search_range }) do
+      for original in extmarks:iter({ range = search_range }) do
         count = count + 1
         assert.is_true(original.start.line < 3) -- should not include line 3
       end
@@ -417,18 +416,18 @@ describe("Extmarks", function()
 
     it("returns original and current ranges", function()
       local first_range = Range.new(Location.new(1, 0), Location.new(1, 8))
-      extmarks:add(buf, first_range)
+      extmarks:add(first_range)
       local second_range = Range.new(Location.new(2, 5), Location.new(2, 15))
-      extmarks:add(buf, second_range)
+      extmarks:add(second_range)
 
-      local marks = extmarks:iter(buf)
+      local marks = extmarks:iter()
 
       local original, current = marks()
       assert.same({ 1, 0, 1, 8 }, original)
       assert.same(original, current)
 
       -- modify buffer to shift the next extmark
-      vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "inserted line at top" })
+      vim.api.nvim_buf_set_lines(0, 0, 0, false, { "inserted line at top" })
       original, current = marks()
       assert.same({ 2, 5, 2, 15 }, original)
       assert.same({ 3, 5, 3, 15 }, current) -- should have shifted down
@@ -438,11 +437,11 @@ describe("Extmarks", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
 
-      extmarks:add(buf, range1)
-      extmarks:add(buf, range2)
+      extmarks:add(range1)
+      extmarks:add(range2)
 
       local ranges = {}
-      for original in extmarks:iter(buf, { reverse = true }) do
+      for original in extmarks:iter({ reverse = true }) do
         table.insert(ranges, original)
       end
 

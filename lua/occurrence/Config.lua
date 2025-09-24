@@ -300,7 +300,7 @@ function Config:wrap_action(action)
   elseif action and callable(action) then
     local Occurrence = require("occurrence.Occurrence")
     return function()
-      return action(Occurrence.get(), self)
+      return action(Occurrence.new(), self)
     end
   end
 

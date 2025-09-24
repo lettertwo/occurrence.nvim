@@ -22,7 +22,7 @@ describe("Occurrence", function()
       assert.is_true(foo:has_matches())
 
       local bar = Occurrence.new(bufnr, "bar", {})
-      assert.is_false(bar:has_matches())
+      assert.is_true(bar:has_matches()) -- should still have "foo" matches
     end)
 
     it("finds matches with special characters", function()

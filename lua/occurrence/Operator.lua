@@ -203,11 +203,10 @@ end
 
 ---@param operator_key string
 ---@param config occurrence.OperatorConfig
----@param occurrence_config occurrence.Config
 ---@return function
-local function create_operator(operator_key, config, occurrence_config)
+local function create_operator(operator_key, config)
   return function()
-    local occurrence = Occurrence.get()
+    local occurrence = Occurrence.new()
     local count, register = vim.v.count, vim.v.register
 
     -- If in visual mode, we should apply the operator directly to the selection
@@ -232,7 +231,7 @@ local function create_operator(operator_key, config, occurrence_config)
 
       if not occurrence:has_marks() then
         log.debug("Occurrence has no marks after operation; deactivating")
-        assert(occurrence_config:get_action_config("deactivate")).callback(occurrence, occurrence_config)
+        occurrence:dispose()
       end
     -- Otherwise, set up for operator-pending mode.
     else
@@ -257,7 +256,7 @@ local function create_operator(operator_key, config, occurrence_config)
 
         if not occurrence:has_marks() then
           log.debug("Occurrence has no marks after operation; deactivating")
-          assert(occurrence_config:get_action_config("deactivate")).callback(occurrence, occurrence_config)
+          occurrence:dispose()
         end
       end)
 

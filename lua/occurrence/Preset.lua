@@ -1,19 +1,15 @@
-local Cursor = require("occurrence.Cursor")
 local Keymap = require("occurrence.Keymap")
 local Occurrence = require("occurrence.Occurrence")
 local Operator = require("occurrence.Operator")
-local Range = require("occurrence.Range")
 
 local log = require("occurrence.log")
-local set_opfunc = require("occurrence.set_opfunc")
 
 ---@module "occurrence.Preset"
 
 -- Function to be used as a callback for a preset action.
 -- The first argument will always be the `Occurrence` for the current buffer.
--- The second argument will be the current `Config`.
 -- If the function returns `false`, the preset activation will be cancelled.
----@alias occurrence.PresetCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): false | nil
+---@alias occurrence.PresetCallback fun(occurrence: occurrence.Occurrence): false | nil
 
 -- An action that will activate preset keymaps after running.
 ---@class (exact) occurrence.PresetConfig
@@ -27,22 +23,16 @@ local function is_preset(candidate)
   return type(candidate) == "table" and candidate.type == "preset"
 end
 
--- Cache of activated presets to avoid re-creating keymaps.
----@type table<occurrence.Occurrence, occurrence.Keymap>
-local PRESET_CACHE = setmetatable({}, { __mode = "k" })
+---@param keymap occurrence.BufferKeymap
+---@param config occurrence.Config
+local function activate_preset(keymap, config)
+  local preset_actions = config:preset_actions()
+  keymap:map_preset_actions("n", config)
+  keymap:map_preset_actions("v", config)
 
----@param occurrence occurrence.Occurrence
----@param occurrence_config occurrence.Config
----@return occurrence.Keymap
-local function activate_preset(occurrence, occurrence_config)
-  local preset_actions = occurrence_config:preset_actions()
-  local keymap = Keymap.new(occurrence.buffer, occurrence_config)
-  keymap:map_preset_actions("n")
-  keymap:map_preset_actions("v")
-
-  for operator_key in pairs(occurrence_config:operators()) do
-    local operator_config = occurrence_config:get_operator_config(operator_key)
-    local operator = operator_config and Operator.new(operator_key, operator_config, occurrence_config)
+  for operator_key in pairs(config:operators()) do
+    local operator_config = config:get_operator_config(operator_key)
+    local operator = operator_config and Operator.new(operator_key, operator_config)
 
     -- Add normal operator keymap (unless overridden or disabled)
     if operator and not preset_actions.n[operator_key] and preset_actions.n[operator_key] ~= false then
@@ -51,7 +41,7 @@ local function activate_preset(occurrence, occurrence_config)
         desc = operator_config.desc
       end
 
-      keymap:n(operator_key, operator, { desc = desc, expr = true })
+      keymap:n(operator_key, operator, { desc = desc, expr = true }, config)
     else
       log.debug("Skipping operator key:", operator_key, "as it is disabled in the config")
     end
@@ -63,13 +53,11 @@ local function activate_preset(occurrence, occurrence_config)
         desc = operator_config.desc .. " in selection"
       end
 
-      keymap:v(operator_key, operator, { desc = desc })
+      keymap:v(operator_key, operator, { desc = desc }, config)
     else
       log.debug("Skipping operator key:", operator_key, "as it is disabled in the config")
     end
   end
-
-  return keymap
 end
 
 ---@param config occurrence.PresetConfig
@@ -77,32 +65,24 @@ end
 ---@return function
 local function create_preset(config, occurrence_config)
   return function()
-    local occurrence = Occurrence.get()
-    local keymap = PRESET_CACHE[occurrence]
+    local occurrence = Occurrence.new()
 
     local ok, result = pcall(config.callback, occurrence, occurrence_config)
-    if ok and result == false then
+    if not ok or result == false then
       log.debug("Preset action cancelled")
-      if keymap then
-        keymap:reset()
-        PRESET_CACHE[occurrence] = nil
-      end
+      occurrence:dispose()
       return
     end
 
     if not occurrence:has_matches() then
       log.warn("No matches found for pattern(s):", table.concat(occurrence.patterns, ", "), "skipping activation")
-      if keymap then
-        keymap:reset()
-        PRESET_CACHE[occurrence] = nil
-      end
+      occurrence:dispose()
       return
     end
 
-    if not keymap then
+    if not occurrence:has_active_keymap() then
       log.debug("Activating preset keymaps for buffer", occurrence.buffer)
-      keymap = activate_preset(occurrence, occurrence_config)
-      PRESET_CACHE[occurrence] = keymap
+      activate_preset(occurrence.keymap, occurrence_config)
     end
   end
 end

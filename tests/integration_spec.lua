@@ -50,11 +50,10 @@ describe("integration tests", function()
     it("sets up keymaps for cancelling", function()
       bufnr = util.buffer("foo bar baz foo")
 
-      local normal_key = "q"
-      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
+      plugin.setup({ actions = { n = { q = "mark_word" } } })
 
       -- Activate occurrence on 'foo'
-      feedkeys(normal_key)
+      feedkeys("q")
 
       -- Verify marks are created
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
@@ -93,11 +92,10 @@ describe("integration tests", function()
     it("sets up keymaps for marking and unmarking", function()
       bufnr = util.buffer("foo bar baz foo")
 
-      local normal_key = "q"
-      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
+      plugin.setup({ actions = { n = { q = "mark_word" } } })
 
       -- Activate occurrence on 'foo'
-      feedkeys(normal_key)
+      feedkeys("q")
 
       -- Check that keys are mapped in normal mode to mark and unmark occurrences
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
@@ -334,6 +332,28 @@ describe("integration tests", function()
       assert.is_nil(mark_key, "Mark key should be unmapped after deactivation")
       assert.is_nil(toggle_key, "Toggle mark key should be unmapped after deactivation")
     end)
+
+    it("finds marks in visual selection", function()
+      bufnr = util.buffer({ "no matches on this line", "foo bar baz foo" })
+
+      plugin.setup({ actions = { n = { q = "mark_search_or_word" } } })
+
+      feedkeys("j") -- Move to second line
+      feedkeys("q") -- Activate occurrence (marks all 'foo')
+      feedkeys("k") -- Move to first line
+      feedkeys("Vj") -- Visually select both lines
+      feedkeys("d") -- Simulate pressing delete to delete marked occurrences in selection
+
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("no matches on this line", lines[1], "First line should be unchanged")
+      assert.equals(" bar baz ", lines[2], "Both 'foo' occurrences should be deleted from second line")
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying operator")
+
+      feedkeys("dd") -- normal delete operator should work
+      lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ " bar baz " }, lines, "Buffer should only have one line")
+    end)
   end)
 
   describe("deactivate", function()
@@ -503,6 +523,9 @@ describe("integration tests", function()
 
       listener:clear()
 
+      feedkeys("<Esc>") -- This should have no effect since operator modification was already cancelled.
+      assert.spy(listener).was_not_called()
+
       vim.api.nvim_del_autocmd(listener_id)
     end)
 
@@ -574,6 +597,8 @@ describe("integration tests", function()
       })
 
       listener:clear()
+      feedkeys("<Esc>") -- This should have no effect since operator modification was already cancelled.
+      assert.spy(listener).was_not_called()
 
       vim.api.nvim_del_autocmd(listener_id)
     end)

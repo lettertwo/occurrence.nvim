@@ -1,5 +1,4 @@
 local Cursor = require("occurrence.Cursor")
-local Keymap = require("occurrence.Keymap")
 local Range = require("occurrence.Range")
 
 local log = require("occurrence.log")
@@ -10,7 +9,7 @@ local log = require("occurrence.log")
 local find_word = {
   desc = "Find occurrences of word",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
     if word == "" then
       log.warn("No word under cursor")
@@ -24,9 +23,9 @@ local find_word = {
 local mark_word = {
   desc = "Mark occurrences of word",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    find_word.callback(occurrence, ...)
+    find_word.callback(occurrence)
     -- mark all occurrences of the newest pattern
     if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then
       local pattern = occurrence.patterns[#occurrence.patterns]
@@ -41,7 +40,7 @@ local mark_word = {
 local find_selection = {
   desc = "Find occurrences of selection",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local range = Range.of_selection()
     assert(range, "no visual selection")
     local text = table.concat(
@@ -62,9 +61,9 @@ local find_selection = {
 local mark_selection = {
   desc = "Mark occurrences of selection",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    find_selection.callback(occurrence, ...)
+    find_selection.callback(occurrence)
     -- mark all occurrences of the newest pattern
     if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then
       local pattern = occurrence.patterns[#occurrence.patterns]
@@ -79,7 +78,7 @@ local mark_selection = {
 local find_last_search = {
   desc = "Find occurrences of last search",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local pattern = vim.fn.getreg("/")
 
     if pattern == "" then
@@ -98,9 +97,9 @@ local find_last_search = {
 local mark_last_search = {
   desc = "Mark occurrences of last search",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    find_last_search.callback(occurrence, ...)
+    find_last_search.callback(occurrence)
     -- mark all occurrences of the newest pattern
     if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then
       local pattern = occurrence.patterns[#occurrence.patterns]
@@ -117,13 +116,13 @@ local mark_last_search = {
 local find_search_or_word = {
   desc = "Find occurrences of search or word",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     if vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "" then
       -- clear the hlsearch as we're going to to replace it with occurrence highlights.
       vim.cmd.nohlsearch()
-      return find_last_search.callback(occurrence, ...)
+      return find_last_search.callback(occurrence)
     end
-    return find_word.callback(occurrence, ...)
+    return find_word.callback(occurrence)
   end,
 }
 
@@ -131,9 +130,9 @@ local find_search_or_word = {
 local mark_search_or_word = {
   desc = "Mark occurrences of search or word",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    find_search_or_word.callback(occurrence, ...)
+    find_search_or_word.callback(occurrence)
     -- mark all occurrences of the newest pattern
     if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then
       local pattern = occurrence.patterns[#occurrence.patterns]
@@ -148,7 +147,7 @@ local mark_search_or_word = {
 local goto_next = {
   desc = "Next occurrence",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     occurrence:match_cursor({ direction = "forward", wrap = true })
   end,
 }
@@ -157,7 +156,7 @@ local goto_next = {
 local goto_previous = {
   desc = "Previous occurrence",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     occurrence:match_cursor({ direction = "backward", wrap = true })
   end,
 }
@@ -166,7 +165,7 @@ local goto_previous = {
 local goto_next_mark = {
   desc = "Next marked occurrence",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
   end,
 }
@@ -175,7 +174,7 @@ local goto_next_mark = {
 local goto_previous_mark = {
   desc = "Previous marked occurrence",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
   end,
 }
@@ -185,7 +184,7 @@ local goto_previous_mark = {
 local mark = {
   desc = "Mark occurrence",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local range = occurrence:match_cursor()
     if range then
       occurrence:mark(range)
@@ -198,7 +197,7 @@ local mark = {
 local unmark = {
   desc = "Unmark occurrence",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local range = occurrence:match_cursor()
     if range then
       occurrence:unmark(range)
@@ -210,7 +209,7 @@ local unmark = {
 local toggle_mark = {
   desc = "Toggle occurrence mark",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local range = occurrence:match_cursor()
     if range then
       if not occurrence:mark(range) then
@@ -224,18 +223,18 @@ local toggle_mark = {
 local mark_word_or_toggle_mark = {
   desc = "Add/Toggle occurrence mark",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
     if pattern_count == 0 then
-      return mark_word.callback(occurrence, ...)
+      return mark_word.callback(occurrence)
     end
     local cursor = Cursor.save()
     local range = occurrence:match_cursor()
     if range and range:contains(cursor.location) then
-      return toggle_mark.callback(occurrence, ...)
+      return toggle_mark.callback(occurrence)
     else
       cursor:restore()
-      return mark_word.callback(occurrence, ...)
+      return mark_word.callback(occurrence)
     end
   end,
 }
@@ -245,7 +244,7 @@ local mark_word_or_toggle_mark = {
 local mark_all = {
   desc = "Mark occurrences",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     for range in occurrence:matches() do
       occurrence:mark(range)
     end
@@ -257,7 +256,7 @@ local mark_all = {
 local unmark_all = {
   desc = "Unmark occurrences",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     for range in occurrence:marks() do
       occurrence:unmark(range)
     end
@@ -269,7 +268,7 @@ local unmark_all = {
 local mark_in_selection = {
   desc = "Mark occurences",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local selection_range = Range:of_selection()
     if selection_range then
       for range in occurrence:matches(selection_range) do
@@ -284,7 +283,7 @@ local mark_in_selection = {
 local unmark_in_selection = {
   desc = "Unmark occurrences",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local selection_range = Range:of_selection()
     if selection_range then
       for range in occurrence:marks({ range = selection_range }) do
@@ -299,7 +298,7 @@ local unmark_in_selection = {
 local toggle_marks_in_selection = {
   desc = "Toggle occurrence marks",
   type = "preset",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local selection_range = Range:of_selection()
     if selection_range then
       for range in occurrence:matches(selection_range) do
@@ -315,16 +314,16 @@ local toggle_marks_in_selection = {
 local mark_selection_or_toggle_marks_in_selection = {
   type = "preset",
   desc = "Add/Toggle occurrence marks",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
     if pattern_count == 0 then
-      return mark_selection.callback(occurrence, ...)
+      return mark_selection.callback(occurrence)
     end
     local selection_range = Range.of_selection()
     if selection_range and occurrence:has_matches(selection_range) then
-      return toggle_marks_in_selection.callback(occurrence, ...)
+      return toggle_marks_in_selection.callback(occurrence)
     else
-      return mark_selection.callback(occurrence, ...)
+      return mark_selection.callback(occurrence)
     end
   end,
 }
@@ -332,13 +331,11 @@ local mark_selection_or_toggle_marks_in_selection = {
 local deactivate = {
   desc = "Clear occurrence",
   type = "preset",
-  callback = function(occurrence, ...)
-    Keymap.del(occurrence.buffer)
+  callback = function(occurrence)
     if occurrence:has_marks() then
       log.debug("Occurrence still has marks during deactivate")
-      occurrence:unmark()
     end
-    occurrence:set()
+    occurrence:dispose()
     return false
   end,
 }
@@ -347,8 +344,8 @@ local deactivate = {
 local modify_operator = {
   desc = "Modify operator to act on marked occurrences",
   type = "operator-modifier",
-  callback = function(occurrence, occurrence_config)
-    mark_word.callback(occurrence, occurrence_config)
+  callback = function(occurrence)
+    mark_word.callback(occurrence)
     if not occurrence:has_marks() then
       return false
     end
