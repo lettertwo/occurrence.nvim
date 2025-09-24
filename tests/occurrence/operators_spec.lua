@@ -254,6 +254,58 @@ describe("operators", function()
     end)
   end)
 
+  describe("case operators", function()
+    it("uppercases marked occurrences", function()
+      bufnr = util.buffer("foo bar foo\nbaz Foo bar")
+      local occurrence = Occurrence.new(bufnr, "foo", {})
+      occurrence:add("Foo")
+
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+      -- Apply change operator with uppercasing
+      local operator_config = assert(Config.new():get_operator_config("uppercase"))
+      Operator.apply(occurrence, operator_config, "gU", nil, nil, '"')
+      -- Check that all 'foo' occurrences were uppercased
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "FOO bar FOO", "baz FOO bar" }, final_lines)
+    end)
+
+    it("lowercases marked occurrences", function()
+      bufnr = util.buffer("FOO BAR FOO\nBAZ FOO BAR")
+      local occurrence = Occurrence.new(bufnr, "FOO", {})
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+      -- Apply change operator with lowercasing
+      local operator_config = assert(Config.new():get_operator_config("lowercase"))
+      Operator.apply(occurrence, operator_config, "gu", nil, nil, '"')
+      -- Check that all 'FOO' occurrences were lowercased
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "foo BAR foo", "BAZ foo BAR" }, final_lines)
+    end)
+
+    it("toggles case of marked occurrences", function()
+      bufnr = util.buffer("foo Bar FOO\nbaz Foo BAR")
+      local occurrence = Occurrence.new(bufnr, "foo", { ignore_case = true })
+
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      -- Apply change operator with case toggling
+      local operator_config = assert(Config.new():get_operator_config("swap_case"))
+      Operator.apply(occurrence, operator_config, "g~", nil, nil, '"')
+
+      -- Check that all 'foo' occurrences had their case toggled
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "FOO Bar FOO", "baz Foo BAR" }, final_lines)
+    end)
+  end)
+
   describe("get_operator_config", function()
     it("retrieves supported operators", function()
       local config = Config.new()
@@ -356,7 +408,6 @@ describe("operators", function()
       end
 
       -- Mock vim functions to test the visual_feedkeys path
-      local cmd_stub = stub(vim, "cmd")
       local feedkeys_stub = stub(vim.api, "nvim_feedkeys")
 
       local config = Config.new({
@@ -369,11 +420,10 @@ describe("operators", function()
       assert.is_true(Operator.is(fallback_op))
       Operator.apply(occurrence, fallback_op, "test_op", nil, nil, nil)
 
-      -- Should call normal! v and feedkeys
-      assert.stub(cmd_stub).was_called_with("normal! v")
-      assert.stub(feedkeys_stub).was_called_with("test_op", "x", true)
+      -- Should feed visual selection and then the operator keys
+      assert.stub(feedkeys_stub).was_called_with("v", "nx", true)
+      assert.stub(feedkeys_stub).was_called_with("test_op", "nx", true)
 
-      cmd_stub:revert()
       feedkeys_stub:revert()
     end)
   end)

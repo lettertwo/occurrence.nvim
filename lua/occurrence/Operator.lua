@@ -176,10 +176,10 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
       edited = edited + 1
     elseif config.method == "visual_feedkeys" then
       log.debug("executing nvim_feedkeys:", operator_name)
-      vim.cmd("normal! v")
+      vim.api.nvim_feedkeys("v", "nx", true)
       Cursor.move(edit.stop)
       occurrence:unmark(edit)
-      vim.api.nvim_feedkeys(operator_name, "x", true)
+      vim.api.nvim_feedkeys(operator_name, "nx", true)
       edited = edited + 1
     else
       ---@diagnostic disable-next-line: undefined-field
@@ -219,11 +219,11 @@ local function create_operator(operator_key, config)
         return
       end
 
-      -- Run the operator
-      apply_operator(occurrence, config, operator_key, selection_range, count, register, nil)
-
       -- Clear visual selection
       vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
+
+      -- Run the operator
+      apply_operator(occurrence, config, operator_key, selection_range, count, register, nil)
 
       -- Move the cursor back to the start of the selection.
       -- This seems to be what nvim does after a visual operation?

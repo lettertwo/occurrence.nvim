@@ -63,30 +63,11 @@ local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
   ["<"] = "indent_left",
   [">"] = "indent_right",
 
-  ["gu"] = {
-    desc = "Make marked occurrences lowercase",
-    method = "visual_feedkeys",
-    uses_register = false,
-    modifies_text = true,
-  },
-  ["gU"] = {
-    desc = "Make marked occurrences uppercase",
-    method = "visual_feedkeys",
-    uses_register = false,
-    modifies_text = true,
-  },
-  ["g~"] = {
-    desc = "Swap case of marked occurrences",
-    method = "visual_feedkeys",
-    uses_register = false,
-    modifies_text = true,
-  },
-  ["g?"] = {
-    desc = "ROT13 encode marked occurrences",
-    method = "visual_feedkeys",
-    uses_register = false,
-    modifies_text = true,
-  },
+  ["gu"] = "lowercase",
+  ["gU"] = "uppercase",
+
+  ["g~"] = "swap_case",
+  ["g?"] = "rot13",
 
   -- TODO: implement these
   ["p"] = false, -- put

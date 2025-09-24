@@ -60,6 +60,7 @@ local yank = {
 
 ---@type occurrence.OperatorConfig
 local indent_left = {
+  desc = "Indent marked occurrences to the left",
   method = "command",
   uses_register = false,
   modifies_text = true,
@@ -67,7 +68,36 @@ local indent_left = {
 
 ---@type occurrence.OperatorConfig
 local indent_right = {
+  desc = "Indent marked occurrences to the right",
   method = "command",
+  uses_register = false,
+  modifies_text = true,
+}
+
+local uppercase = {
+  desc = "Make marked occurrences uppercase",
+  method = "visual_feedkeys",
+  uses_register = false,
+  modifies_text = true,
+}
+
+local lowercase = {
+  desc = "Make marked occurrences lowercase",
+  method = "visual_feedkeys",
+  uses_register = false,
+  modifies_text = true,
+}
+
+local swap_case = {
+  desc = "Swap case of marked occurrences",
+  method = "visual_feedkeys",
+  uses_register = false,
+  modifies_text = true,
+}
+
+local rot13 = {
+  desc = "Rot13 encode marked occurrences",
+  method = "visual_feedkeys",
   uses_register = false,
   modifies_text = true,
 }
@@ -82,5 +112,9 @@ local builtin_operators = {
   yank = yank,
   indent_left = indent_left,
   indent_right = indent_right,
+  uppercase = uppercase,
+  lowercase = lowercase,
+  swap_case = swap_case,
+  rot13 = rot13,
 }
 return builtin_operators

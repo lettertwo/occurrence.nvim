@@ -53,7 +53,11 @@ local function activate_preset(keymap, config)
         desc = operator_config.desc .. " in selection"
       end
 
-      keymap:v(operator_key, operator, { desc = desc }, config)
+      -- keymap:v(operator_key, operator, { desc = desc }, config)
+      keymap:v(operator_key, function()
+        log.debug("Keybind invoked:", operator_key, "count:", vim.v.count, "register:", vim.v.register)
+        operator()
+      end, { desc = desc }, config)
     else
       log.debug("Skipping operator key:", operator_key, "as it is disabled in the config")
     end

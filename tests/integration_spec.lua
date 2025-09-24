@@ -424,7 +424,7 @@ describe("integration tests", function()
       assert.equals(0, #marks, "No 'foo' occurrences should be marked")
     end)
 
-    it("modifies supported operator", function()
+    it("modifies operator supported via direct_api method", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({
@@ -460,6 +460,82 @@ describe("integration tests", function()
 
       lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals(" bar baz ", lines[1], "Both 'foo' occurrences should be deleted")
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying operator")
+    end)
+
+    it("modifies operator supported via command method", function()
+      bufnr = util.buffer({ "foo bar baz foo", "  foo indented" })
+
+      plugin.setup({
+        actions = { o = { q = "modify_operator" } },
+        operators = {
+          ["<"] = {
+            desc = "Indent marked occurrences to the left",
+            method = "command",
+            uses_register = false,
+            modifies_text = true,
+          },
+        },
+      })
+
+      -- Enter left shift operator-pending mode, modify operator
+      feedkeys("<q")
+
+      vim.wait(0) -- The operator-modifier action is async.
+
+      -- Verify no changes have been made yet.
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "foo bar baz foo", "  foo indented" }, lines, "No 'foo' occurrences should be indented yet")
+
+      -- Verify marks are created for all 'foo' occurrences
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(3, #marks, "All 'foo' occurrences should be marked")
+
+      -- Complete a motion to apply operator
+      feedkeys("j")
+
+      lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "foo bar baz foo", "foo indented" }, lines, "Both 'foo' occurrences should be indented left")
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying operator")
+    end)
+
+    it("modifies operator supported via visual_feedkeys method", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({
+        actions = { o = { q = "modify_operator" } },
+        operators = {
+          ["gU"] = {
+            desc = "Make marked occurrences uppercase",
+            method = "visual_feedkeys",
+            uses_register = false,
+            modifies_text = true,
+          },
+        },
+      })
+
+      -- Enter tilde operator-pending mode, modify operator
+      feedkeys("gUq")
+
+      vim.wait(0) -- The operator-modifier action is async.
+
+      -- Verify no changes have been made yet.
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("foo bar baz foo", lines[1], "No 'foo' occurrences should be modified yet")
+
+      -- Verify marks are created for all 'foo' occurrences
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      -- Complete a motion to apply operator
+      feedkeys("$")
+
+      lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("FOO bar baz FOO", lines[1], "Both 'foo' occurrences should be uppercased")
 
       marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
@@ -605,11 +681,24 @@ describe("integration tests", function()
   end)
 
   describe("operators", function()
-    it("applies operator to all marked occurrences", function()
+    it("applies direct_api operator to all marked occurrences", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
+      plugin.setup({
+        actions = { n = { [normal_key] = "mark_word" } },
+        operators = {
+          d = {
+            desc = "Delete",
+            method = "direct_api",
+            uses_register = true,
+            modifies_text = true,
+            replacement = function()
+              return ""
+            end,
+          },
+        },
+      })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -622,7 +711,7 @@ describe("integration tests", function()
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       local delete_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtin_ops.delete.desc then
+        if map.lhs ~= nil and map.desc == "Delete" then
           delete_key = map.lhs
           break
         end
@@ -637,6 +726,188 @@ describe("integration tests", function()
 
       marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
+    end)
+
+    it("applies command operator to all marked occurrences", function()
+      bufnr = util.buffer({ "foo bar baz foo", "  foo indented" })
+
+      local normal_key = "q"
+      plugin.setup({
+        actions = { n = { [normal_key] = "mark_word" } },
+        operators = {
+          ["<"] = {
+            desc = "Indent left",
+            method = "command",
+            uses_register = false,
+            modifies_text = true,
+          },
+        },
+      })
+
+      -- Activate occurrence on 'foo' (marks all foo occurrences)
+      feedkeys(normal_key)
+
+      -- Verify marks are created
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(3, #marks, "All 'foo' occurrences should be marked")
+
+      -- Check that left shift operator is mapped
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local indent_left_key = nil
+      for _, map in ipairs(mappings) do
+        if map.lhs ~= nil and map.desc == "Indent left" then
+          indent_left_key = map.lhs
+          break
+        end
+      end
+      assert.equals("<lt>", indent_left_key, "Indent left key should be mapped")
+
+      -- Apply left shift operator to indent marked occurrences
+      feedkeys("<j")
+
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "foo bar baz foo", "foo indented" }, lines, "Both 'foo' occurrences should be indented left")
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying operator")
+    end)
+
+    it("applies visual_feedkeys operator to all marked occurrences", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      local normal_key = "q"
+      plugin.setup({
+        actions = { n = { [normal_key] = "mark_word" } },
+        operators = {
+          ["gU"] = {
+            desc = "Uppercase",
+            method = "visual_feedkeys",
+            uses_register = false,
+            modifies_text = true,
+          },
+        },
+      })
+
+      -- Activate occurrence on 'foo' (marks all foo occurrences)
+      feedkeys(normal_key)
+
+      -- Verify marks are created
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      -- Check that uppercase operator is mapped
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local uppercase_key = nil
+      for _, map in ipairs(mappings) do
+        if map.lhs ~= nil and map.desc == "Uppercase" then
+          uppercase_key = map.lhs
+          break
+        end
+      end
+      assert.equals("gU", uppercase_key, "Uppercase key should be mapped")
+
+      -- Apply uppercase operator to uppercase marked occurrences
+      feedkeys("gU$")
+
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("FOO bar baz FOO", lines[1], "Both 'foo' occurrences should be uppercased")
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying operator")
+    end)
+
+    it("applies visual_feedkeys operator to all marked occurrences in selection", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      local normal_key = "q"
+      plugin.setup({
+        actions = { n = { [normal_key] = "mark_word" } },
+        operators = {
+          ["gU"] = {
+            desc = "Uppercase",
+            method = "visual_feedkeys",
+            uses_register = false,
+            modifies_text = true,
+          },
+        },
+      })
+
+      -- Activate occurrence on 'foo' (marks all foo occurrences)
+      feedkeys(normal_key)
+
+      -- Verify marks are created
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      -- Check that uppercase operator is mapped
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local uppercase_key = nil
+      for _, map in ipairs(mappings) do
+        if map.lhs ~= nil and map.desc == "Uppercase" then
+          uppercase_key = map.lhs
+          break
+        end
+      end
+      assert.equals("gU", uppercase_key, "Uppercase key should be mapped")
+
+      feedkeys("v3e") -- Select the first 3 words
+      -- Apply uppercase operator to uppercase marked occurrences in selection
+      feedkeys("gU")
+      vim.wait(0) -- The operator application is async.
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("FOO bar baz foo", lines[1], "First 'foo' should be uppercased")
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(1, #marks, "One mark should remain for second 'foo'")
+    end)
+
+    it("applies visual_feedkeys operator to a count of marked occurrences in selection", function()
+      bufnr = util.buffer({ "foo bar baz foo", "bar baz foo bar baz foo" })
+
+      local normal_key = "q"
+      plugin.setup({
+        actions = { n = { [normal_key] = "mark_word" } },
+        operators = {
+          ["U"] = {
+            desc = "Uppercase",
+            method = "visual_feedkeys",
+            uses_register = false,
+            modifies_text = true,
+          },
+        },
+      })
+
+      -- Activate occurrence on 'foo' (marks all foo occurrences)
+      feedkeys(normal_key)
+
+      -- Verify marks are created
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(4, #marks, "All 'foo' occurrences should be marked")
+
+      -- Check that uppercase operator is mapped
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local uppercase_key = nil
+      for _, map in ipairs(mappings) do
+        if map.lhs ~= nil and map.desc == "Uppercase" then
+          uppercase_key = map.lhs
+          break
+        end
+      end
+      assert.equals("U", uppercase_key, "Uppercase key should be mapped")
+
+      feedkeys("Vj") -- Select the first 2 lines
+      -- Apply uppercase operator to 2 occurrences
+      feedkeys("3U")
+      vim.wait(0) -- The operator application is async.
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same(
+        { "FOO bar baz FOO", "bar baz FOO bar baz foo" },
+        lines,
+        "First 3 'foo' occurrences should be uppercased"
+      )
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      assert.equals(1, #marks, "One mark should remain for fourth 'foo'")
     end)
 
     it("supports custom operators", function()

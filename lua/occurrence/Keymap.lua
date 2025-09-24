@@ -95,7 +95,8 @@ function Keymap:map(mode, keymap_config, config)
     local action_config = action ~= false and config:get_action_config(action, mode) or nil
     if action_config then
       local desc = action_config.desc or ("'" .. key .. "' action")
-      vim.keymap.set(mode, key, config:wrap_action(action_config), self:parse_opts({ desc = desc }))
+      local expr = action_config.type == "operator-modifier"
+      vim.keymap.set(mode, key, config:wrap_action(action_config), self:parse_opts({ desc = desc, expr = expr }))
       self.active_keymaps[mode][key] = true
     elseif action ~= false then
       if type(action) == "string" then
