@@ -1,13 +1,15 @@
 {
-  "$schema": "https://raw.githubusercontent.com/sumneko/vscode-lua/master/setting/schema.json",
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
   "runtime": {
-    "version": "LuaJIT"
-  },
-  "diagnostics": {
-    "globals": ["describe", "it", "before_each", "after_each"]
+    "version": "Lua 5.1"
   },
   "workspace": {
     "checkThirdParty": false,
-    "library": ["./lua", "$VIMRUNTIME/lua"]
+    "library": [
+      "./lua",
+      "$VIMRUNTIME/lua",
+      "${3rd}/luv/library",
+      "${3rd}/busted/library"
+    ]
   }
 }

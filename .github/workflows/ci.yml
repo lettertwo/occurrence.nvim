@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        nvim-version: [stable, nightly]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim-version }}
+
+      - name: Setup Lua
+        uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.1"
+
+      - name: Setup LuaRocks
+        uses: leafo/gh-actions-luarocks@v4
+
+      - name: Install dependencies
+        run: |
+          luarocks --local install busted
+          luarocks --local install nlua
+
+      - name: Run tests
+        run: |
+          eval $(luarocks --local path)
+          busted --exclude-pattern=perf_ tests/
+
+      - name: Run performance tests
+        run: |
+          eval $(luarocks --local path)
+          busted tests/perf_spec.lua
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Lua Language Server
+        uses: junnplus/setup-lua-language-server@v1
+
+      - name: Run type checking
+        run: |
+          lua-language-server --check . --checklevel=Error
+

@@ -1,19 +1,36 @@
-PLUGIN_FILES := $(shell find plugin -type f -name '*.lua')
+PROJECT_NAME := occurrence.nvim
+NVIM_VERSION := 0.10.0
 
-LEMMY_HELP := $(shell command -v lemmy-help 2> /dev/null)
+./lua_modules/bin/%:
+	@mkdir -p $(@D)
+	@luarocks install $*
 
-.PHONY: lemmy-help
-lemmy-help:
-ifndef LEMMY_HELP
-	cargo install lemmy-help --features=cli
-endif
+./vendor/panvimdoc/panvimdoc.sh:
+	@mkdir -p $(@D)
+	@git clone git@github.com:kdheepak/panvimdoc.git $(@D)
 
-doc/occurrence.txt: lemmy-help $(PLUGIN_FILES)
-	@lemmy-help $(PLUGIN_FILES) > $@
+./doc/%.txt: ./vendor/panvimdoc/panvimdoc.sh README.md
+	@mkdir -p $(@D)
+	@$< --project-name "$*" --input-file "$(word 2,$^)" --vim-version "NVIM >= $(NVIM_VERSION)"
+
+./doc/tags:
+	@mkdir -p $(@D)
+	@printf "%s\n" "Generating help tags in $(@D)"
+	@printf "%s\n" "nvim --headless -c 'helptags $(@D)' -c q"
+	@nvim --headless -c "helptags $(@D)" -c q
 
 .PHONY: doc
-doc: doc/occurrence.txt
+doc: ./doc/$(PROJECT_NAME).txt ./doc/tags
 
 .PHONY: test
-test:
-	@busted
+test: ./lua_modules/bin/busted ./lua_modules/bin/nlua
+	@printf "%s\n" "$< --lua $(word 2,$^) --exclude-pattern=perf_* tests/"
+	@$< --lua $(word 2,$^) --exclude-pattern=perf_* tests/
+
+.PHONY: test-perf
+test-perf: ./lua_modules/bin/busted ./lua_modules/bin/nlua
+	@printf "%s\n" "$< --lua $(word 2,$^) tests/perf_*"
+	@$< --lua $(word 2,$^) tests/perf_*
+
+.PHONY: test-all
+test-all: test test-perf

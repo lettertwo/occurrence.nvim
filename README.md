@@ -1,35 +1,304 @@
 # occurrence.nvim
 
-## Tests
+A modern Neovim plugin for intelligent occurrence highlighting and operations. Mark occurrences of words/patterns in a buffer and perform operations on them, similar to multiple cursor functionality but with vim-native operators.
 
-To run tests, you need to have [busted] and [nlua] installed.
+## Features
 
-Example setup for macOS using [Homebrew]:
+- 🔍 **Smart Occurrence Detection**: Find word under cursor, visual selections, or last search patterns
+- 🎯 **Visual Highlighting**: Mark and highlight occurrences using Neovim's extmarks system
+- ⚡ **Vim Operator Integration**: Use native vim operators (`c`, `d`, `y`, etc.) on marked occurrences
+- 🎮 **Multiple Interaction Modes**: Preset actions, operator-pending mode, and operator modifiers
+- 🔧 **Highly Configurable**: Customize keymaps, operators, and behavior
+- 🏗️ **Modern Architecture**: Built with proper resource management and performance in mind
 
-```bash
-# Install luarocks...
-brew install luarocks
-# Configure luarocks to use lua_version 5.1...
-luarocks config lua_version 5.1
+## Installation
 
-# Install luajit...
-brew install luajit
-# Configure luarocks to include luajit...
-luarocks config variables.LUA_INCDIR /usr/local/include/luajit-2.1
+### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
 
-# Install nlua...
-luarocks --local install nlua
-# Configure luarocks to use nlua...
-luarocks config variables.LUA "$HOME/.luarocks/bin/nlua"
-
-# Install busted...
-luarocks --local install busted
-
-# Run tests...
-busted
-
+```lua
+{
+  "occurrence.nvim",
+  config = function()
+    require("occurrence").setup()
+  end,
+}
 ```
 
+### Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+
+```lua
+use {
+  "occurrence.nvim",
+  config = function()
+    require("occurrence").setup()
+  end,
+}
+```
+
+## Quick Start
+
+With default configuration:
+
+1. **Mark occurrences**: Place cursor on a word and press `go` (normal mode) or select text and press `go` (visual mode)
+2. **Navigate**: Use `n`/`N` to jump between marked occurrences, or `gn`/`gN` for all occurrences
+3. **Mark individual**: `ga` to mark current occurrence, `gx` to unmark
+4. **Toggle mark**: `go` to toggle mark on current occurrence
+5. **Apply operations**: Use vim operators like `c` (change), `d` (delete), `y` (yank) on marked occurrences
+6. **Exit**: Press `<Esc>` to clear all marks and return to normal mode
+
+## Usage
+
+### Basic Workflow
+
+```vim
+" 1. Mark word under cursor
+go
+
+" 2. Navigate through marked occurrences
+n          " Next marked occurrence
+N          " Previous marked occurrence
+gn         " Next occurrence (all)
+gN         " Previous occurrence (all)
+
+" 3. Mark/unmark individual occurrences
+ga         " Mark current occurrence
+gx         " Unmark current occurrence
+
+" 4. Apply operations to all marked occurrences
+c          " Change all marked occurrences
+d          " Delete all marked occurrences
+y          " Yank all marked occurrences
+>          " Indent all marked occurrences right
+<          " Indent all marked occurrences left
+
+" 5. Exit occurrence mode
+<Esc>      " Clear marks and exit
+```
+
+### Visual Mode Operations
+
+```vim
+" Select text and mark all occurrences
+v          " Enter visual mode
+/pattern   " Select text
+go         " Mark all occurrences of selection
+
+" Mark/unmark within selection
+go         " Mark all occurrences in selection (if already active)
+ga         " Mark occurrences in selection
+gx         " Unmark occurrences in selection
+```
+
+### Operator-Pending Mode
+
+Use the `o` modifier to activate occurrence mode within vim operators:
+
+```vim
+" Change word occurrences with motion
+coo w      " Change occurrences of word with word motion
+doo $      " Delete occurrences of word to end of line
+yoo ip     " Yank occurrences of word in paragraph
+```
+
+## Configuration
+
+### Default Configuration
+
+```lua
+require("occurrence").setup({
+  -- Action keymaps (entry points)
+  actions = {
+    n = {
+      go = "mark_search_or_word",  -- Mark word under cursor or last search
+    },
+    v = {
+      go = "mark_selection",       -- Mark visual selection
+    },
+    o = {
+      o = "modify_operator",       -- Operator modifier (e.g., coo, doo)
+    },
+  },
+
+  -- Preset action keymaps (active when occurrences are marked)
+  preset_actions = {
+    n = {
+      -- Navigation
+      n = "goto_next_mark",        -- Next marked occurrence
+      N = "goto_previous_mark",    -- Previous marked occurrence
+      gn = "goto_next",            -- Next occurrence (all)
+      gN = "goto_previous",        -- Previous occurrence (all)
+
+      -- Mark/unmark
+      go = "mark_word_or_toggle_mark",  -- Mark word or toggle current
+      ga = "mark",                 -- Mark current occurrence
+      gx = "unmark",               -- Unmark current occurrence
+
+      -- Exit
+      ["<Esc>"] = "deactivate",    -- Clear marks and exit
+    },
+    v = {
+      go = "mark_selection_or_toggle_marks_in_selection",
+      ga = "mark",
+      gx = "unmark",
+    },
+  },
+
+  -- Operator support
+  operators = {
+    ["c"] = "change",             -- Change marked occurrences
+    ["d"] = "delete",             -- Delete marked occurrences
+    ["y"] = "yank",               -- Yank marked occurrences
+    ["<"] = "indent_left",        -- Indent left
+    [">"] = "indent_right",       -- Indent right
+    ["gu"] = "lowercase",         -- Convert to lowercase
+    ["gU"] = "uppercase",         -- Convert to uppercase
+    ["g~"] = "swap_case",         -- Swap case
+    ["g?"] = "rot13",             -- ROT13 encoding
+  },
+})
+```
+
+### Custom Configuration Examples
+
+#### Minimal Configuration
+
+```lua
+require("occurrence").setup({
+  actions = {
+    n = { ["<leader>o"] = "mark_word" },
+  },
+  preset_actions = {
+    n = {
+      ["<Esc>"] = "deactivate",
+      ["n"] = "goto_next_mark",
+      ["N"] = "goto_previous_mark",
+    },
+  },
+})
+```
+
+#### Advanced Configuration
+
+```lua
+require("occurrence").setup({
+  actions = {
+    n = {
+      ["<leader>oh"] = "mark_search_or_word",
+      ["<leader>ow"] = "mark_word",
+      ["<leader>os"] = "find_last_search",
+    },
+    v = {
+      ["<leader>o"] = "mark_selection",
+    },
+  },
+  preset_actions = {
+    n = {
+      -- Custom navigation
+      ["<Tab>"] = "goto_next_mark",
+      ["<S-Tab>"] = "goto_previous_mark",
+
+      -- Batch operations
+      ["<leader>a"] = "mark_all",
+      ["<leader>x"] = "unmark_all",
+
+      -- Exit
+      ["q"] = "deactivate",
+      ["<Esc>"] = "deactivate",
+    },
+  },
+  -- Disable some operators
+  operators = {
+    ["c"] = "change",
+    ["d"] = "delete",
+    ["y"] = "yank",
+    ["g?"] = false,  -- Disable ROT13
+  },
+})
+```
+
+## Available Actions
+
+### Entry Actions
+
+- `find_word` - Find occurrences of word under cursor
+- `find_selection` - Find occurrences of visual selection
+- `find_last_search` - Find occurrences of last search pattern
+- `find_search_or_word` - Find search pattern or word under cursor
+- `mark_word` - Mark all occurrences of word under cursor
+- `mark_selection` - Mark all occurrences of visual selection
+- `mark_search_or_word` - Mark search pattern or word under cursor
+
+### Preset Actions (Active Mode)
+
+- `goto_next` / `goto_previous` - Navigate through all occurrences
+- `goto_next_mark` / `goto_previous_mark` - Navigate through marked occurrences
+- `mark` / `unmark` - Mark/unmark current occurrence
+- `toggle_mark` - Toggle mark on current occurrence
+- `mark_all` / `unmark_all` - Mark/unmark all occurrences
+- `mark_in_selection` / `unmark_in_selection` - Mark/unmark in visual selection
+- `deactivate` - Clear all marks and exit
+
+### Operators
+
+- `change` - Change marked occurrences (with input prompt)
+- `delete` - Delete marked occurrences
+- `yank` - Yank marked occurrences to register
+- `indent_left` / `indent_right` - Adjust indentation
+- `uppercase` / `lowercase` / `swap_case` - Case conversion
+- `rot13` - ROT13 encoding
+
+## Development
+
+### Modern Toolchain (2024)
+
+occurrence.nvim uses modern Neovim development practices:
+
+- **Documentation**: Auto-generated with [panvimdoc] from this README
+- **Type Safety**: [LuaCATS] annotations with lua-language-server
+- **CI/CD**: GitHub Actions with automated testing and releases
+- **Package Management**: Published to [LuaRocks] with automated releases
+- **Testing**: [busted] with performance benchmarks
+
+### Running Tests
+
+```bash
+# Install dependencies
+luarocks --local install busted
+luarocks --local install nlua
+
+# Run all tests
+make test
+
+# Run performance tests only
+make test-perf
+```
+
+### Project Structure
+
+- `lua/occurrence.lua` - Main plugin entry point with LuaCATS annotations
+- `lua/occurrence/` - Core plugin modules
+  - `Occurrence.lua` - Central occurrence management
+  - `BufferState.lua` - Per-buffer state management
+  - `Config.lua` - Configuration handling
+  - `actions.lua` - Built-in actions
+  - `operators.lua` - Built-in operators
+- `tests/` - Test suite including performance tests
+- `.github/workflows/` - CI/CD automation
+- `doc/` - Auto-generated vim help (via panvimdoc)
+
+### Release Process
+
+Releases are automated via GitHub Actions:
+1. Push a version tag (e.g., `v1.0.0`)
+2. Tests run automatically
+3. GitHub release created
+4. Package published to LuaRocks
+
+## License
+
+MIT
+
+[panvimdoc]: https://github.com/kdheepak/panvimdoc
+[LuaCATS]: https://luals.github.io/wiki/annotations/
+[LuaRocks]: https://luarocks.org/modules/lettertwo/occurrence.nvim
 [busted]: https://github.com/lunarmodules/busted
-[nlua]: https://github.com/mfussenegger/nlua
-[Homebrew]: https://brew.sh
