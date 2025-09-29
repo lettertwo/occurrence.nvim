@@ -1,4 +1,3 @@
-local Keymap = require("occurrence.keymap")
 local Occurrence = require("occurrence.Occurrence")
 local Operator = require("occurrence.Operator")
 local Range = require("occurrence.Range")
@@ -37,14 +36,29 @@ local function modify_operator(occurrence, occurrence_config)
   end
 
   log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
-  local keymap = Keymap.new(occurrence.buffer, occurrence_config)
-  occurrence.keymap = keymap
+
+  -- Set up buffer-local operator-pending escape keymaps
   local deactivate = function()
     occurrence:dispose()
   end
-  keymap:o("<Esc>", deactivate, "Clear occurrence")
-  keymap:o("<C-c>", deactivate, "Clear occurrence")
-  keymap:o("<C-[>", deactivate, "Clear occurrence")
+
+  vim.keymap.set("o", "<Esc>", deactivate, {
+    buffer = occurrence.buffer,
+    desc = "Clear occurrence",
+  })
+  occurrence:add_keymap("o", "<Esc>")
+
+  vim.keymap.set("o", "<C-c>", deactivate, {
+    buffer = occurrence.buffer,
+    desc = "Clear occurrence",
+  })
+  occurrence:add_keymap("o", "<C-c>")
+
+  vim.keymap.set("o", "<C-[>", deactivate, {
+    buffer = occurrence.buffer,
+    desc = "Clear occurrence",
+  })
+  occurrence:add_keymap("o", "<C-[>")
 
   set_opfunc({
     operator = operator,

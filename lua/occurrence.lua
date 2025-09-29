@@ -1,8 +1,6 @@
 ---@module 'occurrence'
 local occurrence = {}
 
-local log = require("occurrence.log")
-
 -- TODO: look at :h SafeState. Is this an event that can help with detecting pending ops?
 
 -- TODO: look at :h command-preview. Can we get inc updating this way?
@@ -18,10 +16,8 @@ end
 
 ---@param opts occurrence.Options
 function occurrence.setup(opts)
-  local Keymap = require("occurrence.Keymap")
-  local BufferState = require("occurrence.BufferState")
+  opts = opts or {}
   local config = require("occurrence.Config").new(opts)
-  local actions_config = config:actions()
 
   local command = require("occurrence.command")
   command.init(config)
@@ -34,33 +30,53 @@ function occurrence.setup(opts)
     preview = command.preview,
   })
 
-  -- Setup keymaps for normal mode actions.
-  Keymap:map_actions("n", config)
+  -- Register global <Plug> mappings for all commands using CapCase convention
+  local actions = require("occurrence.actions")
 
-  -- Setup keymaps for visual mode actions.
-  Keymap:map_actions("v", config)
+  -- Helper to convert snake_case to CapCase
+  local function to_capcase(snake_str)
+    local result = snake_str:gsub("_(%w)", function(c)
+      return c:upper()
+    end)
+    return result:sub(1, 1):upper() .. result:sub(2)
+  end
 
-  -- Setup keymaps for operator-pending mode actions.
-  -- Note that these are dynamically bound for supported operators
-  -- when entering operator-pending mode.
-  if vim.iter(actions_config.o):any(function(_, v)
-    return v ~= false
-  end) then
-    vim.api.nvim_create_autocmd("ModeChanged", {
-      pattern = "*:*o",
-      group = vim.api.nvim_create_augroup("OccurrenceOperatorPending", { clear = true }),
-      callback = function(evt)
-        log.debug("ModeChanged to operator-pending")
+  for name, action in pairs(actions) do
+    local capcase = to_capcase(name)
+    local plug_name = "<Plug>Occurrence" .. capcase
+    local cmd = "<Cmd>Occurrence " .. name .. "<CR>"
+    local desc = action.desc or ("Occurrence: " .. name)
 
-        local operator = vim.v.operator
-        if config:operator_is_supported(operator) then
-          local state = BufferState.get(evt.buf)
-          -- If a keymap exists, we assume that a preset occurrence is active, so we do nothing.
-          if not state:has_active_keymap() then
-            state.keymap:map_actions("o", config)
-          end
-        end
-      end,
+    -- Normal mode
+    vim.keymap.set("n", plug_name, cmd, { desc = desc, silent = true })
+
+    -- Visual mode
+    vim.keymap.set("v", plug_name, cmd, { desc = desc, silent = true })
+
+    -- Operator-pending mode (for operator-modifier actions)
+    if action.type == "operator-modifier" then
+      -- For operator-pending mode, we need to call the wrapped action directly
+      -- since expr mappings need to return a value
+      local wrapped = config:wrap_action(action)
+      vim.keymap.set("o", plug_name, wrapped, { desc = desc, silent = true, expr = true })
+    end
+  end
+
+  -- Set up default keymaps if user hasn't disabled them
+  if config.default_keymaps then
+    -- Normal mode default
+    vim.keymap.set("n", "go", "<Plug>OccurrenceMarkSearchOrWord", {
+      desc = "Mark occurrences of search or word",
+    })
+
+    -- Visual mode default
+    vim.keymap.set("v", "go", "<Plug>OccurrenceMarkSelection", {
+      desc = "Mark occurrences of selection",
+    })
+
+    -- Operator-pending mode default
+    vim.keymap.set("o", "o", "<Plug>OccurrenceModifyOperator", {
+      desc = "Occurrences of word",
     })
   end
 end

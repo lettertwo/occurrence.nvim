@@ -4,7 +4,6 @@ local stub = require("luassert.stub")
 local util = require("tests.util")
 
 local builtins = require("occurrence.actions")
-local builtin_ops = require("occurrence.operators")
 local plugin = require("occurrence")
 
 local NS = vim.api.nvim_create_namespace("Occurrence")
@@ -38,7 +37,8 @@ describe("integration tests", function()
       -- Create buffer with a unique word that won't have multiple occurrences
       bufnr = util.buffer("unique_word_that_appears_only_once")
 
-      plugin.setup({ actions = { n = { q = "mark_search_or_word" } } })
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>OccurrenceMarkSearchOrWord", { buffer = bufnr })
 
       vim.cmd([[silent! /nonexistent_pattern<CR>]]) -- Search for a pattern that won't match anything
 
@@ -50,7 +50,8 @@ describe("integration tests", function()
     it("sets up keymaps for cancelling", function()
       bufnr = util.buffer("foo bar baz foo")
 
-      plugin.setup({ actions = { n = { q = "mark_word" } } })
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -92,7 +93,8 @@ describe("integration tests", function()
     it("sets up keymaps for marking and unmarking", function()
       bufnr = util.buffer("foo bar baz foo")
 
-      plugin.setup({ actions = { n = { q = "mark_word" } } })
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -150,7 +152,8 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
+      plugin.setup({})
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all occurrences)
       feedkeys(normal_key)
@@ -205,7 +208,8 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
+      plugin.setup({})
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (cursor at position 0)
       feedkeys(normal_key)
@@ -273,7 +277,8 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
+      plugin.setup({})
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Move to 'bar' and activate occurrence
       feedkeys("w") -- Move to 'bar'
@@ -291,7 +296,7 @@ describe("integration tests", function()
       for _, map in ipairs(mappings) do
         if map.lhs ~= nil and map.desc == builtins.mark.desc then
           mark_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == builtins.mark_selection_or_toggle_marks_in_selection.desc then
+        elseif map.lhs ~= nil and map.desc == builtins.toggle_selection.desc then
           toggle_key = map.lhs
         end
       end
@@ -325,7 +330,7 @@ describe("integration tests", function()
       for _, map in ipairs(mappings) do
         if map.lhs ~= nil and map.desc == builtins.mark.desc then
           mark_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == builtins.mark_selection_or_toggle_marks_in_selection.desc then
+        elseif map.lhs ~= nil and map.desc == builtins.toggle_selection.desc then
           toggle_key = map.lhs
         end
       end
@@ -336,7 +341,8 @@ describe("integration tests", function()
     it("finds marks in visual selection", function()
       bufnr = util.buffer({ "no matches on this line", "foo bar baz foo" })
 
-      plugin.setup({ actions = { n = { q = "mark_search_or_word" } } })
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>OccurrenceMarkSearchOrWord", { buffer = bufnr })
 
       feedkeys("j") -- Move to second line
       feedkeys("q") -- Activate occurrence (marks all 'foo')
@@ -361,7 +367,8 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
-      plugin.setup({ actions = { n = { [normal_key] = "mark_word" } } })
+      plugin.setup({})
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- simulate pressing normal keymap to find 'foo'
       feedkeys(normal_key)
@@ -406,9 +413,9 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({
-        actions = { o = { q = "modify_operator" } },
         operators = { c = false },
       })
+      vim.keymap.set("o", "q", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
 
       -- Enter change operator-pending mode, modify operator
       feedkeys("cq")
@@ -428,7 +435,6 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({
-        actions = { o = { q = "modify_operator" } },
         operators = {
           d = {
             desc = "Delete on marked occurrences",
@@ -441,6 +447,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("o", "q", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
 
       -- Enter delete operator-pending mode, modify operator
       feedkeys("dq")
@@ -469,7 +476,6 @@ describe("integration tests", function()
       bufnr = util.buffer({ "foo bar baz foo", "  foo indented" })
 
       plugin.setup({
-        actions = { o = { q = "modify_operator" } },
         operators = {
           ["<"] = {
             desc = "Indent marked occurrences to the left",
@@ -479,6 +485,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("o", "q", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
 
       -- Enter left shift operator-pending mode, modify operator
       feedkeys("<q")
@@ -507,7 +514,6 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({
-        actions = { o = { q = "modify_operator" } },
         operators = {
           ["gU"] = {
             desc = "Make marked occurrences uppercase",
@@ -517,6 +523,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("o", "q", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
 
       -- Enter tilde operator-pending mode, modify operator
       feedkeys("gUq")
@@ -545,7 +552,6 @@ describe("integration tests", function()
       bufnr = util.buffer({ "", "foo bar baz foo" })
 
       plugin.setup({
-        actions = { o = { q = "modify_operator" } },
         operators = {
           d = {
             desc = "Delete on marked occurrences",
@@ -558,6 +564,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("o", "q", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
 
       local listener = stub.new()
 
@@ -609,7 +616,6 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({
-        actions = { o = { q = "modify_operator" } },
         operators = {
           d = {
             desc = "Delete on marked occurrences",
@@ -622,6 +628,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("o", "q", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
 
       local listener = stub.new()
 
@@ -686,7 +693,6 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({
-        actions = { n = { [normal_key] = "mark_word" } },
         operators = {
           d = {
             desc = "Delete",
@@ -699,6 +705,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -733,7 +740,6 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({
-        actions = { n = { [normal_key] = "mark_word" } },
         operators = {
           ["<"] = {
             desc = "Indent left",
@@ -743,6 +749,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -777,7 +784,6 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({
-        actions = { n = { [normal_key] = "mark_word" } },
         operators = {
           ["gU"] = {
             desc = "Uppercase",
@@ -787,6 +793,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -821,7 +828,6 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({
-        actions = { n = { [normal_key] = "mark_word" } },
         operators = {
           ["gU"] = {
             desc = "Uppercase",
@@ -831,6 +837,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -866,7 +873,6 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({
-        actions = { n = { [normal_key] = "mark_word" } },
         operators = {
           ["U"] = {
             desc = "Uppercase",
@@ -876,6 +882,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -915,7 +922,6 @@ describe("integration tests", function()
 
       -- Setup plugin with custom operator
       plugin.setup({
-        actions = { n = { z = "mark_search_or_word" } },
         operators = {
           q = {
             desc = "Custom operator: replace with 'test'",
@@ -928,6 +934,7 @@ describe("integration tests", function()
           },
         },
       })
+      vim.keymap.set("n", "z", "<Plug>OccurrenceMarkSearchOrWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys("z")

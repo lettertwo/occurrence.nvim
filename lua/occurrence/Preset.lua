@@ -1,4 +1,3 @@
-local Keymap = require("occurrence.Keymap")
 local Occurrence = require("occurrence.Occurrence")
 local Operator = require("occurrence.Operator")
 
@@ -23,43 +22,109 @@ local function is_preset(candidate)
   return type(candidate) == "table" and candidate.type == "preset"
 end
 
----@param keymap occurrence.BufferKeymap
+-- Helper to convert snake_case to CapCase for <Plug> names
+local function to_capcase(snake_str)
+  local result = snake_str:gsub("_(%w)", function(c)
+    return c:upper()
+  end)
+  return result:sub(1, 1):upper() .. result:sub(2)
+end
+
+local DEFAULT_PRESET_KEYMAP = {
+  n = {
+    ["<Esc>"] = "deactivate",
+    n = "goto_next_mark",
+    N = "goto_previous_mark",
+    gn = "goto_next",
+    gN = "goto_previous",
+    go = "mark_word_or_toggle_mark",
+    ga = "mark",
+    gx = "unmark",
+  },
+  v = {
+    go = "toggle_selection",
+    ga = "mark",
+    gx = "unmark",
+  },
+}
+
+---@param occurrence occurrence.Occurrence
 ---@param config occurrence.Config
-local function activate_preset(keymap, config)
-  local preset_actions = config:preset_actions()
-  keymap:map_preset_actions("n", config)
-  keymap:map_preset_actions("v", config)
+local function activate_preset(occurrence, config)
+  local buffer = occurrence.buffer
 
-  for operator_key in pairs(config:operators()) do
-    local operator_config = config:get_operator_config(operator_key)
-    local operator = operator_config and Operator.new(operator_key, operator_config)
-
-    -- Add normal operator keymap (unless overridden or disabled)
-    if operator and not preset_actions.n[operator_key] and preset_actions.n[operator_key] ~= false then
-      local desc = "'" .. operator_key .. "' on marked occurrences"
-      if type(operator_config) == "table" and operator_config.desc then
-        desc = operator_config.desc
-      end
-
-      keymap:n(operator_key, operator, { desc = desc, expr = true }, config)
-    else
-      log.debug("Skipping operator key:", operator_key, "as it is disabled in the config")
+  if config.on_preset_activate then
+    -- User provided custom callback - create map API
+    local map = function(mode, lhs, rhs, opts)
+      opts = vim.tbl_extend("force", opts or {}, { buffer = buffer })
+      vim.keymap.set(mode, lhs, rhs, opts)
+      occurrence:add_keymap(mode, lhs)
     end
 
-    -- Add visual operator keymap (unless overridden or disabled)
-    if operator and not preset_actions.v[operator_key] and preset_actions.v[operator_key] ~= false then
-      local desc = "'" .. operator_key .. "' on marked occurrences in selection"
-      if type(operator_config) == "table" and operator_config.desc then
-        desc = operator_config.desc .. " in selection"
-      end
+    -- Call user callback
+    config:on_preset_activate(map)
+  elseif config.default_keymaps then
+    -- Use default keymaps
 
-      -- keymap:v(operator_key, operator, { desc = desc }, config)
-      keymap:v(operator_key, function()
-        log.debug("Keybind invoked:", operator_key, "count:", vim.v.count, "register:", vim.v.register)
-        operator()
-      end, { desc = desc }, config)
-    else
-      log.debug("Skipping operator key:", operator_key, "as it is disabled in the config")
+    -- Set up buffer-local keymaps for normal mode preset actions
+    local builtin_actions = require("occurrence.actions")
+    for key, action_name in pairs(DEFAULT_PRESET_KEYMAP.n) do
+      local capcase = to_capcase(action_name)
+      local action_config = builtin_actions[action_name]
+      local desc = action_config and action_config.desc or ("Occurrence: " .. action_name)
+      vim.keymap.set("n", key, "<Plug>Occurrence" .. capcase, {
+        buffer = buffer,
+        desc = desc,
+      })
+      occurrence:add_keymap("n", key)
+    end
+
+    -- Set up buffer-local keymaps for visual mode preset actions
+    for key, action_name in pairs(DEFAULT_PRESET_KEYMAP.v) do
+      local capcase = to_capcase(action_name)
+      local action_config = builtin_actions[action_name]
+      local desc = action_config and action_config.desc or ("Occurrence: " .. action_name)
+      vim.keymap.set("v", key, "<Plug>Occurrence" .. capcase, {
+        buffer = buffer,
+        desc = desc,
+      })
+      occurrence:add_keymap("v", key)
+    end
+
+    -- Set up buffer-local keymaps for operators
+    for operator_key in pairs(config:operators()) do
+      local operator_config = config:get_operator_config(operator_key)
+      local operator = operator_config and Operator.new(operator_key, operator_config)
+
+      if operator then
+        local desc = "'" .. operator_key .. "' on marked occurrences"
+        if type(operator_config) == "table" and operator_config.desc then
+          desc = operator_config.desc
+        end
+
+        -- Normal mode operator
+        vim.keymap.set("n", operator_key, operator, {
+          buffer = buffer,
+          desc = desc,
+          expr = true,
+        })
+        occurrence:add_keymap("n", operator_key)
+
+        -- Visual mode operator
+        local visual_desc = "'" .. operator_key .. "' on marked occurrences in selection"
+        if type(operator_config) == "table" and operator_config.desc then
+          visual_desc = operator_config.desc .. " in selection"
+        end
+
+        vim.keymap.set("v", operator_key, function()
+          log.debug("Keybind invoked:", operator_key, "count:", vim.v.count, "register:", vim.v.register)
+          operator()
+        end, {
+          buffer = buffer,
+          desc = visual_desc,
+        })
+        occurrence:add_keymap("v", operator_key)
+      end
     end
   end
 end
@@ -84,9 +149,9 @@ local function create_preset(config, occurrence_config)
       return
     end
 
-    if not occurrence:has_active_keymap() then
+    if not occurrence:has_active_keymaps() then
       log.debug("Activating preset keymaps for buffer", occurrence.buffer)
-      activate_preset(occurrence.keymap, occurrence_config)
+      activate_preset(occurrence, occurrence_config)
     end
   end
 end

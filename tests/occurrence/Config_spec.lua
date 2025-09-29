@@ -18,19 +18,11 @@ describe("Config", function()
   describe("config.new validation", function()
     it("validates valid options", function()
       local valid_opts = {
-        actions = {
-          n = { go = "mark_word" },
-          v = { go = "mark_selection" },
-          o = { o = "modify_operator" },
-        },
         operators = {
           c = "change",
           d = "delete",
         },
-        preset_actions = {
-          n = { n = "goto_next_mark" },
-          v = { go = "mark_selection" },
-        },
+        default_keymaps = true,
       }
 
       assert.has_no.errors(function()
@@ -41,13 +33,13 @@ describe("Config", function()
     it("handles invalid options gracefully with warning", function()
       -- These should warn but not error (based on log.warn_once usage)
       local conf1 = Config.new({ invalid_option = "value" })
-      assert.spy(vim.notify).was_called_with(match.has_match("invalid_option"), vim.log.levels.WARN, match._)
+      assert.spy(vim.notify).was_called_with(match.has_match("unknown option"), vim.log.levels.WARN, match._)
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
       ---@diagnostic disable-next-line: assign-type-mismatch
-      local conf2 = Config.new({ actions = "invalid_type" })
-      assert.spy(vim.notify).was_called_with(match.has_match("actions must be a table"), vim.log.levels.WARN, match._)
+      local conf2 = Config.new({ operators = "invalid_type" })
+      assert.spy(vim.notify).was_called_with(match.has_match("operators must be a table"), vim.log.levels.WARN, match._)
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
@@ -67,48 +59,40 @@ describe("Config", function()
   describe("config.new", function()
     it("creates config with default values when no options provided", function()
       local conf = Config.new()
-      for key, value in pairs(Config.default()) do
-        assert.is_same(value, conf:get(key))
-      end
+      local defaults = Config.default()
+      assert.is_same(defaults.operators, conf:operators())
+      assert.equals(defaults.default_keymaps, conf.default_keymaps)
     end)
 
     it("creates config with nil options", function()
       local conf = Config.new(nil)
-      for key, value in pairs(Config.default()) do
-        assert.is_same(value, conf:get(key))
-      end
+      local defaults = Config.default()
+      assert.is_same(defaults.operators, conf:operators())
+      assert.equals(defaults.default_keymaps, conf.default_keymaps)
     end)
 
     it("overrides defaults with provided options", function()
       local opts = {
-        actions = {
-          n = { gn = "mark_word" },
-          v = { gv = "mark_selection" },
-        },
         operators = {
           p = "other",
           y = "fake",
         },
-        preset_actions = {
-          n = { ["<Esc>"] = false },
-        },
+        default_keymaps = false,
       }
 
       local defaults = Config.default()
       local conf = Config.new(opts)
 
-      assert.is_not_same(defaults.actions, conf:actions())
-      assert.is_same(vim.tbl_deep_extend("force", defaults.actions, opts.actions), conf:actions())
-      assert.is_not_same(defaults.preset_actions, conf:preset_actions())
-      assert.is_same(vim.tbl_deep_extend("force", defaults.preset_actions, opts.preset_actions), conf:preset_actions())
       assert.is_not_same(defaults.operators, conf:operators())
       assert.is_same(vim.tbl_deep_extend("force", defaults.operators, opts.operators), conf:operators())
+      assert.is_not_same(defaults.default_keymaps, conf.default_keymaps)
+      assert.equals(false, conf.default_keymaps)
     end)
 
     it("passes through an existing config", function()
       local opts = {
-        actions = {
-          n = { gn = "mark_word" },
+        operators = {
+          x = "delete",
         },
       }
 
@@ -128,19 +112,12 @@ describe("Config", function()
   end)
 
   describe("Config:get_action_config", function()
-    it("returns nil for unsupported modes", function()
-      local conf = Config.new()
-      ---@diagnostic disable-next-line: param-type-mismatch
-      assert.is_nil(conf:get_action_config("some_action", "x"))
-      assert.spy(vim.notify).was_called_with(match.has_match("Invalid mode"), vim.log.levels.WARN, match._)
-    end)
-
     it("returns nil for unsupported actions", function()
       local conf = Config.new()
-      assert.is_nil(conf:get_action_config("nonexistent_action", "n"))
+      assert.is_nil(conf:get_action_config("nonexistent_action"))
     end)
 
-    it("resolves builtin actions without a mode", function()
+    it("resolves builtin actions", function()
       local conf = Config.new()
 
       local action =
@@ -148,26 +125,6 @@ describe("Config", function()
       assert.is_function(action.callback)
       assert.is_string(action.desc)
       assert.equals("preset", action.type)
-    end)
-
-    it("returns the correct action config for valid mode and action", function()
-      local opts = {
-        actions = {
-          n = { q = "mark_word" },
-          v = { q = "mark_selection" },
-        },
-      }
-      local conf = Config.new(opts)
-
-      local action_n = assert(conf:get_action_config("q", "n"), "Expected action config for 'q' in normal mode")
-      assert.is_function(action_n.callback)
-      assert.is_string(action_n.desc)
-      assert.equals("preset", action_n.type)
-
-      local action_v = assert(conf:get_action_config("q", "v"), "Expected action config for 'q' in visual mode")
-      assert.is_function(action_v.callback)
-      assert.is_string(action_v.desc)
-      assert.equals("preset", action_v.type)
     end)
   end)
 

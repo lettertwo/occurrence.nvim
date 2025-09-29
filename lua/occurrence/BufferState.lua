@@ -12,13 +12,9 @@ local buffer_state = {}
 ---@class occurrence.BufferState: occurrence.Disposable
 ---@field buffer integer The buffer this state is for.
 ---@field patterns string[] The active search patterns for the buffer.
+---@field protected keymaps { mode: string, lhs: string }[] The active preset keymaps for the buffer.
 ---@field protected extmarks occurrence.Extmarks The active extmarks for the buffer.
----@field keymap occurrence.BufferKeymap The active keymap for the buffer.
 local BufferState = {}
-
-function BufferState:has_active_keymap()
-  return rawget(self, "keymap") ~= nil
-end
 
 function BufferState:has_patterns()
   local patterns = rawget(self, "patterns")
@@ -43,6 +39,36 @@ function BufferState:add_pattern(pattern)
   table.insert(patterns, pattern)
 end
 
+function BufferState:has_active_keymaps()
+  local keymaps = rawget(self, "keymaps")
+  return keymaps ~= nil and #keymaps > 0
+end
+
+function BufferState:clear_keymaps()
+  ---@type { mode: string, lhs: string }[] | nil
+  local keymaps = rawget(self, "keymaps")
+  if keymaps then
+    for _, km in ipairs(keymaps) do
+      pcall(vim.keymap.del, km.mode, km.lhs, { buffer = self.buffer })
+    end
+    rawset(self, "keymaps", nil)
+  end
+end
+
+---@param modes string | string[]
+---@param lhs string
+function BufferState:add_keymap(modes, lhs)
+  modes = type(modes) == "table" and modes or { modes }
+  local keymaps = rawget(self, "keymaps")
+  if keymaps == nil then
+    keymaps = {}
+    rawset(self, "keymaps", keymaps)
+  end
+  for _, mode in ipairs(modes) do
+    table.insert(keymaps, { mode = mode, lhs = lhs })
+  end
+end
+
 ---@param buffer integer
 ---@return occurrence.BufferState
 local function create_buffer_state(buffer)
@@ -52,13 +78,15 @@ local function create_buffer_state(buffer)
       BUFFER_STATE_CACHE[buffer] = nil
     end
     rawset(self, "patterns", nil)
-    if rawget(self, "keymap") then
-      rawget(self, "keymap"):reset()
-      rawset(self, "keymap", nil)
-    end
     if rawget(self, "extmarks") then
       rawget(self, "extmarks"):reset()
       rawset(self, "extmarks", nil)
+    end
+    if rawget(self, "keymaps") then
+      for _, km in ipairs(rawget(self, "keymaps")) do
+        pcall(vim.keymap.del, km.mode, km.lhs, { buffer = buffer })
+      end
+      rawset(self, "keymaps", nil)
     end
   end)
   setmetatable(self, {
@@ -71,18 +99,17 @@ local function create_buffer_state(buffer)
           rawset(tbl, "extmarks", extmarks)
         end
         return rawget(tbl, "extmarks")
-      elseif key == "keymap" then
-        if rawget(tbl, "keymap") == nil then
-          local keymap = require("occurrence.Keymap").new(buffer)
-          rawset(tbl, "keymap", keymap)
-        end
-        return rawget(tbl, "keymap")
       elseif key == "patterns" then
         if rawget(tbl, "patterns") == nil then
           local patterns = {}
           rawset(tbl, "patterns", patterns)
         end
         return rawget(tbl, "patterns")
+      elseif key == "keymaps" then
+        if rawget(tbl, "keymaps") == nil then
+          rawset(tbl, "keymaps", {})
+        end
+        return rawget(tbl, "keymaps")
       elseif disposable[key] ~= nil then
         return disposable[key]
       elseif BufferState[key] ~= nil then
@@ -96,8 +123,6 @@ local function create_buffer_state(buffer)
         error("Cannot modify read-only property 'buffer'")
       elseif key == "extmarks" then
         error("Cannot modify read-only property 'extmarks'")
-      elseif key == "keymap" then
-        error("Cannot modify read-only property 'keymap'")
       elseif key == "patterns" then
         error("Cannot modify read-only property 'patterns'")
       else

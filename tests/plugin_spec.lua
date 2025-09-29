@@ -96,7 +96,7 @@ describe("occurrence module", function()
     it("handles partial config", function()
       assert.has_no.errors(function()
         require("occurrence").setup({
-          actions = { n = { ["<leader>test"] = "mark_word" } },
+          operators = { x = "delete" },
         })
       end)
     end)
@@ -105,7 +105,7 @@ describe("occurrence module", function()
       assert.has_no.errors(function()
         local occurrence = require("occurrence")
         occurrence.setup({})
-        occurrence.setup({ actions = { n = { ["<leader>test"] = "mark_word" } } })
+        occurrence.setup({ operators = { x = "delete" } })
         occurrence.setup({})
       end)
     end)
@@ -115,7 +115,6 @@ describe("occurrence module", function()
       local config_spy = spy.on(Config, "new")
 
       local test_opts = {
-        actions = { n = { ["<leader>test"] = "mark_word" } },
         operators = { c = "change" },
       }
 

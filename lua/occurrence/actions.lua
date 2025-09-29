@@ -311,7 +311,7 @@ local toggle_marks_in_selection = {
 }
 
 ---@type occurrence.PresetConfig
-local mark_selection_or_toggle_marks_in_selection = {
+local toggle_selection = {
   type = "preset",
   desc = "Add/Toggle occurrence marks",
   callback = function(occurrence)
@@ -371,7 +371,7 @@ local actions = {
   mark_in_selection = mark_in_selection,
   unmark_in_selection = unmark_in_selection,
   toggle_marks_in_selection = toggle_marks_in_selection,
-  mark_selection_or_toggle_marks_in_selection = mark_selection_or_toggle_marks_in_selection,
+  toggle_selection = toggle_selection,
   mark_word = mark_word,
   mark_selection = mark_selection,
   mark_last_search = mark_last_search,

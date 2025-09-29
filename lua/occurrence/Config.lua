@@ -1,5 +1,8 @@
 local log = require("occurrence.log")
 
+---@module 'occurrence.Config'
+local config = {}
+
 ---@alias occurrence.ActionConfig occurrence.PresetConfig | occurrence.OperatorModifierConfig
 
 -- Function to be used as a callback for an action.
@@ -7,52 +10,18 @@ local log = require("occurrence.log")
 -- The second argument will be the current `Config`.
 ---@alias occurrence.ActionCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): nil
 
----@module 'occurrence.Config'
-local config = {}
-
 ---@alias occurrence.KeymapAction occurrence.PresetConfig | occurrence.OperatorModifierConfig | occurrence.BuiltinAction | occurrence.ActionCallback | false
-
----@class occurrence.KeymapConfig
----@field n { [string]: occurrence.KeymapAction } normal mode keymaps
----@field v { [string]: occurrence.KeymapAction } visual mode keymaps
----@field o { [string]: occurrence.KeymapAction } operator-pending mode keymaps
-
----@class occurrence.KeymapOptions
----@field n? { [string]?: occurrence.KeymapAction } normal mode keymaps
----@field v? { [string]?: occurrence.KeymapAction } visual mode keymaps
----@field o? { [string]?: occurrence.KeymapAction } operator-pending mode keymaps
-
----@class occurrence.ActivePresetKeymapConfig
----@field n { [string]: occurrence.KeymapAction } normal mode keymaps
----@field v { [string]: occurrence.KeymapAction } visual mode keymaps
-
----@class occurrence.ActivePresetKeymapOptions
----@field n? { [string]?: occurrence.KeymapAction } normal mode keymaps
----@field v? { [string]?: occurrence.KeymapAction } visual mode keymaps
 
 ---@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.BuiltinOperator | boolean
 ---@class occurrence.OperatorKeymapConfig: { [string]: occurrence.OperatorKeymapEntry }
 ---@class occurrence.OperatorKeymapOptions: { [string]?: occurrence.OperatorKeymapEntry }
 
----@class occurrence.Options
----@field actions? occurrence.KeymapOptions
----@field operators? occurrence.OperatorKeymapOptions
----@field preset_actions? occurrence.ActivePresetKeymapOptions
+---@alias occurrence.PresetMapFn fun(mode: string|string[], lhs: string, rhs: string|function, opts?: vim.keymap.set.Opts)
 
----@type occurrence.KeymapConfig
-local DEFAULT_KEYMAP_CONFIG = {
-  n = {
-    go = "mark_search_or_word",
-    -- go = "mark_word",
-  },
-  v = {
-    go = "mark_selection",
-  },
-  o = {
-    o = "modify_operator",
-    -- oo = "modify_operator_linewise",
-  },
-}
+---@class occurrence.Options
+---@field operators? occurrence.OperatorKeymapOptions
+---@field default_keymaps? boolean
+---@field on_preset_activate? fun(map: occurrence.PresetMapFn): nil
 
 ---@type occurrence.OperatorKeymapConfig
 local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
@@ -79,46 +48,10 @@ local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
   ["g@"] = false, -- call function set with 'operatorfunc'
 }
 
----@type occurrence.ActivePresetKeymapConfig
-local DEFAULT_ACTIVE_PRESET_KEYMAP_CONFIG = {
-  n = {
-    -- deactivate
-    ["<Esc>"] = "deactivate",
-    -- ["<C-c>"] = "deactivate",
-    -- ["<C-[>"] = "deactivate",
-
-    -- navigate
-    n = "goto_next_mark",
-    N = "goto_previous_mark",
-    gn = "goto_next",
-    gN = "goto_previous",
-
-    -- mark/unmark
-    go = "mark_word_or_toggle_mark",
-    ga = "mark",
-    gx = "unmark",
-
-    -- operators
-    -- TODO: implement these
-    ["dd"] = false, -- delete line
-    ["cc"] = false, -- change line
-    ["yy"] = false, -- yank line
-    ["C"] = false, -- change to end of line
-    ["D"] = false, -- delete to end of line
-    ["Y"] = false, -- yank to end of line
-  },
-  v = {
-    -- mark/unmark
-    go = "mark_selection_or_toggle_marks_in_selection",
-    ga = "mark",
-    gx = "unmark",
-  },
-}
-
 local DEFAULT_CONFIG = {
-  actions = DEFAULT_KEYMAP_CONFIG,
   operators = DEFAULT_OPERATOR_KEYMAP_CONFIG,
-  preset_actions = DEFAULT_ACTIVE_PRESET_KEYMAP_CONFIG,
+  default_keymaps = true,
+  on_preset_activate = nil,
 }
 
 -- Default operator configuration that is used
@@ -130,33 +63,33 @@ local DEFAULT_OPERATOR_CONFIG = {
   modifies_text = true,
 }
 
----@param opts? occurrence.Options
----@param key string
----@return occurrence.KeymapConfig|occurrence.OperatorKeymapConfig|occurrence.ActivePresetKeymapConfig|nil
----@overload fun(opts: occurrence.Options?, key: "actions"): occurrence.KeymapConfig
----@overload fun(opts: occurrence.Options?, key: "operators"): occurrence.OperatorKeymapConfig
----@overload fun(opts: occurrence.Options?, key: "preset_actions"): occurrence.ActivePresetKeymapConfig
-local function get(opts, key)
-  if opts ~= nil and opts[key] ~= nil and DEFAULT_CONFIG[key] ~= nil then
-    return vim.tbl_deep_extend("force", {}, DEFAULT_CONFIG[key], opts[key])
-  else
-    return vim.deepcopy(DEFAULT_CONFIG[key])
-  end
-end
-
 ---Validate the given options.
 ---Returns error message if the options represent an invalid configuration.
 ---@param opts occurrence.Options
 ---@return string? error_message
 local function validate(opts)
+  -- TODO: Use vim.validate instead?
   if type(opts) ~= "table" then
     return "opts must be a table"
   end
+
+  local valid_keys = {
+    operators = true,
+    default_keymaps = true,
+    on_preset_activate = true,
+  }
+
   for k, v in pairs(opts) do
-    if DEFAULT_CONFIG[k] == nil then
-      return "invalid option: " .. k
+    if not valid_keys[k] then
+      return "unknown option: " .. k
     end
-    if type(v) ~= type(DEFAULT_CONFIG[k]) then
+
+    -- Special handling for on_preset_activate (can be function or nil)
+    if k == "on_preset_activate" then
+      if type(v) ~= "function" and v ~= nil then
+        return "option on_preset_activate must be a function"
+      end
+    elseif DEFAULT_CONFIG[k] and type(v) ~= type(DEFAULT_CONFIG[k]) then
       return "option " .. k .. " must be a " .. type(DEFAULT_CONFIG[k])
     end
   end
@@ -191,29 +124,11 @@ local function resolve_operator_key(key, operators_config)
   return key
 end
 
----@param key string
----@param actions_config occurrence.KeymapConfig
----@return string
-local function resolve_action_key(key, actions_config)
-  local resolved = actions_config[key]
-  local seen = {}
-  while type(resolved) == "string" do
-    if seen[key] then
-      error("Circular action alias detected: '" .. key .. "' <-> '" .. resolved .. "'")
-    end
-    seen[key] = true
-    key = resolved
-    resolved = actions_config[key]
-  end
-  return key
-end
-
 ---@class occurrence.Config
----@field actions fun(self: occurrence.Config): occurrence.KeymapConfig
 ---@field operators fun(self: occurrence.Config): occurrence.OperatorKeymapConfig
----@field preset_actions fun(self: occurrence.Config): occurrence.ActivePresetKeymapConfig
 ---@field validate fun(self: occurrence.Config, opts: occurrence.Options): string? error_message
----@field get fun(self: occurrence.Config, key: string): occurrence.KeymapConfig|occurrence.OperatorKeymapConfig|occurrence.ActivePresetKeymapConfig|nil
+---@field default_keymaps boolean
+---@field on_preset_activate? fun(self: occurrence.Config, map: occurrence.PresetMapFn): nil
 local Config = {}
 
 ---@param name string
@@ -244,24 +159,10 @@ function Config:operator_is_supported(name)
 end
 
 ---@param name string
----@param mode? occurrence.KeymapMode
----@return occurrence.ActionConfig | false | nil
-function Config:get_action_config(name, mode)
-  local actions = self:actions()
-  local action_config = nil
-  if mode ~= nil then
-    if actions[mode] == nil then
-      log.warn_once("Invalid mode: " .. tostring(mode))
-      return
-    end
-    name = resolve_action_key(name, actions[mode])
-    action_config = actions[mode][name]
-  end
-  if action_config == nil then
-    local builtins = require("occurrence.actions")
-    action_config = builtins[name]
-  end
-  return action_config
+---@return occurrence.ActionConfig | nil
+function Config:get_action_config(name)
+  local builtins = require("occurrence.actions")
+  return builtins[name]
 end
 
 -- Wrap the given `action` in a function to be used as a keymap callback.
@@ -271,7 +172,7 @@ end
 ---@param action occurrence.KeymapAction
 ---@return function
 function Config:wrap_action(action)
-  ---@type { callback: occurrence.ActionCallback } | nil | false
+  ---@type { callback: occurrence.ActionCallback } | nil
   local action_config = nil
 
   if type(action) == "string" then
@@ -283,10 +184,6 @@ function Config:wrap_action(action)
     return function()
       return action(Occurrence.new(), self)
     end
-  end
-
-  if action_config == false then
-    error("Action " .. tostring(action) .. " is disabled")
   end
 
   if action_config and action_config.type then
@@ -340,16 +237,26 @@ function config.new(opts, ...)
           return validate(o or opts)
         end
       end
-      if key == "get" then
-        return function(_, k)
-          return get(opts, k)
+      if key == "operators" then
+        return function(_)
+          local default_operators = DEFAULT_OPERATOR_KEYMAP_CONFIG
+          if opts and opts.operators then
+            return vim.tbl_deep_extend("force", vim.deepcopy(default_operators), opts.operators)
+          end
+          return default_operators
         end
+      end
+      if key == "default_keymaps" then
+        if opts and opts.default_keymaps ~= nil then
+          return opts.default_keymaps
+        end
+        return true -- default to true if not specified
+      end
+      if key == "on_preset_activate" then
+        return opts and opts.on_preset_activate or nil
       end
       if Config[key] ~= nil then
         return Config[key]
-      end
-      return function()
-        return get(opts, key)
       end
     end,
     __newindex = function()
