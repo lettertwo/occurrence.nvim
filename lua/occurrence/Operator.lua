@@ -188,7 +188,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
   end
 
   if edited == 0 then
-    log.error("No occurrences to apply operator", operator_name)
+    log.debug("No occurrences to apply operator", operator_name)
     return
   end
 

@@ -23,6 +23,17 @@ function occurrence.setup(opts)
   local config = require("occurrence.Config").new(opts)
   local actions_config = config:actions()
 
+  local command = require("occurrence.command")
+  command.init(config)
+
+  vim.api.nvim_create_user_command("Occurrence", command.execute, {
+    nargs = "+",
+    desc = "Occurrence command with subcommands",
+    force = true,
+    complete = command.complete,
+    preview = command.preview,
+  })
+
   -- Setup keymaps for normal mode actions.
   Keymap:map_actions("n", config)
 
@@ -48,8 +59,6 @@ function occurrence.setup(opts)
           if not state:has_active_keymap() then
             state.keymap:map_actions("o", config)
           end
-        else
-          log.warn_once("Operator '" .. operator .. "' is not supported")
         end
       end,
     })

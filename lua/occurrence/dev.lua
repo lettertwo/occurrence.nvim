@@ -10,6 +10,19 @@ function dev.setup(opts)
   local log = require("occurrence.log")
   log.set_level(log.levels.DEBUG)
   prev_opts = opts
+
+  require("occurrence.command").add("reload", {
+    impl = function()
+      dev.reload()
+    end,
+  })
+
+  vim.api.nvim_create_autocmd({ "BufWritePost" }, {
+    pattern = { "*/occurrence.nvim*/lua/*.lua" },
+    command = "Occurrence reload",
+    group = vim.api.nvim_create_augroup("OccurrenceDev", { clear = true }),
+  })
+
   log.debug("occurrence.dev.setup(" .. vim.inspect(opts) .. ")")
   require("occurrence").setup(opts)
 end
@@ -33,16 +46,5 @@ function dev.reload()
   require("occurrence").reset() -- ...once after reload.
   dev.setup()
 end
-
-vim.api.nvim_create_user_command("ReloadOccurrence", dev.reload, {
-  desc = "Reload the occurrence plugin and run setup again",
-  force = true,
-})
-
-vim.api.nvim_create_autocmd({ "BufWritePost" }, {
-  pattern = { "*/occurrence.nvim*/lua/*.lua" },
-  command = "ReloadOccurrence",
-  group = vim.api.nvim_create_augroup("OccurrenceDev", { clear = true }),
-})
 
 return dev
