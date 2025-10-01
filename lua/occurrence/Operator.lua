@@ -121,7 +121,8 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
     -- Get text for register/processing
     local text = nil
     if config.uses_register or config.modifies_text or config.method == "interactive" then
-      text = vim.api.nvim_buf_get_text(0, edit.start.line, edit.start.col, edit.stop.line, edit.stop.col, {})
+      text =
+        vim.api.nvim_buf_get_text(occurrence.buffer, edit.start.line, edit.start.col, edit.stop.line, edit.stop.col, {})
     end
 
     -- Save to register if needed
@@ -157,7 +158,14 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
         end
 
         occurrence:unmark(edit)
-        vim.api.nvim_buf_set_text(0, edit.start.line, edit.start.col, edit.stop.line, edit.stop.col, replacement or {})
+        vim.api.nvim_buf_set_text(
+          occurrence.buffer,
+          edit.start.line,
+          edit.start.col,
+          edit.stop.line,
+          edit.stop.col,
+          replacement or {}
+        )
         edited = edited + 1
       else
         -- NOTE: at this point, "direct_api" that does not modify text is a no-op.
@@ -175,6 +183,8 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
       vim.cmd(string.format("%d,%d%s", start_line, stop_line, operator_name))
       edited = edited + 1
     elseif config.method == "visual_feedkeys" then
+      -- Clear any visual selection before (re-)entering visual mode
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
       log.debug("executing nvim_feedkeys:", operator_name)
       vim.api.nvim_feedkeys("v", "nx", true)
       Cursor.move(edit.stop)
@@ -219,11 +229,11 @@ local function create_operator(operator_key, config)
         return
       end
 
-      -- Clear visual selection
-      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
-
       -- Run the operator
       apply_operator(occurrence, config, operator_key, selection_range, count, register, nil)
+
+      -- Clear visual selection
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
 
       -- Move the cursor back to the start of the selection.
       -- This seems to be what nvim does after a visual operation?
