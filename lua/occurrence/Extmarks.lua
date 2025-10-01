@@ -1,3 +1,4 @@
+local Disposable = require("occurrence.Disposable")
 local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 
@@ -12,7 +13,7 @@ local NS = vim.api.nvim_create_namespace("Occurrence")
 local OCCURRENCE_HL_GROUP = "Underlined" -- "Occurrence"
 
 -- A map of `Range` objects to extmark ids.
----@class occurrence.Extmarks
+---@class occurrence.Extmarks: occurrence.Disposable
 ---@field buffer integer The buffer the extmarks are in.
 local Extmarks = {}
 
@@ -20,26 +21,24 @@ local Extmarks = {}
 ---@return occurrence.Extmarks
 function extmarks.new(buffer)
   buffer = resolve_buffer(buffer, true)
-  return setmetatable({}, {
+  local disposable = Disposable.new()
+  local self = setmetatable({}, {
     __index = function(tbl, key)
-      if key == "buffer" then
+      if rawget(tbl, key) ~= nil then
+        return rawget(tbl, key)
+      elseif key == "buffer" then
         return buffer
-      end
-      if Extmarks[key] then
+      elseif Extmarks[key] then
         return Extmarks[key]
+      elseif disposable[key] ~= nil then
+        return disposable[key]
       end
-      return rawget(tbl, key)
-    end,
-    __newindex = function(tbl, key, value)
-      if key == "buffer" then
-        error("Cannot modify read-only property 'buffer'")
-      end
-      if Extmarks[key] then
-        error("Cannot modify read-only method '" .. key .. "'")
-      end
-      rawset(tbl, key, value)
     end,
   })
+  disposable:add(function()
+    self:clear()
+  end)
+  return self
 end
 
 -- Check if there is an extmark for the given id or `Range`.
@@ -60,17 +59,15 @@ end
 ---@param range? occurrence.Range
 ---@return boolean
 function Extmarks:has_any(range)
-  if range ~= nil then
-    local iter = self:iter({ range = range })
-    return iter() ~= nil
-  end
-  return next(self) ~= nil
+  local iter = self:iter({ range = range })
+  return iter() ~= nil
 end
 
 -- Add an extmark and highlight for the given `Range`.
 ---@param range occurrence.Range
 ---@return boolean added Whether an extmark was added.
 function Extmarks:add(range)
+  assert(not self:is_disposed(), "Cannot use a disposed Extmarks")
   local key = range:serialize()
 
   if key and self[key] == nil then
@@ -117,6 +114,7 @@ end
 ---@param id_or_range number | occurrence.Range
 ---@return boolean deleted Whether an extmark was removed.
 function Extmarks:del(id_or_range)
+  assert(not self:is_disposed(), "Cannot use a disposed Extmarks")
   local key, id
   if type(id_or_range) == "number" then
     key = self[id_or_range]
@@ -134,7 +132,8 @@ function Extmarks:del(id_or_range)
   return false
 end
 
-function Extmarks:reset()
+function Extmarks:clear()
+  assert(not self:is_disposed(), "Cannot use a disposed Extmarks")
   vim.api.nvim_buf_clear_namespace(self.buffer, NS, 0, -1)
   for k in pairs(self) do
     self[k] = nil

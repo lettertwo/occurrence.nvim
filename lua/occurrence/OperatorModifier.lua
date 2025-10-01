@@ -31,7 +31,8 @@ local function modify_operator(occurrence, occurrence_config)
   local operator_config = occurrence_config:get_operator_config(operator)
 
   if not operator_config then
-    log.warn("Operator not supported:", operator)
+    log.warn(string.format("Operator '%s' is not supported", operator))
+    occurrence:dispose()
     return
   end
 
@@ -42,23 +43,20 @@ local function modify_operator(occurrence, occurrence_config)
     occurrence:dispose()
   end
 
-  vim.keymap.set("o", "<Esc>", deactivate, {
+  occurrence.keymap:set("o", "<Esc>", deactivate, {
     buffer = occurrence.buffer,
     desc = "Clear occurrence",
   })
-  occurrence:add_keymap("o", "<Esc>")
 
-  vim.keymap.set("o", "<C-c>", deactivate, {
+  occurrence.keymap:set("o", "<C-c>", deactivate, {
     buffer = occurrence.buffer,
     desc = "Clear occurrence",
   })
-  occurrence:add_keymap("o", "<C-c>")
 
-  vim.keymap.set("o", "<C-[>", deactivate, {
+  occurrence.keymap:set("o", "<C-[>", deactivate, {
     buffer = occurrence.buffer,
     desc = "Clear occurrence",
   })
-  occurrence:add_keymap("o", "<C-[>")
 
   set_opfunc({
     operator = operator,
@@ -70,7 +68,7 @@ local function modify_operator(occurrence, occurrence_config)
     state.register = vim.v.register
 
     if not state.occurrence then
-      state.occurrence = Occurrence.new()
+      state.occurrence = Occurrence.get()
       assert(occurrence_config:get_action_config("mark_word")).callback(state.occurrence, occurrence_config)
     end
 
@@ -106,7 +104,7 @@ end
 ---@return function
 local function create_operator_modifier(config, occurrence_config)
   return function()
-    local occurrence = Occurrence.new()
+    local occurrence = Occurrence.get()
     local ok, result = pcall(config.callback, occurrence, occurrence_config)
     if not ok or result == false then
       log.debug("Operator modifier cancelled")

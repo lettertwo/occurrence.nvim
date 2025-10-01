@@ -80,7 +80,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
     log.debug("range:", range)
   end
 
-  local edits = vim.iter(vim.iter(occurrence:marks({ range = range })):fold({}, function(acc, _, edit)
+  local edits = vim.iter(vim.iter(occurrence.extmarks:iter({ range = range })):fold({}, function(acc, _, edit)
     table.insert(acc, edit)
     return acc
   end))
@@ -206,7 +206,7 @@ end
 ---@return function
 local function create_operator(operator_key, config)
   return function()
-    local occurrence = Occurrence.new()
+    local occurrence = Occurrence.get()
     local count, register = vim.v.count, vim.v.register
 
     -- If in visual mode, we should apply the operator directly to the selection
@@ -229,7 +229,7 @@ local function create_operator(operator_key, config)
       -- This seems to be what nvim does after a visual operation?
       Cursor.move(selection_range.start)
 
-      if not occurrence:has_marks() then
+      if not occurrence.extmarks:has_any() then
         log.debug("Occurrence has no marks after operation; deactivating")
         occurrence:dispose()
       end
@@ -254,7 +254,7 @@ local function create_operator(operator_key, config)
           state.type
         )
 
-        if not occurrence:has_marks() then
+        if not occurrence.extmarks:has_any() then
           log.debug("Occurrence has no marks after operation; deactivating")
           occurrence:dispose()
         end

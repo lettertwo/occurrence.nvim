@@ -15,7 +15,7 @@ local find_word = {
       log.warn("No word under cursor")
       return
     end
-    occurrence:add(word, { is_word = true })
+    occurrence:add_pattern(word, { is_word = true })
   end,
 }
 
@@ -51,7 +51,7 @@ local find_selection = {
       log.warn("Empty visual selection")
       return
     end
-    occurrence:add(text)
+    occurrence:add_pattern(text)
     -- Clear visual selection
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
   end,
@@ -89,7 +89,7 @@ local find_last_search = {
     -- Convert vim search pattern to occurrence pattern
     -- Remove leading/trailing delimiters and escape for literal search if needed
     local cleaned_pattern = pattern:gsub("^\\v", ""):gsub("^\\V", "")
-    occurrence:add(cleaned_pattern, { is_word = false })
+    occurrence:add_pattern(cleaned_pattern, { is_word = false })
   end,
 }
 
@@ -257,7 +257,7 @@ local unmark_all = {
   desc = "Unmark occurrences",
   type = "preset",
   callback = function(occurrence)
-    for range in occurrence:marks() do
+    for range in occurrence.extmarks:iter() do
       occurrence:unmark(range)
     end
   end,
@@ -286,7 +286,7 @@ local unmark_in_selection = {
   callback = function(occurrence)
     local selection_range = Range:of_selection()
     if selection_range then
-      for range in occurrence:marks({ range = selection_range }) do
+      for range in occurrence.extmarks:iter({ range = selection_range }) do
         occurrence:unmark(range)
       end
     end
@@ -332,7 +332,7 @@ local deactivate = {
   desc = "Clear occurrence",
   type = "preset",
   callback = function(occurrence)
-    if occurrence:has_marks() then
+    if occurrence.extmarks:has_any() then
       log.debug("Occurrence still has marks during deactivate")
     end
     occurrence:dispose()
@@ -346,7 +346,7 @@ local modify_operator = {
   type = "operator-modifier",
   callback = function(occurrence)
     mark_word.callback(occurrence)
-    if not occurrence:has_marks() then
+    if not occurrence.extmarks:has_any() then
       return false
     end
   end,

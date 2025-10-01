@@ -100,7 +100,7 @@ end
 ---@param opts any
 ---@return boolean
 local function is_config(opts)
-  return type(opts) == "table" and type(opts.get) == "function" and type(opts.validate) == "function"
+  return type(opts) == "table" and type(opts.validate) == "function"
 end
 
 local function callable(fn)
@@ -182,7 +182,7 @@ function Config:wrap_action(action)
   elseif action and callable(action) then
     local Occurrence = require("occurrence.Occurrence")
     return function()
-      return action(Occurrence.new(), self)
+      return action(Occurrence.get(), self)
     end
   end
 

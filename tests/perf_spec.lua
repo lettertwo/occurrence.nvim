@@ -1,7 +1,6 @@
 local assert = require("luassert")
 local util = require("tests.util")
 local Occurrence = require("occurrence.Occurrence")
-local BufferState = require("occurrence.BufferState")
 local Range = require("occurrence.Range")
 local Location = require("occurrence.Location")
 
@@ -54,7 +53,7 @@ describe("Performance Tests", function()
       bufnr = util.buffer(large_content)
       local start_time = vim.loop.hrtime()
 
-      local occurrence = Occurrence.new(bufnr, "content")
+      local occurrence = Occurrence.get(bufnr, "content")
       assert.is_true(occurrence:has_matches())
 
       local elapsed = (vim.loop.hrtime() - start_time) / 1e6 -- Convert to milliseconds
@@ -65,11 +64,11 @@ describe("Performance Tests", function()
       bufnr = util.buffer(large_content)
       local start_time = vim.loop.hrtime()
 
-      local occurrence = Occurrence.new(bufnr)
-      occurrence:add("content")
-      occurrence:add("pattern")
-      occurrence:add("line")
-      occurrence:add("text")
+      local occurrence = Occurrence.get(bufnr)
+      occurrence:add_pattern("content")
+      occurrence:add_pattern("pattern")
+      occurrence:add_pattern("line")
+      occurrence:add_pattern("text")
 
       assert.is_true(occurrence:has_matches())
 
@@ -79,7 +78,7 @@ describe("Performance Tests", function()
 
     it("iterates through matches efficiently", function()
       bufnr = util.buffer(large_content)
-      local occurrence = Occurrence.new(bufnr, "content")
+      local occurrence = Occurrence.get(bufnr, "content")
 
       local start_time = vim.loop.hrtime()
       local count = 0
@@ -96,7 +95,7 @@ describe("Performance Tests", function()
   describe("Extmark Performance", function()
     it("marks many occurrences efficiently", function()
       bufnr = util.buffer(huge_content)
-      local occurrence = Occurrence.new(bufnr, "foo")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       local start_time = vim.loop.hrtime()
       local marked = occurrence:mark()
@@ -108,7 +107,7 @@ describe("Performance Tests", function()
 
     it("unmarks many occurrences efficiently", function()
       bufnr = util.buffer(huge_content)
-      local occurrence = Occurrence.new(bufnr, "foo")
+      local occurrence = Occurrence.get(bufnr, "foo")
       occurrence:mark() -- Mark first
 
       local start_time = vim.loop.hrtime()
@@ -121,12 +120,12 @@ describe("Performance Tests", function()
 
     it("iterates through marks efficiently", function()
       bufnr = util.buffer(huge_content)
-      local occurrence = Occurrence.new(bufnr, "foo")
+      local occurrence = Occurrence.get(bufnr, "foo")
       occurrence:mark()
 
       local start_time = vim.loop.hrtime()
       local count = 0
-      for _ in occurrence:marks() do
+      for _ in occurrence.extmarks:iter() do
         count = count + 1
       end
       local elapsed = (vim.loop.hrtime() - start_time) / 1e6
@@ -139,7 +138,7 @@ describe("Performance Tests", function()
   describe("Search Performance", function()
     it("finds cursor matches efficiently in large buffers", function()
       bufnr = util.buffer(huge_content)
-      local occurrence = Occurrence.new(bufnr, "foo")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       -- Position cursor in the middle
       vim.api.nvim_win_set_cursor(0, { 5000, 10 })
@@ -154,7 +153,7 @@ describe("Performance Tests", function()
 
     it("handles wrapped search efficiently", function()
       bufnr = util.buffer(huge_content)
-      local occurrence = Occurrence.new(bufnr, "foo")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       -- Position cursor near the end
       vim.api.nvim_win_set_cursor(0, { 9500, 0 })
@@ -171,7 +170,7 @@ describe("Performance Tests", function()
   describe("Range Operations Performance", function()
     it("processes large ranges efficiently", function()
       bufnr = util.buffer(huge_content)
-      local occurrence = Occurrence.new(bufnr, "foo")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       local large_range = Range.new(Location.new(0, 0), Location.new(5000, 0))
 
@@ -185,7 +184,7 @@ describe("Performance Tests", function()
 
     it("marks within ranges efficiently", function()
       bufnr = util.buffer(huge_content)
-      local occurrence = Occurrence.new(bufnr, "foo")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       local range = Range.new(Location.new(1000, 0), Location.new(2000, 0))
 
@@ -205,7 +204,7 @@ describe("Performance Tests", function()
 
       -- Reduce iterations to make test more reasonable
       for i = 1, 200 do
-        local occurrence = Occurrence.new(bufnr, "content")
+        local occurrence = Occurrence.get(bufnr, "content")
         if i % 20 == 0 then
           occurrence:mark()
         end
@@ -226,7 +225,7 @@ describe("Performance Tests", function()
       -- Create multiple buffers with occurrences
       for i = 1, 10 do
         local buf = util.buffer(large_content)
-        local occ = Occurrence.new(buf, "pattern_" .. (i % 5))
+        local occ = Occurrence.get(buf, "pattern_" .. (i % 5))
         table.insert(buffers, buf)
         table.insert(occurrences, occ)
       end
@@ -269,11 +268,11 @@ describe("Performance Tests", function()
 
       local occurrence, count
       local memory_delta = measure_memory(function()
-        occurrence = Occurrence.new(bufnr)
+        occurrence = Occurrence.get(bufnr)
 
         -- Add many patterns
         for i = 1, 10 do
-          occurrence:add("pattern_" .. i)
+          occurrence:add_pattern("pattern_" .. i)
         end
 
         -- Mark occurrences for all patterns
@@ -299,7 +298,7 @@ describe("Performance Tests", function()
       local memory_delta = measure_memory(function()
         -- Create and dispose many occurrences (similar to old "Memory Management Performance" test)
         for i = 1, 100 do
-          local occurrence = Occurrence.new(bufnr, "pattern_" .. (i % 10))
+          local occurrence = Occurrence.get(bufnr, "pattern_" .. (i % 10))
           occurrence:dispose()
         end
       end)
@@ -314,7 +313,7 @@ describe("Performance Tests", function()
       local memory_delta = measure_memory(function()
         -- Create and dispose many occurrences with marking
         for i = 1, 10 do
-          local occurrence = Occurrence.new(bufnr, "content")
+          local occurrence = Occurrence.get(bufnr, "content")
           occurrence:mark()
           occurrence:dispose()
         end
@@ -323,7 +322,7 @@ describe("Performance Tests", function()
       local memory_delta2 = measure_memory(function()
         -- Create and dispose many occurrences with marking
         for i = 1, 10 do
-          local occurrence = Occurrence.new(bufnr, "content")
+          local occurrence = Occurrence.get(bufnr, "content")
           occurrence:mark()
           occurrence:dispose()
         end
@@ -337,7 +336,7 @@ describe("Performance Tests", function()
       )
     end)
 
-    it("buffer state cleanup doesn't leak memory", function()
+    it("Occurrence cleanup doesn't leak memory", function()
       local memory_delta = measure_memory(function()
         local buffers = {}
 
@@ -345,7 +344,7 @@ describe("Performance Tests", function()
         for i = 1, 50 do
           local buf = util.buffer({ "test content line " .. i, "another line with pattern" })
           table.insert(buffers, buf)
-          local occurrence = Occurrence.new(buf, "pattern")
+          local occurrence = Occurrence.get(buf, "pattern")
           occurrence:mark()
         end
 
@@ -365,7 +364,7 @@ describe("Performance Tests", function()
       bufnr = util.buffer(huge_content)
 
       local memory_delta = measure_memory(function()
-        local occurrence = Occurrence.new(bufnr, "foo")
+        local occurrence = Occurrence.get(bufnr, "foo")
 
         -- Mark all occurrences (should be thousands)
         occurrence:mark()
@@ -380,7 +379,7 @@ describe("Performance Tests", function()
       assert.is_true(memory_delta < 512, "Extmark operations used excessive memory: " .. memory_delta .. "KB")
     end)
 
-    it("buffer state cache has reasonable memory footprint", function()
+    it("occurrence cache has reasonable memory footprint", function()
       local memory_delta = measure_memory(function()
         local buffers = {}
 
@@ -388,13 +387,13 @@ describe("Performance Tests", function()
         for i = 1, 100 do
           local buf = util.buffer({ "test line " .. i })
           table.insert(buffers, buf)
-          local state = BufferState.get(buf)
+          local state = Occurrence.get(buf)
           state:add_pattern("test_" .. i)
         end
 
         -- Clean up explicitly
         for _, buf in ipairs(buffers) do
-          BufferState.del(buf)
+          Occurrence.del(buf)
           if vim.api.nvim_buf_is_valid(buf) then
             vim.api.nvim_buf_delete(buf, { force = true })
           end
@@ -402,13 +401,13 @@ describe("Performance Tests", function()
       end)
 
       -- 100 buffer states should not use excessive memory
-      assert.is_true(memory_delta < 64, "Buffer state cache used too much memory: " .. memory_delta .. "KB")
+      assert.is_true(memory_delta < 64, "Occurrence cache used too much memory: " .. memory_delta .. "KB")
     end)
 
     it("large buffer processing has bounded memory usage", function()
       local memory_delta = measure_memory(function()
         local temp_buf = util.buffer(huge_content) -- 10k lines
-        local occurrence = Occurrence.new(temp_buf, "foo")
+        local occurrence = Occurrence.get(temp_buf, "foo")
 
         -- Process all matches
         local count = 0
@@ -441,7 +440,7 @@ describe("Performance Tests", function()
 
         local memory_delta = measure_memory(function()
           local temp_buf = util.buffer(test_content)
-          local occurrence = Occurrence.new(temp_buf, "pattern")
+          local occurrence = Occurrence.get(temp_buf, "pattern")
           occurrence:has_matches()
           occurrence:dispose()
           if vim.api.nvim_buf_is_valid(temp_buf) then

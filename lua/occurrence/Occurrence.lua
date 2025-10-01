@@ -1,7 +1,15 @@
-local BufferState = require("occurrence.BufferState")
 local Cursor = require("occurrence.Cursor")
+local Disposable = require("occurrence.Disposable")
+local Extmarks = require("occurrence.Extmarks")
+local Keymap = require("occurrence.Keymap")
 local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
+
+local resolve_buffer = require("occurrence.resolve_buffer")
+
+-- A map of Buffer ids to their Occurrence instances.
+---@type table<integer, occurrence.Occurrence>
+local OCCURRENCE_CACHE = {}
 
 ---@module 'occurrence.Occurrence'
 local occurrence = {}
@@ -121,35 +129,12 @@ local function closest(state, flags, cursor, bounds)
 end
 
 -- A stateful representation of an occurrence of a pattern in a buffer.
----@class occurrence.Occurrence: occurrence.BufferState
+---@class occurrence.Occurrence: occurrence.Disposable
+---@field buffer integer The buffer the occurrence is in.
+---@field extmarks occurrence.Extmarks The extmarks used to highlight marked occurrences.
+---@field keymap occurrence.Keymap The buffer-local keymap for this occurrence.
+---@field patterns string[] The patterns used to search for occurrences.
 local Occurrence = {}
-
--- Create a new Occurrence for the given buffer and text.
--- If no `buffer` is provided, the current buffer will be used.
--- If a `text` pattern is provided, it will be added to the active occurrence patterns.
--- Optional `opts` are the same as for `Occurrence:add`.
----@param buffer? integer
----@param text? string
----@param opts? { is_word: boolean }
----@return occurrence.Occurrence
-function occurrence.new(buffer, text, opts)
-  local state = BufferState.get(buffer)
-  local self = setmetatable({}, {
-    __index = function(tbl, key)
-      if Occurrence[key] ~= nil then
-        return Occurrence[key]
-      end
-      if state[key] ~= nil then
-        return state[key]
-      end
-      return rawget(tbl, key)
-    end,
-  })
-  if text ~= nil then
-    Occurrence.add(self, text, opts)
-  end
-  return self
-end
 
 -- Move the cursor to the nearest occurrence.
 --
@@ -252,6 +237,7 @@ end
 ---@param range? occurrence.Range
 ---@return boolean marked Whether occurrences were marked.
 function Occurrence:mark(range)
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
   local extmarks = self.extmarks
   local success = false
   for match in self:matches(range) do
@@ -267,6 +253,7 @@ end
 ---@param range? occurrence.Range
 ---@return boolean unmarked Whether occurrences were unmarked.
 function Occurrence:unmark(range)
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
   local success = false
   for match in self:matches(range) do
     if self.extmarks:del(match) then
@@ -377,57 +364,98 @@ function Occurrence:matches(range, patterns)
   return next_match
 end
 
--- Get an iterator of the marked occurrence ranges.
--- If the `range` option is provided, only yields the marked occurrences contained within the given `Range`.
--- If the `reverse` option is `true` (default is `false`), yields the marked occurrences in reverse order.
---
--- The iterator yields two `Range` values for each marked occurrence:
--- - The orginal range of the marked occurrence.
---   This can be used to unmark the occurrence, e.g., `occurrence:unmark(original_range)`.
--- - The current 'live' range of the marked occurrence.
---   This can be used to make edits to the buffer, e.g., with `vim.api.nvim_buf_set_text(...)`.
----@param opts? { range?: occurrence.Range, reverse?: boolean }
----@return fun(): occurrence.Range?, occurrence.Range? next_mark
-function Occurrence:marks(opts)
-  ---@diagnostic disable-next-line: param-type-mismatch
-  return self.extmarks:iter(opts)
-end
-
--- Whether or not there is at least one marked occurrence in the range.
--- If no `range` is provided, checks if there are any marked occurrences in the buffer.
----@param range? occurrence.Range
-function Occurrence:has_marks(range)
-  return self.extmarks:has_any(range)
-end
-
--- Set the text to search for.
--- If the `is_word` option is set, the text will only match when surrounded with word boundaries.
----@param text? string
----@param opts? { is_word: boolean }
-function Occurrence:set(text, opts)
-  -- (re-)initialize the internal state store for this Occurrence.
-  for i = 1, #self.patterns do
-    self.patterns[i] = nil
-  end
-  self.extmarks:reset()
-  if text ~= nil then
-    self:add(text, opts)
-  end
-end
-
---- Clear all patterns and extmarks.
-function Occurrence:reset()
-  self:set()
-end
-
 -- Add an additional text pattern to search for.
 -- If the `is_word` option is set, the text will only match when surrounded with word boundaries.
 ---@param text string
 ---@param opts? { is_word: boolean }
-function Occurrence:add(text, opts)
+function Occurrence:add_pattern(text, opts)
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
   local escaped = text:gsub("\n", "\\n")
   local pattern = opts and opts.is_word and string.format([[\V\C\<%s\>]], escaped) or string.format([[\V\C%s]], escaped)
   table.insert(self.patterns, pattern)
 end
+
+function Occurrence:clear()
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
+  self.extmarks:clear()
+  self.patterns = {}
+end
+
+---@param buffer integer
+---@return occurrence.Occurrence
+local function create_occurrence(buffer)
+  local self = {}
+  local state = {
+    extmarks = Extmarks.new(buffer),
+    keymap = Keymap.new(buffer),
+    patterns = {},
+  }
+  local disposable = Disposable.new()
+  disposable:add(state.extmarks)
+  disposable:add(state.keymap)
+  setmetatable(self, {
+    __index = function(tbl, key)
+      if rawget(tbl, key) ~= nil then
+        return rawget(tbl, key)
+      elseif key == "buffer" then
+        return buffer
+      elseif state[key] ~= nil then
+        return state[key]
+      elseif Occurrence[key] ~= nil then
+        return Occurrence[key]
+      elseif disposable[key] ~= nil then
+        return disposable[key]
+      end
+    end,
+  })
+  return self
+end
+
+-- Get or create an Occurrence for the given buffer and text.
+-- If no `buffer` is provided, the current buffer will be used.
+-- If a `text` pattern is provided, it will be added to the active occurrence patterns.
+-- Optional `opts` are the same as for `Occurrence:add`.
+---@param buffer? integer
+---@param text? string
+---@param opts? { is_word: boolean }
+---@return occurrence.Occurrence
+function occurrence.get(buffer, text, opts)
+  buffer = resolve_buffer(buffer, true)
+  local self = OCCURRENCE_CACHE[buffer]
+  if not self then
+    self = create_occurrence(buffer)
+    self:add(function()
+      OCCURRENCE_CACHE[buffer] = nil
+    end)
+    OCCURRENCE_CACHE[buffer] = self
+  end
+  if text then
+    self:add_pattern(text, opts)
+  end
+  return self
+end
+
+-- Delete the Occurrence for the given buffer, disposing of its resources.
+-- If no `buffer` is provided, the current buffer will be used.
+---@param buffer? integer
+---@return boolean deleted Whether an Occurrence was deleted.
+function occurrence.del(buffer)
+  buffer = resolve_buffer(buffer, true)
+  local self = OCCURRENCE_CACHE[buffer]
+  if self then
+    self:dispose()
+    OCCURRENCE_CACHE[buffer] = nil
+    return true
+  end
+  return false
+end
+
+-- Autocmd to cleanup occurrences when a buffer is deleted.
+vim.api.nvim_create_autocmd({ "BufDelete" }, {
+  group = vim.api.nvim_create_augroup("OccurrenceCleanup", { clear = true }),
+  callback = function(args)
+    occurrence.del(args.buf)
+  end,
+})
 
 return occurrence

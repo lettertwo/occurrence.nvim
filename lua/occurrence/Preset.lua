@@ -54,15 +54,11 @@ local function activate_preset(occurrence, config)
   local buffer = occurrence.buffer
 
   if config.on_preset_activate then
-    -- User provided custom callback - create map API
-    local map = function(mode, lhs, rhs, opts)
+    -- Call user callback with keymap setter
+    config:on_preset_activate(function(mode, lhs, rhs, opts)
       opts = vim.tbl_extend("force", opts or {}, { buffer = buffer })
-      vim.keymap.set(mode, lhs, rhs, opts)
-      occurrence:add_keymap(mode, lhs)
-    end
-
-    -- Call user callback
-    config:on_preset_activate(map)
+      occurrence.keymap:set(mode, lhs, rhs, opts)
+    end)
   elseif config.default_keymaps then
     -- Use default keymaps
 
@@ -72,11 +68,10 @@ local function activate_preset(occurrence, config)
       local capcase = to_capcase(action_name)
       local action_config = builtin_actions[action_name]
       local desc = action_config and action_config.desc or ("Occurrence: " .. action_name)
-      vim.keymap.set("n", key, "<Plug>Occurrence" .. capcase, {
+      occurrence.keymap:set("n", key, "<Plug>Occurrence" .. capcase, {
         buffer = buffer,
         desc = desc,
       })
-      occurrence:add_keymap("n", key)
     end
 
     -- Set up buffer-local keymaps for visual mode preset actions
@@ -84,11 +79,10 @@ local function activate_preset(occurrence, config)
       local capcase = to_capcase(action_name)
       local action_config = builtin_actions[action_name]
       local desc = action_config and action_config.desc or ("Occurrence: " .. action_name)
-      vim.keymap.set("v", key, "<Plug>Occurrence" .. capcase, {
+      occurrence.keymap:set("v", key, "<Plug>Occurrence" .. capcase, {
         buffer = buffer,
         desc = desc,
       })
-      occurrence:add_keymap("v", key)
     end
 
     -- Set up buffer-local keymaps for operators
@@ -103,12 +97,11 @@ local function activate_preset(occurrence, config)
         end
 
         -- Normal mode operator
-        vim.keymap.set("n", operator_key, operator, {
+        occurrence.keymap:set("n", operator_key, operator, {
           buffer = buffer,
           desc = desc,
           expr = true,
         })
-        occurrence:add_keymap("n", operator_key)
 
         -- Visual mode operator
         local visual_desc = "'" .. operator_key .. "' on marked occurrences in selection"
@@ -116,14 +109,13 @@ local function activate_preset(occurrence, config)
           visual_desc = operator_config.desc .. " in selection"
         end
 
-        vim.keymap.set("v", operator_key, function()
+        occurrence.keymap:set("v", operator_key, function()
           log.debug("Keybind invoked:", operator_key, "count:", vim.v.count, "register:", vim.v.register)
           operator()
         end, {
           buffer = buffer,
           desc = visual_desc,
         })
-        occurrence:add_keymap("v", operator_key)
       end
     end
   end
@@ -134,7 +126,7 @@ end
 ---@return function
 local function create_preset(config, occurrence_config)
   return function()
-    local occurrence = Occurrence.new()
+    local occurrence = Occurrence.get()
 
     local ok, result = pcall(config.callback, occurrence, occurrence_config)
     if not ok or result == false then
@@ -149,7 +141,7 @@ local function create_preset(config, occurrence_config)
       return
     end
 
-    if not occurrence:has_active_keymaps() then
+    if not occurrence.keymap:is_active() then
       log.debug("Activating preset keymaps for buffer", occurrence.buffer)
       activate_preset(occurrence, occurrence_config)
     end

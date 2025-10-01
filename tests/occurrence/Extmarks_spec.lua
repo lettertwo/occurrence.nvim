@@ -25,7 +25,7 @@ describe("Extmarks", function()
     end
   end)
 
-  describe("extmarks.new", function()
+  describe(".new", function()
     it("creates new Extmarks object", function()
       local extmarks = Extmarks.new()
 
@@ -53,7 +53,7 @@ describe("Extmarks", function()
     end)
   end)
 
-  describe("Extmarks:has_any", function()
+  describe(":has_any", function()
     ---@type occurrence.Extmarks
     local extmarks
 
@@ -108,7 +108,7 @@ describe("Extmarks", function()
     end)
   end)
 
-  describe("Extmarks:has", function()
+  describe(":has", function()
     ---@type occurrence.Extmarks
     local extmarks
 
@@ -145,7 +145,7 @@ describe("Extmarks", function()
     end)
   end)
 
-  describe("Extmarks:add", function()
+  describe(":add", function()
     ---@type occurrence.Extmarks
     local extmarks
 
@@ -232,7 +232,7 @@ describe("Extmarks", function()
     end)
   end)
 
-  describe("Extmarks:get", function()
+  describe(":get", function()
     ---@type occurrence.Extmarks
     local extmarks
 
@@ -293,7 +293,7 @@ describe("Extmarks", function()
     end)
   end)
 
-  describe("Extmarks:del", function()
+  describe(":del", function()
     ---@type occurrence.Extmarks
     local extmarks
 
@@ -364,7 +364,7 @@ describe("Extmarks", function()
     end)
   end)
 
-  describe("Extmarks:iter", function()
+  describe(":iter", function()
     ---@type occurrence.Extmarks
     local extmarks
 
@@ -446,6 +446,69 @@ describe("Extmarks", function()
       end
 
       assert.same({ range2, range1 }, ranges)
+    end)
+  end)
+
+  describe(":clear", function()
+    ---@type occurrence.Extmarks
+    local extmarks
+
+    before_each(function()
+      extmarks = Extmarks.new()
+    end)
+
+    it("clears all extmarks from buffer and internal tracking", function()
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
+      local range2 = Range.new(Location.new(1, 5), Location.new(1, 10))
+
+      extmarks:add(range1)
+      extmarks:add(range2)
+
+      assert.is_true(extmarks:has_any())
+
+      -- Verify extmarks exist in buffer
+      local marks = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
+      assert.equals(2, #marks)
+
+      extmarks:clear()
+
+      assert.is_false(extmarks:has_any())
+
+      -- Verify no extmarks exist in buffer
+      marks = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
+      assert.equals(0, #marks)
+    end)
+  end)
+
+  describe(":dispose", function()
+    ---@type occurrence.Extmarks
+    local extmarks
+
+    before_each(function()
+      extmarks = Extmarks.new()
+    end)
+
+    it("clears extmarks and makes instance unusable", function()
+      local range = Range.new(Location.new(0, 0), Location.new(0, 5))
+      extmarks:add(range)
+
+      assert.is_true(extmarks:has_any())
+
+      extmarks:dispose()
+
+      assert.is_false(extmarks:has_any())
+
+      assert.has_error(function()
+        extmarks:add(range)
+      end, "Cannot use a disposed Extmarks")
+
+      assert.has_error(function()
+        extmarks:del(range)
+      end, "Cannot use a disposed Extmarks")
+
+      assert.has_error(function()
+        extmarks:clear()
+      end, "Cannot use a disposed Extmarks")
     end)
   end)
 end)

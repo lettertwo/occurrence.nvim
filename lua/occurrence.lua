@@ -8,9 +8,9 @@ local occurrence = {}
 function occurrence.reset()
   -- We want to allow setup to be called multiple times to reconfigure the plugin.
   -- That means we need to clean up any existing state first.
-  local BufferState = require("occurrence.BufferState")
+  local Occurrence = require("occurrence.Occurrence")
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    BufferState.del(buf)
+    Occurrence.del(buf)
   end
 end
 

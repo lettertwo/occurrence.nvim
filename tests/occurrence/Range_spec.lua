@@ -378,7 +378,7 @@ describe("Range", function()
         vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-v>", true, false, true), "nx", false)
 
         -- Should error for blockwise mode
-        assert.is_true(vim.api.nvim_get_mode().mode == "\x16")
+        assert.is_true(vim.api.nvim_get_mode().mode == "") -- visual block mode
         assert.error(function()
           Range.of_selection()
         end)

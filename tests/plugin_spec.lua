@@ -63,9 +63,9 @@ describe("occurrence module", function()
       assert.is_function(require("occurrence").reset)
     end)
 
-    it("resets buffer state", function()
-      local BufferState = require("occurrence.BufferState")
-      local reset_spy = spy.on(BufferState, "del")
+    it("resets occurrence state", function()
+      local Occurrence = require("occurrence.Occurrence")
+      local reset_spy = spy.on(Occurrence, "del")
       assert.spy(reset_spy).was_not_called()
 
       require("occurrence").reset()

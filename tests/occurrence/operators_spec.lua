@@ -23,7 +23,7 @@ describe("operators", function()
   describe("delete operator", function()
     it("deletes marked occurrences", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark all occurrences of 'foo'
       for range in occurrence:matches() do
@@ -45,7 +45,7 @@ describe("operators", function()
 
     it("saves deleted text to register", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark first occurrence only
       for range in occurrence:matches() do
@@ -64,7 +64,7 @@ describe("operators", function()
 
     it("saves deleted text to specified register", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "bar", {})
+      local occurrence = Occurrence.get(bufnr, "bar", {})
 
       -- Mark first occurrence
       for range in occurrence:matches() do
@@ -85,7 +85,7 @@ describe("operators", function()
   describe("yank operator", function()
     it("yanks marked occurrences without modifying text", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark all occurrences
       for range in occurrence:matches() do
@@ -107,7 +107,7 @@ describe("operators", function()
 
     it("saves yanked text to register", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "bar", {})
+      local occurrence = Occurrence.get(bufnr, "bar", {})
 
       -- Mark first occurrence
       for range in occurrence:matches() do
@@ -126,7 +126,7 @@ describe("operators", function()
 
     it("concatenates multiple yanked texts", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark all occurrences
       for range in occurrence:matches() do
@@ -146,7 +146,7 @@ describe("operators", function()
   describe("change operator", function()
     it("replaces marked occurrences with user input", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark all occurrences
       for range in occurrence:matches() do
@@ -177,7 +177,7 @@ describe("operators", function()
 
     it("saves original text to register", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "bar", {})
+      local occurrence = Occurrence.get(bufnr, "bar", {})
 
       -- Mark first occurrence
       for range in occurrence:matches() do
@@ -202,7 +202,7 @@ describe("operators", function()
 
     it("uses cached replacement for subsequent edits", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark all occurrences
       for range in occurrence:matches() do
@@ -232,7 +232,7 @@ describe("operators", function()
     it("indent_left and indent_right are command-based operators", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
       -- Test that these don't error when called
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark first occurrence
       for range in occurrence:matches() do
@@ -257,8 +257,8 @@ describe("operators", function()
   describe("case operators", function()
     it("uppercases marked occurrences", function()
       bufnr = util.buffer("foo bar foo\nbaz Foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
-      occurrence:add("Foo")
+      local occurrence = Occurrence.get(bufnr, "foo", {})
+      occurrence:add_pattern("Foo")
 
       -- Mark all occurrences
       for range in occurrence:matches() do
@@ -274,7 +274,7 @@ describe("operators", function()
 
     it("lowercases marked occurrences", function()
       bufnr = util.buffer("FOO BAR FOO\nBAZ FOO BAR")
-      local occurrence = Occurrence.new(bufnr, "FOO", {})
+      local occurrence = Occurrence.get(bufnr, "FOO", {})
       -- Mark all occurrences
       for range in occurrence:matches() do
         occurrence:mark(range)
@@ -289,7 +289,7 @@ describe("operators", function()
 
     it("toggles case of marked occurrences", function()
       bufnr = util.buffer("foo Bar FOO\nbaz Foo BAR")
-      local occurrence = Occurrence.new(bufnr, "foo", { ignore_case = true })
+      local occurrence = Occurrence.get(bufnr, "foo", { ignore_case = true })
 
       -- Mark all occurrences
       for range in occurrence:matches() do
@@ -401,7 +401,7 @@ describe("operators", function()
 
     it("uses visual_feedkeys method by default", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
       for range in occurrence:matches() do
         occurrence:mark(range)
         break
@@ -431,7 +431,7 @@ describe("operators", function()
   describe("count parameter", function()
     it("limits operation to specified count", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark all occurrences (there are 3)
       for range in occurrence:matches() do
@@ -457,7 +457,7 @@ describe("operators", function()
       local test_bufnr = util.buffer("foo bar\nfoo baz\nfoo qux")
       vim.api.nvim_set_current_buf(test_bufnr)
 
-      local occurrence = Occurrence.new(test_bufnr, "foo", {})
+      local occurrence = Occurrence.get(test_bufnr, "foo", {})
 
       -- Mark all occurrences
       for range in occurrence:matches() do
@@ -485,27 +485,9 @@ describe("operators", function()
   end)
 
   describe("error handling", function()
-    it("logs error when no occurrences are marked", function()
-      bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      -- mock vim.notify to capture warnings
-      local original_notify = vim.notify
-      vim.notify = spy.new(function() end)
-
-      local occurrence = Occurrence.new(bufnr, "foo", {})
-      -- Don't mark any occurrences
-
-      local operator_config = assert(Config.new():get_operator_config("delete"))
-      Operator.apply(occurrence, operator_config, "d", nil, nil, '"')
-
-      assert.spy(vim.notify).was_called_with(match.has_match("No occurrences"), vim.log.levels.ERROR, match._)
-
-      -- restore original notify
-      vim.notify = original_notify
-    end)
-
     it("handles empty replacement gracefully", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", {})
 
       -- Mark first occurrence
       for range in occurrence:matches() do
@@ -530,7 +512,7 @@ describe("operators", function()
   describe("cursor restoration", function()
     it("restores cursor position after operation", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.new(bufnr, "bar", {})
+      local occurrence = Occurrence.get(bufnr, "bar", {})
 
       -- Set initial cursor position
       vim.api.nvim_win_set_cursor(0, { 2, 5 }) -- Line 2, column 5
