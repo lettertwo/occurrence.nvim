@@ -1,9 +1,7 @@
 local Occurrence = require("occurrence.Occurrence")
 local Operator = require("occurrence.Operator")
-local Range = require("occurrence.Range")
 
 local log = require("occurrence.log")
-local set_opfunc = require("occurrence.set_opfunc")
 
 ---@module "occurrence.OperatorModifier"
 
@@ -36,54 +34,9 @@ local function modify_operator(occurrence, occurrence_config)
     return
   end
 
-  log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
-
-  -- Set up buffer-local operator-pending escape keymaps
-  local deactivate = function()
-    occurrence:dispose()
-  end
-
-  occurrence.keymap:set("o", "<Esc>", deactivate, {
-    buffer = occurrence.buffer,
-    desc = "Clear occurrence",
-  })
-
-  occurrence.keymap:set("o", "<C-c>", deactivate, {
-    buffer = occurrence.buffer,
-    desc = "Clear occurrence",
-  })
-
-  occurrence.keymap:set("o", "<C-[>", deactivate, {
-    buffer = occurrence.buffer,
-    desc = "Clear occurrence",
-  })
-
-  set_opfunc({
-    operator = operator,
-    count = count,
-    register = register,
-    occurrence = occurrence,
-  }, function(state)
-    state.count = vim.v.count > 0 and vim.v.count or state.count
-    state.register = vim.v.register
-
-    if not state.occurrence then
-      state.occurrence = Occurrence.get()
-      assert(occurrence_config:get_action_config("mark_word")).callback(state.occurrence, occurrence_config)
-    end
-
-    Operator.apply(
-      state.occurrence,
-      operator_config,
-      state.operator,
-      Range.of_motion(state.type),
-      state.count,
-      state.register,
-      state.type
-    )
-
-    state.occurrence:dispose()
-  end)
+  -- send <C-\><C\n> immediately to cancel pending op.
+  -- see `:h CTRL-\_CTRL-N` and `:h g@`
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
 
   -- Schedule sending `g@` to trigger custom opfunc on the next frame.
   -- This is async to allow the first mode change event to cycle.
@@ -91,12 +44,39 @@ local function modify_operator(occurrence, occurrence_config)
   -- other plugins (e.g. which-key) to react to the modified operator mode change.
   -- see `:h CTRL-\_CTRL-N` and `:h g@`
   vim.schedule(function()
+    if vim.v.operator ~= operator then
+      log.debug("Operator changed from", operator, "to", vim.v.operator, "cancelling operator modifier")
+      occurrence:dispose()
+      return
+    end
+
+    log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
+
+    -- Set up buffer-local operator-pending escape keymaps
+    local deactivate = function()
+      occurrence:dispose()
+    end
+
+    occurrence.keymap:set("o", "<Esc>", deactivate, {
+      buffer = occurrence.buffer,
+      desc = "Clear occurrence",
+    })
+
+    occurrence.keymap:set("o", "<C-c>", deactivate, {
+      buffer = occurrence.buffer,
+      desc = "Clear occurrence",
+    })
+
+    occurrence.keymap:set("o", "<C-[>", deactivate, {
+      buffer = occurrence.buffer,
+      desc = "Clear occurrence",
+    })
+
+    Operator.create_opfunc("o", occurrence, operator_config, operator, count, register)
+
     -- re-enter operator-pending mode
     vim.api.nvim_feedkeys("g@", "n", true)
   end)
-  -- send <C-\><C\n> immediately to cancel pending op.
-  -- see `:h CTRL-\_CTRL-N` and `:h g@`
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
 end
 
 ---@param config occurrence.OperatorModifierConfig

@@ -109,12 +109,10 @@ local function activate_preset(occurrence, config)
           visual_desc = operator_config.desc .. " in selection"
         end
 
-        occurrence.keymap:set("v", operator_key, function()
-          log.debug("Keybind invoked:", operator_key, "count:", vim.v.count, "register:", vim.v.register)
-          operator()
-        end, {
+        occurrence.keymap:set("v", operator_key, operator, {
           buffer = buffer,
           desc = visual_desc,
+          expr = true,
         })
       end
     end

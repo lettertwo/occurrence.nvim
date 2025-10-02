@@ -4,7 +4,6 @@ local Range = require("occurrence.Range")
 local Register = require("occurrence.Register")
 
 local log = require("occurrence.log")
-local set_opfunc = require("occurrence.set_opfunc")
 
 ---@module "occurrence.Operator"
 
@@ -65,14 +64,59 @@ local function is_operator(candidate)
     and (candidate.method == "visual_feedkeys" or candidate.method == "command" or candidate.method == "direct_api")
 end
 
+-- A map of Window ids to their cached cursor positions.
+---@type table<integer, occurrence.Cursor>
+local CURSOR_CACHE = {}
+
+vim.api.nvim_create_autocmd("WinClosed", {
+  group = vim.api.nvim_create_augroup("OccurrenceCursorCache", { clear = true }),
+  callback = function(args)
+    local win_id = tonumber(args.match)
+    if win_id and CURSOR_CACHE[win_id] then
+      CURSOR_CACHE[win_id] = nil
+      log.debug("Cleared cached cursor position for closed window", win_id)
+    end
+  end,
+})
+
+---@type integer?
+local watching_dot_repeat
+
+local function watch_dot_repeat()
+  if watching_dot_repeat == nil then
+    watching_dot_repeat = vim.on_key(function(char)
+      if char == "." then
+        local win = vim.api.nvim_get_current_win()
+        CURSOR_CACHE[win] = Cursor.save()
+        log.debug("Updating cached cursor position for dot-repeat to", CURSOR_CACHE[win].location)
+      end
+    end)
+  end
+  log.debug("Watching for dot-repeat to cache cursor position")
+end
+
+-- Based on https://github.com/neovim/neovim/issues/14157#issuecomment-1320787927
+local _set_opfunc = vim.fn[vim.api.nvim_exec2(
+  [[
+  func! s:set_opfunc(val)
+    let &opfunc = a:val
+  endfunc
+  echon get(function('s:set_opfunc'), 'name')
+]],
+  { output = true }
+).output]
+
 -- Apply the configured operator to the given occurrence.
----@param occurrence occurrence.Occurrence
----@param config occurrence.OperatorConfig
----@param operator_name? string
----@param range? occurrence.Range
----@param count? integer
----@param register? string
----@param register_type? string
+---@param occurrence occurrence.Occurrence The occurrence to operate on.
+---@param config occurrence.OperatorConfig The configuration for the operator. One of:
+--   - `method = visual_feedkeys`: The operator will be applied in visual mode using `nvim.api.nvim_feedkeys`.
+--   - `method = command`: The operator will be applied using a command (e.g. `:d`, `:y`, etc).
+--   - `method = direct_api`: The operator will be applied directly using the Neovim API.
+---@param operator_name? string The name of the operator (e.g. "d", "y", etc). If `nil`, it will be taken from `vim.v.operator`.
+---@param range? occurrence.Range The range of motion (e.g. "daw", "y$", etc). If `nil`, the full buffer range will be used.
+---@param count? integer The count of occurrences in the range to operate on. If `nil` or `0`, all occurrences in the range will be touched.
+---@param register? string The register (e.g. '"*d', '"ay', etc). If `nil`, the default register will be used.
+---@param register_type? string The type of the register (e.g. "v", "V", etc). If `nil`, it will be inferred from the text yanked to the register.
 local function apply_operator(occurrence, config, operator_name, range, count, register, register_type)
   operator_name = operator_name or vim.v.operator
 
@@ -80,19 +124,19 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
     log.debug("range:", range)
   end
 
-  local edits = vim.iter(vim.iter(occurrence.extmarks:iter({ range = range })):fold({}, function(acc, _, edit)
-    table.insert(acc, edit)
+  local marks = vim.iter(vim.iter(occurrence.extmarks:iter({ range = range })):fold({}, function(acc, origin, edit)
+    table.insert(acc, { origin, edit })
     return acc
   end))
 
   if count and count > 0 then
     log.debug("count:", count)
-    edits = edits:take(count)
+    marks = marks:take(count)
   end
 
   if config.modifies_text then
     log.debug("reversing edits for text modification")
-    edits = edits:rev()
+    marks = marks:rev()
   end
 
   -- Initialize register if needed
@@ -105,12 +149,13 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
   -- Cache for replacement values when using a function
   local cached_replacement = nil
 
-  edits = edits:totable()
+  marks = marks:totable()
 
-  log.debug("edits found:" .. #edits)
+  log.debug("edits found:" .. #marks)
 
   -- Apply operation to all occurrences
-  for i, edit in ipairs(edits) do
+  for i = 1, #marks do
+    local mark, edit = unpack(marks[i])
     -- Create single undo block for all edits
     if config.modifies_text and edited > 0 then
       vim.cmd("silent! undojoin")
@@ -120,7 +165,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
 
     -- Get text for register/processing
     local text = nil
-    if config.uses_register or config.modifies_text or config.method == "interactive" then
+    if config.uses_register or config.modifies_text or config.method == "direct_api" then
       text =
         vim.api.nvim_buf_get_text(occurrence.buffer, edit.start.line, edit.start.col, edit.stop.line, edit.stop.col, {})
     end
@@ -157,7 +202,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
           cached_replacement = replacement
         end
 
-        occurrence:unmark(edit)
+        occurrence.extmarks:del(mark)
         vim.api.nvim_buf_set_text(
           occurrence.buffer,
           edit.start.line,
@@ -173,13 +218,13 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
         -- Maybe we will want to support processing the text in some way in the future,
         -- but that likely means rethinking "direct_api" with a replacement function as
         -- something more general.
-        occurrence:unmark(edit)
+        occurrence.extmarks:del(mark)
         edited = edited + 1
       end
     elseif config.method == "command" then
       local start_line, stop_line = edit.start.line + 1, edit.stop.line + 1
       log.debug("execuing command: ", string.format("%d,%d%s", start_line, stop_line, operator_name))
-      occurrence:unmark(edit)
+      occurrence.extmarks:del(mark)
       vim.cmd(string.format("%d,%d%s", start_line, stop_line, operator_name))
       edited = edited + 1
     elseif config.method == "visual_feedkeys" then
@@ -188,7 +233,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
       log.debug("executing nvim_feedkeys:", operator_name)
       vim.api.nvim_feedkeys("v", "nx", true)
       Cursor.move(edit.stop)
-      occurrence:unmark(edit)
+      occurrence.extmarks:del(mark)
       vim.api.nvim_feedkeys(operator_name, "nx", true)
       edited = edited + 1
     else
@@ -211,68 +256,137 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
   log.debug("Applied operator", operator_name, "to", edited, "occurrences. Method: ", config.method)
 end
 
----@param operator_key string
----@param config occurrence.OperatorConfig
+-- Register an `:h opfunc` that will apply an operator to occurrences within a range of motion,
+-- keeping track of the details of the operation for subesquent `:h single-repeat`.
+--
+-- If this opfunc is being used to modify a pending operation (`mode` is `"o"`),
+-- then the operator will dispose of the occurrence after it is applied. Otherwise,
+-- the operator will only dispose of the occurrence if it has no remaining marks.
+---@param mode 'n' | 'v' | 'o' The mode from which the operator is being triggered.
+---@param occurrence occurrence.Occurrence The occurrence to operate on.
+---@param config occurrence.OperatorConfig The configuration for the operator. One of:
+--   - `method = visual_feedkeys`: The operator will be applied in visual mode using `nvim.api.nvim_feedkeys`.
+--   - `method = command`: The operator will be applied using a command (e.g. `:d`, `:y`, etc).
+--   - `method = direct_api`: The operator will be applied directly using the Neovim API.
+---@param operator_name string The name of the operator (e.g. "d", "y", etc). If `nil`, it will be taken from `vim.v.operator`.
+---@param count integer The count (e.g. "2d", "3y", etc). Only used if the opfunc is replacing a pending operator.
+---@param register string The register (e.g. '"*d', '"ay', etc). If `nil`, the default register will be used.
+local function create_opfunc(mode, occurrence, config, operator_name, count, register)
+  ---@type occurrence.Cursor?
+  local cursor = nil
+  ---@type occurrence.Range?
+  local range = nil
+  ---@type fun(type: string)?
+  local opfunc = nil
+  ---@type string?
+  local type = nil
+  local win = vim.api.nvim_get_current_win()
+
+  log.debug("Caching cursor position for opfunc in buffer", occurrence.buffer)
+  cursor = Cursor.save()
+  CURSOR_CACHE[win] = cursor
+
+  opfunc = function(initial_type)
+    -- From :h single-repeat:
+    --   > Note that when repeating a command that used a Visual selection,
+    --   > the same SIZE of area is used.
+    type = type or initial_type
+    cursor = cursor or CURSOR_CACHE[win] or Cursor.save()
+    range = range and range:move(cursor.location) or Range.of_motion(type)
+
+    ---@cast occurrence +nil
+    if not occurrence then
+      occurrence = Occurrence.get()
+      local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
+      if word == "" then
+        log.warn("No word under cursor")
+      else
+        occurrence:add_pattern(word, { is_word = true })
+      end
+    end
+
+    -- From :h single-repeat:
+    --   > Without a count, the count of the last change is used.
+    --   > If you enter a count, it will replace the last one.
+    count = vim.v.count > 0 and vim.v.count or count
+    -- if we are modifying a pending operator, then consume the count
+    -- as a limit on how many occurrences to operate on.
+    if mode == "o" and count and count > 0 then
+      occurrence:unmark()
+      local matches = vim.iter(occurrence:matches(range))
+      matches = matches:take(count)
+      for match_range in matches do
+        occurrence:mark(match_range)
+      end
+    end
+
+    cursor:restore()
+
+    if
+      apply_operator(
+        occurrence,
+        config,
+        operator_name,
+        range,
+        -- NOTE: if we are replacing a pending operator, we've already consumed count
+        -- while selecting occurrences, so we pass `0` to indicate that the operator should not be limited by count.
+        mode ~= "o" and count or 0,
+        register,
+        type
+      ) ~= false
+    then
+      if mode == "v" then
+        -- Clear visual selection
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
+        if cursor and range then
+          -- Move the cursor back to the start of the selection.
+          -- This seems to be what nvim does after a visual operation?
+          cursor:move(range.start)
+        end
+      end
+
+      cursor = nil
+
+      if occurrence and (mode == "o" or not occurrence.extmarks:has_any()) then
+        log.debug(
+          mode == "o" and "Modified operatation complete; deactivating"
+            or "Occurrence has no marks after operation; deactivating"
+        )
+        occurrence:dispose()
+        -- Reset state to allow dot-repatable operation on a different occurrence.
+        occurrence = nil ---@diagnostic disable-line: cast-local-type
+      end
+
+      -- If running the edits changed `vim.v.operator`, we need to restore it.
+      -- NOTE: we do it this way because `vim.v.operator` can only be set internally by nvim.
+      if vim.v.operator ~= "g@" then
+        log.debug("Restoring operator to g@ for dot-repeat")
+        -- set opfunc to a noop so we can get `g@` back into `vim.v.operator` with no side effects.
+        _set_opfunc(function() end)
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("g@$", true, false, true), "nx", false)
+        -- Restore our original opfunc.
+        _set_opfunc(opfunc)
+      end
+
+      -- Watch for dot-repeat to cache cursor position prior to repeating the operation.
+      watch_dot_repeat()
+    end
+  end
+
+  _set_opfunc(opfunc)
+end
+
+---@param operator_name string
+---@param operator_config occurrence.OperatorConfig
 ---@return function
-local function create_operator(operator_key, config)
+local function create_operator(operator_name, operator_config)
   return function()
     local occurrence = Occurrence.get()
     local count, register = vim.v.count, vim.v.register
-
-    -- If in visual mode, we should apply the operator directly to the selection
-    -- instead of entering operator-pending mode.
-    if vim.fn.mode():match("[vV]") then
-      log.debug("In visual mode; applying operator directly to selection")
-      local selection_range = Range.of_selection()
-      if not selection_range then
-        log.error("No visual selection found for operator", operator_key)
-        return
-      end
-
-      -- Run the operator
-      apply_operator(occurrence, config, operator_key, selection_range, count, register, nil)
-
-      -- Clear visual selection
-      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
-
-      -- Move the cursor back to the start of the selection.
-      -- This seems to be what nvim does after a visual operation?
-      Cursor.move(selection_range.start)
-
-      if not occurrence.extmarks:has_any() then
-        log.debug("Occurrence has no marks after operation; deactivating")
-        occurrence:dispose()
-      end
-    -- Otherwise, set up for operator-pending mode.
-    else
-      set_opfunc({
-        operator = operator_key,
-        occurrence = occurrence,
-        count = count,
-        register = register,
-      }, function(state)
-        state.count = vim.v.count > 0 and vim.v.count or state.count
-        state.register = vim.v.register
-
-        apply_operator(
-          state.occurrence,
-          config,
-          state.operator,
-          Range.of_motion(state.type),
-          state.count,
-          state.register,
-          state.type
-        )
-
-        if not occurrence.extmarks:has_any() then
-          log.debug("Occurrence has no marks after operation; deactivating")
-          occurrence:dispose()
-        end
-      end)
-
-      -- send g@ to trigger custom opfunc
-      return "g@"
-    end
+    local mode = vim.fn.mode():match("[vV]") and "v" or "n"
+    create_opfunc(mode, occurrence, operator_config, operator_name, count, register)
+    -- send g@ to trigger custom opfunc
+    return "g@"
   end
 end
 
@@ -280,4 +394,5 @@ return {
   new = create_operator,
   is = is_operator,
   apply = apply_operator,
+  create_opfunc = create_opfunc,
 }
