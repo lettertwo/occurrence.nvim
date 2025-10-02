@@ -22,10 +22,14 @@ NVIM_VERSION := 0.10.0
 .PHONY: doc
 doc: ./doc/$(PROJECT_NAME).txt ./doc/tags
 
+# Allow passing arguments after target name
+%:
+	@:
+
 .PHONY: test
 test: ./lua_modules/bin/busted ./lua_modules/bin/nlua
-	@printf "%s\n" "$< --lua $(word 2,$^) --exclude-pattern=perf_* tests/"
-	@$< --lua $(word 2,$^) --exclude-pattern=perf_* tests/
+	@printf "%s\n" "LUA_PATH='lua_modules/share/lua/5.1/?.lua;lua_modules/share/lua/5.1/?/init.lua;;' LUA_CPATH='lua_modules/lib/lua/5.1/?.so;;' $< --lua $(word 2,$^) --exclude-pattern=perf_* $(or $(filter-out $@,$(MAKECMDGOALS)),tests/)"
+	@LUA_PATH='lua_modules/share/lua/5.1/?.lua;lua_modules/share/lua/5.1/?/init.lua;;' LUA_CPATH='lua_modules/lib/lua/5.1/?.so;;' $< --lua $(word 2,$^) --exclude-pattern=perf_* $(or $(filter-out $@,$(MAKECMDGOALS)),tests/)
 
 .PHONY: test-perf
 test-perf: ./lua_modules/bin/busted ./lua_modules/bin/nlua
