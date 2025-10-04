@@ -1,5 +1,7 @@
 PROJECT_NAME := occurrence.nvim
 NVIM_VERSION := 0.10.0
+LUA_PATH := './lua_modules/share/lua/5.1/?.lua;./lua_modules/share/lua/5.1/?/init.lua;;'
+LUA_CPATH := './lua_modules/lib/lua/5.1/?.so;;'
 
 ./lua_modules/bin/%:
 	@mkdir -p $(@D)
@@ -28,13 +30,8 @@ doc: ./doc/$(PROJECT_NAME).txt ./doc/tags
 
 .PHONY: test
 test: ./lua_modules/bin/busted ./lua_modules/bin/nlua
-	@printf "%s\n" "LUA_PATH='lua_modules/share/lua/5.1/?.lua;lua_modules/share/lua/5.1/?/init.lua;;' LUA_CPATH='lua_modules/lib/lua/5.1/?.so;;' $< --lua $(word 2,$^) --exclude-pattern=perf_* $(or $(filter-out $@,$(MAKECMDGOALS)),tests/)"
-	@LUA_PATH='lua_modules/share/lua/5.1/?.lua;lua_modules/share/lua/5.1/?/init.lua;;' LUA_CPATH='lua_modules/lib/lua/5.1/?.so;;' $< --lua $(word 2,$^) --exclude-pattern=perf_* $(or $(filter-out $@,$(MAKECMDGOALS)),tests/)
+	@LUA_PATH=$(LUA_PATH) LUA_CPATH=$(LUA_CPATH) $< --lua $(word 2,$^) --exclude-pattern=perf_* $(or $(filter-out $@,$(MAKECMDGOALS)),tests/)
 
 .PHONY: test-perf
 test-perf: ./lua_modules/bin/busted ./lua_modules/bin/nlua
-	@printf "%s\n" "$< --lua $(word 2,$^) tests/perf_*"
-	@$< --lua $(word 2,$^) tests/perf_*
-
-.PHONY: test-all
-test-all: test test-perf
+	@LUA_PATH=$(LUA_PATH) LUA_CPATH=$(LUA_CPATH) $< --lua $(word 2,$^) $(or $(filter-out $@,$(MAKECMDGOALS)),tests/perf_*)
