@@ -171,6 +171,129 @@ describe("dot repeat functionality", function()
     assert.same({ "      end  bar" }, lines, "Last 2 'foo' occurrence should be deleted by dot-repeat")
   end)
 
+  it("repeats operator-modifier with motion, preserving the original word pattern", function()
+    -- Tests that `coip` (change occurrence + inner paragraph) remembers the word
+    -- it operated on, so dot-repeat applies to the same word in a different location
+
+    bufnr = util.buffer({
+      "This is 1st paragraph text.",
+      "2nd line also include text text text.",
+      "3rd line include text text text",
+      "",
+      "This is 2nd paragraph text.",
+      "2nd line also include text text text.",
+      "3rd line include text text text",
+      "4th text",
+    })
+
+    plugin.setup({
+      operators = {
+        c = {
+          method = "direct_api",
+          uses_register = true,
+          modifies_text = true,
+          replacement = "abc",
+        },
+      },
+    })
+
+    vim.keymap.set("o", "o", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
+
+    feedkeys("4w") -- move to first 'text'
+    feedkeys("co")
+    vim.wait(0)
+    feedkeys("ip")
+
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    assert.same({
+      "This is 1st paragraph abc.",
+      "2nd line also include abc abc abc.",
+      "3rd line include abc abc abc",
+      "",
+      "This is 2nd paragraph text.",
+      "2nd line also include text text text.",
+      "3rd line include text text text",
+      "4th text",
+    }, lines, "all instances of 'text' in the first paragraph should be replaced with 'abc'")
+
+    feedkeys("}j") -- move to next paragraph
+    feedkeys(".")
+
+    lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    assert.same({
+      "This is 1st paragraph abc.",
+      "2nd line also include abc abc abc.",
+      "3rd line include abc abc abc",
+      "",
+      "This is 2nd paragraph abc.",
+      "2nd line also include abc abc abc.",
+      "3rd line include abc abc abc",
+      "4th abc",
+    }, lines, "all instances of 'text' in the second paragraph should be replaced with 'abc'")
+  end)
+
+  it("repeats operator on preset marks with motion, preserving all marked patterns", function()
+    -- Tests that after marking multiple words with `go`, then doing `cip` (change inner paragraph),
+    -- dot-repeat preserves all the marked patterns and applies them to a new motion range
+
+    bufnr = util.buffer({
+      "This is 1st paragraph text.",
+      "2nd line also include text text text.",
+      "3rd line include text text text",
+      "",
+      "This is 2nd paragraph text.",
+      "2nd line also include text text text.",
+      "3rd line include text text text",
+      "4th text",
+    })
+
+    plugin.setup({
+      operators = {
+        c = {
+          method = "direct_api",
+          uses_register = true,
+          modifies_text = true,
+          replacement = "abc",
+        },
+      },
+    })
+
+    vim.keymap.set("n", "go", "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+
+    feedkeys("4w") -- move to first 'text'
+    feedkeys("go")
+    feedkeys("j^w") -- move to first 'line' on second line
+    feedkeys("go")
+    feedkeys("cip")
+
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    assert.same({
+      "This is 1st paragraph abc.",
+      "2nd abc also include abc abc abc.",
+      "3rd abc include abc abc abc",
+      "",
+      "This is 2nd paragraph text.",
+      "2nd line also include text text text.",
+      "3rd line include text text text",
+      "4th text",
+    }, lines, "all instances of 'text' and 'line' in the first paragraph should be replaced with 'abc'")
+
+    feedkeys("}j") -- move to next paragraph
+    feedkeys(".")
+
+    lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    assert.same({
+      "This is 1st paragraph abc.",
+      "2nd abc also include abc abc abc.",
+      "3rd abc include abc abc abc",
+      "",
+      "This is 2nd paragraph abc.",
+      "2nd abc also include abc abc abc.",
+      "3rd abc include abc abc abc",
+      "4th abc",
+    }, lines, "all instances of 'text' and 'line' in the second paragraph should be replaced with 'abc'")
+  end)
+
   it("repeats modified operator with count and register", function()
     bufnr = util.buffer({ "foo bar foo baz foo bar end foo bar" })
 

@@ -291,11 +291,21 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
     --   > Note that when repeating a command that used a Visual selection,
     --   > the same SIZE of area is used.
     type = type or initial_type
-    cursor = cursor or CURSOR_CACHE[win] or Cursor.save()
-    range = range and range:move(cursor.location) or Range.of_motion(type)
+
+    -- For visual mode, preserve the size of the original range by moving it to the new position.
+    -- For operator-pending/normal mode with motion, recalculate the range at the current position.
+    if range and mode == "v" then
+      cursor = cursor or CURSOR_CACHE[win] or Cursor.save()
+      range = range:move(cursor.location)
+    else
+      -- Recalculate range at current cursor position (don't restore old cursor yet)
+      range = Range.of_motion(type)
+      cursor = cursor or CURSOR_CACHE[win] or Cursor.save()
+    end
 
     ---@cast occurrence +nil
     if not occurrence then
+      -- Get word at current cursor position before restoring
       occurrence = Occurrence.get()
       local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
       if word == "" then
@@ -347,13 +357,9 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
 
       cursor = nil
 
-      if occurrence and (mode == "o" or not occurrence.extmarks:has_any()) then
-        log.debug(
-          mode == "o" and "Modified operatation complete; deactivating"
-            or "Occurrence has no marks after operation; deactivating"
-        )
+      if occurrence and not occurrence.extmarks:has_any() then
+        log.debug("Occurrence has no marks after operation; deactivating")
         occurrence:dispose()
-        -- Reset state to allow dot-repatable operation on a different occurrence.
         occurrence = nil ---@diagnostic disable-line: cast-local-type
       end
 
