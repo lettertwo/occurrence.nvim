@@ -65,10 +65,10 @@ describe("Performance Tests", function()
       local start_time = vim.loop.hrtime()
 
       local occurrence = Occurrence.get(bufnr)
-      occurrence:add_pattern("content")
-      occurrence:add_pattern("pattern")
-      occurrence:add_pattern("line")
-      occurrence:add_pattern("text")
+      occurrence:add_pattern("content", "word")
+      occurrence:add_pattern("pattern", "word")
+      occurrence:add_pattern("line", "word")
+      occurrence:add_pattern("text", "word")
 
       assert.is_true(occurrence:has_matches())
 
@@ -272,7 +272,7 @@ describe("Performance Tests", function()
 
         -- Add many patterns
         for i = 1, 10 do
-          occurrence:add_pattern("pattern_" .. i)
+          occurrence:add_pattern("pattern_" .. i, "word")
         end
 
         -- Mark occurrences for all patterns
@@ -388,7 +388,7 @@ describe("Performance Tests", function()
           local buf = util.buffer({ "test line " .. i })
           table.insert(buffers, buf)
           local state = Occurrence.get(buf)
-          state:add_pattern("test_" .. i)
+          state:add_pattern("test_" .. i, "word")
         end
 
         -- Clean up explicitly

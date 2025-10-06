@@ -15,7 +15,7 @@ local find_word = {
       log.warn("No word under cursor")
       return
     end
-    occurrence:add_pattern(word, { is_word = true })
+    occurrence:add_pattern(word, "word")
   end,
 }
 
@@ -51,7 +51,7 @@ local find_selection = {
       log.warn("Empty visual selection")
       return
     end
-    occurrence:add_pattern(text)
+    occurrence:add_pattern(text, "selection")
     -- Clear visual selection
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
   end,
@@ -86,10 +86,7 @@ local find_last_search = {
       return
     end
 
-    -- Convert vim search pattern to occurrence pattern
-    -- Remove leading/trailing delimiters and escape for literal search if needed
-    local cleaned_pattern = pattern:gsub("^\\v", ""):gsub("^\\V", "")
-    occurrence:add_pattern(cleaned_pattern, { is_word = false })
+    occurrence:add_pattern(pattern)
   end,
 }
 
@@ -118,9 +115,12 @@ local find_search_or_word = {
   type = "preset",
   callback = function(occurrence)
     if vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "" then
-      -- clear the hlsearch as we're going to to replace it with occurrence highlights.
-      vim.cmd.nohlsearch()
-      return find_last_search.callback(occurrence)
+      local result = find_last_search.callback(occurrence)
+      if result ~= false then
+        -- clear the hlsearch as we're going to to replace it with occurrence highlights.
+        vim.cmd.nohlsearch()
+      end
+      return result
     end
     return find_word.callback(occurrence)
   end,

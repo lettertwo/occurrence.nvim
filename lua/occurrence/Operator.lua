@@ -301,7 +301,7 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
       if word == "" then
         log.warn("No word under cursor")
       else
-        occurrence:add_pattern(word, { is_word = true })
+        occurrence:add_pattern(word, "word")
       end
     end
 

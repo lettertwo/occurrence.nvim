@@ -7,6 +7,8 @@ local Range = require("occurrence.Range")
 
 local resolve_buffer = require("occurrence.resolve_buffer")
 
+---@alias occurrence.PatternType 'pattern' | 'selection' | 'word'
+
 -- A map of Buffer ids to their Occurrence instances.
 ---@type table<integer, occurrence.Occurrence>
 local OCCURRENCE_CACHE = {}
@@ -365,13 +367,17 @@ function Occurrence:matches(range, patterns)
 end
 
 -- Add an additional text pattern to search for.
--- If the `is_word` option is set, the text will only match when surrounded with word boundaries.
 ---@param text string
----@param opts? { is_word: boolean }
-function Occurrence:add_pattern(text, opts)
+---@param pattern_type? occurrence.PatternType The type of occurrence matching to use. Default is 'pattern'.
+function Occurrence:add_pattern(text, pattern_type)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
-  local escaped = text:gsub("\n", "\\n")
-  local pattern = opts and opts.is_word and string.format([[\V\C\<%s\>]], escaped) or string.format([[\V\C%s]], escaped)
+  local pattern = text:gsub("\n", "\\n")
+  if pattern_type == "selection" then
+    pattern = string.format([[\V\C%s]], pattern)
+  elseif pattern_type == "word" then
+    pattern = string.format([[\V\C\<%s\>]], pattern)
+  end
+
   table.insert(self.patterns, pattern)
 end
 
@@ -414,12 +420,12 @@ end
 -- Get or create an Occurrence for the given buffer and text.
 -- If no `buffer` is provided, the current buffer will be used.
 -- If a `text` pattern is provided, it will be added to the active occurrence patterns.
--- Optional `opts` are the same as for `Occurrence:add`.
+-- Optional `pattern_type` is the same as for `Occurrence:add`.
 ---@param buffer? integer
 ---@param text? string
----@param opts? { is_word: boolean }
+---@param pattern_type? occurrence.PatternType
 ---@return occurrence.Occurrence
-function occurrence.get(buffer, text, opts)
+function occurrence.get(buffer, text, pattern_type)
   buffer = resolve_buffer(buffer, true)
   local self = OCCURRENCE_CACHE[buffer]
   if not self then
@@ -430,7 +436,7 @@ function occurrence.get(buffer, text, opts)
     OCCURRENCE_CACHE[buffer] = self
   end
   if text then
-    self:add_pattern(text, opts)
+    self:add_pattern(text, pattern_type)
   end
   return self
 end

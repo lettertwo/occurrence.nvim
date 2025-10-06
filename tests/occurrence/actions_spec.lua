@@ -21,7 +21,7 @@ describe("actions", function()
   describe("find_word", function()
     it("finds occurrences of word under cursor", function()
       bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
 
       local config = Config.new()
       config:get_action_config("find_word").callback(occurrence, config)
@@ -40,7 +40,7 @@ describe("actions", function()
       vim.api.nvim_win_set_cursor(0, { 1, 5 }) -- Position at 'bar'
       vim.cmd("normal! viw") -- Select the word 'bar'
 
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
       local config = Config.new()
       config:get_action_config("find_selection").callback(occurrence, config)
 
@@ -56,7 +56,7 @@ describe("actions", function()
       bufnr = util.buffer("foo bar baz foo")
       vim.fn.setreg("/", "foo")
 
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
       local config = Config.new()
       config:get_action_config("find_last_search").callback(occurrence, config)
 
@@ -74,7 +74,7 @@ describe("actions", function()
       vim.fn.setreg("/", "")
 
       bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
 
       local config = Config.new()
       config:get_action_config("find_last_search").callback(occurrence, config)
@@ -95,7 +95,7 @@ describe("actions", function()
       vim.fn.setreg("/", "bar")
       bufnr = util.buffer("foo bar baz foo")
 
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
       local config = Config:new()
       config:get_action_config("find_search_or_word").callback(occurrence, config)
 
@@ -110,7 +110,7 @@ describe("actions", function()
     describe("mark_all", function()
       it("marks all occurrences", function()
         bufnr = util.buffer("foo bar baz foo")
-        local occurrence = Occurrence.get(bufnr, "foo", {})
+        local occurrence = Occurrence.get(bufnr, "foo", "word")
         local config = Config:new()
         config:get_action_config("mark_all").callback(occurrence, config)
 
@@ -122,7 +122,7 @@ describe("actions", function()
     describe("unmark_all", function()
       it("unmarks all occurrences", function()
         bufnr = util.buffer("foo bar baz foo")
-        local occurrence = Occurrence.get(bufnr, "foo", {})
+        local occurrence = Occurrence.get(bufnr, "foo", "word")
         local config = Config:new()
         config:get_action_config("mark_all").callback(occurrence, config)
 
@@ -141,7 +141,7 @@ describe("actions", function()
     describe("mark", function()
       it("marks occurrence at cursor position", function()
         bufnr = util.buffer("foo bar baz foo")
-        local occurrence = Occurrence.get(bufnr, "foo", {})
+        local occurrence = Occurrence.get(bufnr, "foo", "word")
 
         local config = Config:new()
         config:get_action_config("mark").callback(occurrence, config)
@@ -165,7 +165,7 @@ describe("actions", function()
     describe("navigation", function()
       it("goto_next moves cursor to next occurrence", function()
         bufnr = util.buffer("foo bar baz foo")
-        local occurrence = Occurrence.get(bufnr, "foo", {})
+        local occurrence = Occurrence.get(bufnr, "foo", "word")
 
         -- Should move to second 'foo' at position (1, 12)
         local config = Config:new()
@@ -179,7 +179,7 @@ describe("actions", function()
 
       it("goto_previous moves cursor to previous occurrence", function()
         bufnr = util.buffer("foo bar baz foo")
-        local occurrence = Occurrence.get(bufnr, "foo", {})
+        local occurrence = Occurrence.get(bufnr, "foo", "word")
         vim.api.nvim_win_set_cursor(0, { 1, 12 }) -- Start at second 'foo' (0-indexed)
         assert.same({ 1, 12 }, vim.api.nvim_win_get_cursor(0))
 
@@ -197,7 +197,7 @@ describe("actions", function()
     it("mark_word finds and marks all occurrences", function()
       bufnr = util.buffer("foo bar baz foo")
 
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
 
       local config = Config:new()
@@ -211,7 +211,7 @@ describe("actions", function()
     it("mark_word should only mark the new cursor word", function()
       bufnr = util.buffer("foo bar baz foo")
 
-      local occurrence = Occurrence.get(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", "word")
       assert.is_true(occurrence:has_matches())
 
       local config = Config:new()
@@ -237,7 +237,7 @@ describe("actions", function()
       bufnr = util.buffer("foo bar baz foo")
 
       -- Create occurrence with pattern already set
-      local occurrence = Occurrence.get(bufnr, "foo", {})
+      local occurrence = Occurrence.get(bufnr, "foo", "word")
 
       -- First call should toggle mark (mark the current occurrence)
       local config = Config:new()
@@ -256,7 +256,7 @@ describe("actions", function()
     it("mark_word_or_toggle_mark should add new cursor word marks", function()
       bufnr = util.buffer("foo bar baz foo bar")
 
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
       local config = Config:new()
       config:get_action_config("mark_word_or_toggle_mark").callback(occurrence, config)
@@ -275,7 +275,7 @@ describe("actions", function()
       vim.api.nvim_win_set_cursor(0, { 1, 5 }) -- Position at 'bar'
       vim.cmd("normal! viw") -- Select the word 'bar'
 
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
 
       local config = Config:new()
@@ -290,7 +290,7 @@ describe("actions", function()
       bufnr = util.buffer("foo bar baz foo")
       vim.fn.setreg("/", "foo")
 
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
 
       local config = Config:new()
@@ -306,7 +306,7 @@ describe("actions", function()
       vim.fn.setreg("/", "bar")
       bufnr = util.buffer("foo bar baz foo")
 
-      local occurrence = Occurrence.get(bufnr, nil, {})
+      local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
 
       local config = Config:new()
