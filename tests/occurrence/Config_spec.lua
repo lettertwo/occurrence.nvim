@@ -31,7 +31,6 @@ describe("Config", function()
     end)
 
     it("handles invalid options gracefully with warning", function()
-      -- These should warn but not error (based on log.warn_once usage)
       local conf1 = Config.new({ invalid_option = "value" })
       assert.spy(vim.notify).was_called_with(match.has_match("unknown option"), vim.log.levels.WARN, match._)
       ---@diagnostic disable-next-line: undefined-field
@@ -39,13 +38,19 @@ describe("Config", function()
 
       ---@diagnostic disable-next-line: assign-type-mismatch
       local conf2 = Config.new({ operators = "invalid_type" })
-      assert.spy(vim.notify).was_called_with(match.has_match("operators must be a table"), vim.log.levels.WARN, match._)
+      assert.spy(vim.notify).was_called_with(match.has_match("operators: expected table"), vim.log.levels.WARN, match._)
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
       ---@diagnostic disable-next-line: param-type-mismatch
       local conf3 = Config.new("not_a_table")
-      assert.spy(vim.notify).was_called_with(match.has_match("opts must be a table"), vim.log.levels.WARN, match._)
+      assert.spy(vim.notify).was_called_with(match.has_match("opts: expected table"), vim.log.levels.WARN, match._)
+      ---@diagnostic disable-next-line: undefined-field
+      vim.notify:clear()
+
+      ---@diagnostic disable-next-line: missing-fields
+      local conf4 = Config.new({ operators = { test = {} } })
+      assert.spy(vim.notify).was_called_with(match.has_match("method: expected string"), vim.log.levels.WARN, match._)
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
@@ -53,6 +58,7 @@ describe("Config", function()
       assert.is_table(conf1)
       assert.is_table(conf2)
       assert.is_table(conf3)
+      assert.is_table(conf4)
     end)
   end)
 

@@ -68,31 +68,40 @@ local DEFAULT_OPERATOR_CONFIG = {
 ---@param opts occurrence.Options
 ---@return string? error_message
 local function validate(opts)
-  -- TODO: Use vim.validate instead?
-  if type(opts) ~= "table" then
-    return "opts must be a table"
-  end
+  local ok, err = pcall(function()
+    vim.validate("opts", opts, "table")
 
-  local valid_keys = {
-    operators = true,
-    default_keymaps = true,
-    on_preset_activate = true,
-  }
+    local valid_keys = {
+      operators = "table",
+      default_keymaps = "boolean",
+      on_preset_activate = "function",
+    }
 
-  for k, v in pairs(opts) do
-    if not valid_keys[k] then
-      return "unknown option: " .. k
+    for key, validator in pairs(valid_keys) do
+      vim.validate(key, opts[key], validator, true)
     end
 
-    -- Special handling for on_preset_activate (can be function or nil)
-    if k == "on_preset_activate" then
-      if type(v) ~= "function" and v ~= nil then
-        return "option on_preset_activate must be a function"
+    if opts.operators then
+      for key, value in pairs(opts.operators) do
+        --- occurrence.OperatorConfig | occurrence.BuiltinOperator | boolean
+        vim.validate(key, value, { "table", "boolean", "string" })
+        if type(value) == "table" then
+          vim.validate("method", value.method, "string")
+          vim.validate("uses_register", value.uses_register, "boolean")
+          vim.validate("modifies_text", value.modifies_text, "boolean")
+        end
       end
-    elseif DEFAULT_CONFIG[k] and type(v) ~= type(DEFAULT_CONFIG[k]) then
-      return "option " .. k .. " must be a " .. type(DEFAULT_CONFIG[k])
     end
+
+    for key in pairs(opts) do
+      assert(valid_keys[key], string.format('unknown option "%s"', key))
+    end
+  end)
+
+  if not ok then
+    return tostring(err)
   end
+
   return nil
 end
 
