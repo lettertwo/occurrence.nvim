@@ -34,9 +34,9 @@ end
 --- Move the cursor to the given `Location`.
 ---@param location occurrence.Location
 function cursor.move(location)
-  -- TODO: figure out if we can use nvim api instead?
-  -- Currently not doing so because it appears to always scroll the window.
-  -- vim.api.nvim_win_set_cursor(0, location:to_markpos())
+  -- NOTE: not using `vim.api.nvim_win_set_cursor()`
+  -- because it triggers scrolling (to keep the cursor in view),
+  -- which we don't want when moving cursors around for operating on occurrences.
   vim.fn.setpos(".", vim.iter({ 0, location:to_pos(), 0 }):flatten():totable())
 end
 

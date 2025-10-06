@@ -257,7 +257,7 @@ local unmark_all = {
   desc = "Unmark occurrences",
   type = "preset",
   callback = function(occurrence)
-    for range in occurrence.extmarks:iter() do
+    for range in occurrence.extmarks:iter_marks() do
       occurrence:unmark(range)
     end
   end,
@@ -286,7 +286,7 @@ local unmark_in_selection = {
   callback = function(occurrence)
     local selection_range = Range:of_selection()
     if selection_range then
-      for range in occurrence.extmarks:iter({ range = selection_range }) do
+      for range in occurrence.extmarks:iter_marks({ range = selection_range }) do
         occurrence:unmark(range)
       end
     end
@@ -346,7 +346,7 @@ local modify_operator = {
   type = "operator-modifier",
   callback = function(occurrence)
     mark_word.callback(occurrence)
-    if not occurrence.extmarks:has_any() then
+    if not occurrence.extmarks:has_any_marks() then
       return false
     end
   end,

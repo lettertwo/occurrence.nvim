@@ -177,19 +177,19 @@ function Occurrence:match_cursor(opts)
   -- we find a marked occurrence in each direction.
   if opts.marked then
     local extmarks = self.extmarks
-    if next_match and not extmarks:has(next_match) then
+    if next_match and not extmarks:has_mark(next_match) then
       local start = next_match
       repeat
         cursor:move(next_match.start)
         next_match = closest(self, flags, cursor.location, bounds)
-      until not next_match or extmarks:has(next_match) or next_match == start
+      until not next_match or extmarks:has_mark(next_match) or next_match == start
     end
-    if prev_match and not extmarks:has(prev_match) then
+    if prev_match and not extmarks:has_mark(prev_match) then
       local start = prev_match
       repeat
         cursor:move(prev_match.start)
         prev_match = closest(self, flags({ backward = true }), cursor.location, bounds)
-      until not prev_match or extmarks:has(prev_match) or prev_match == start
+      until not prev_match or extmarks:has_mark(prev_match) or prev_match == start
     end
   end
 
@@ -243,7 +243,7 @@ function Occurrence:mark(range)
   local extmarks = self.extmarks
   local success = false
   for match in self:matches(range) do
-    if extmarks:add(match) then
+    if extmarks:mark(match) then
       success = true
     end
   end
@@ -258,7 +258,7 @@ function Occurrence:unmark(range)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
   local success = false
   for match in self:matches(range) do
-    if self.extmarks:del(match) then
+    if self.extmarks:unmark(match) then
       success = true
     end
   end
@@ -379,6 +379,9 @@ function Occurrence:add_pattern(text, pattern_type)
   end
 
   table.insert(self.patterns, pattern)
+  for match in self:matches(nil, pattern) do
+    self.extmarks:add(match)
+  end
 end
 
 function Occurrence:clear()

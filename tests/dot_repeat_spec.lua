@@ -4,7 +4,7 @@ local util = require("tests.util")
 
 local plugin = require("occurrence")
 
-local NS = vim.api.nvim_create_namespace("Occurrence")
+local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
 
 describe("dot repeat functionality", function()
   local bufnr
@@ -46,7 +46,7 @@ describe("dot repeat functionality", function()
     -- Mark all 'foo' occurrences
     feedkeys("q")
 
-    local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+    local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.equals(4, #marks, "All 'foo' occurrences should be marked")
 
     -- Delete marked occurrences on first line
@@ -55,7 +55,7 @@ describe("dot repeat functionality", function()
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ " bar  baz", "foo test foo end" }, lines, "First line 'foo' occurrences should be deleted")
 
-    marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+    marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.equals(2, #marks, "Two 'foo' marks should remain on second line")
 
     -- Move to second line and repeat the delete operation
@@ -65,7 +65,7 @@ describe("dot repeat functionality", function()
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ " bar  baz", " test  end" }, lines, "Second line 'foo' occurrences should be deleted by dot-repeat")
 
-    marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+    marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.same({}, marks, "All marks should be cleared after second operation")
   end)
 
@@ -388,7 +388,7 @@ describe("dot repeat functionality", function()
     -- Mark all 'foo' occurrences
     feedkeys("q")
 
-    local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+    local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.equals(7, #marks, "All 'foo' occurrences should be marked")
 
     -- Delete marked occurrences in first line using visual mode
@@ -398,7 +398,7 @@ describe("dot repeat functionality", function()
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ " bar  baz", "foo test foo end", "foo start foo mid foo end" }, lines)
 
-    marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+    marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.equals(5, #marks, "Five 'foo' marks should remain")
 
     -- Move to second line and repeat in visual mode
@@ -408,7 +408,7 @@ describe("dot repeat functionality", function()
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ " bar  baz", " test  end", "foo start foo mid foo end" }, lines)
 
-    marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+    marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.equals(3, #marks, "Three 'foo' marks should remain on third line")
   end)
 

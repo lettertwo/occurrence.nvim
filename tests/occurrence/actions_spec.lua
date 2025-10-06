@@ -114,7 +114,7 @@ describe("actions", function()
         local config = Config:new()
         config:get_action_config("mark_all").callback(occurrence, config)
 
-        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
         assert.equals(2, marked_count) -- All 2 'foo' occurrences
       end)
     end)
@@ -127,13 +127,13 @@ describe("actions", function()
         config:get_action_config("mark_all").callback(occurrence, config)
 
         -- Verify they are marked
-        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
         assert.equals(2, marked_count)
 
         -- Then unmark all
         config:get_action_config("unmark_all").callback(occurrence, config)
 
-        marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
         assert.equals(0, marked_count)
       end)
     end)
@@ -146,18 +146,18 @@ describe("actions", function()
         local config = Config:new()
         config:get_action_config("mark").callback(occurrence, config)
 
-        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
         assert.equals(1, marked_count)
 
         -- Mark again at same position should not increase count
         config:get_action_config("mark").callback(occurrence, config)
-        marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
         assert.equals(1, marked_count)
 
         -- Move cursor to second 'foo' and mark
         vim.api.nvim_win_set_cursor(0, { 1, 12 }) -- Position at second 'foo'
         config:get_action_config("mark").callback(occurrence, config)
-        marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
         assert.equals(2, marked_count)
       end)
     end)
@@ -204,7 +204,7 @@ describe("actions", function()
       config:get_action_config("mark_word").callback(occurrence, config)
       assert.is_true(occurrence:has_matches())
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(2, marked_count) -- All 'foo' occurrences marked
     end)
 
@@ -216,12 +216,12 @@ describe("actions", function()
 
       local config = Config:new()
       config:get_action_config("mark_word").callback(occurrence, config)
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(2, marked_count) -- All 'foo' occurrences marked
 
       -- unmark all first
       config:get_action_config("unmark_all").callback(occurrence, config)
-      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(0, marked_count)
 
       -- Move cursor to 'bar' and mark
@@ -229,7 +229,7 @@ describe("actions", function()
       config:get_action_config("mark_word").callback(occurrence, config)
 
       -- Check that only 'bar' occurrences are marked
-      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(1, marked_count) -- All 'bar' occurrences marked
     end)
 
@@ -243,13 +243,13 @@ describe("actions", function()
       local config = Config:new()
       config:get_action_config("mark_word_or_toggle_mark").callback(occurrence, config)
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(1, marked_count) -- Should mark just the one at cursor
 
       -- Second call should toggle (unmark)
       config:get_action_config("mark_word_or_toggle_mark").callback(occurrence, config)
 
-      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(0, marked_count) -- Should unmark the one at cursor
     end)
 
@@ -260,13 +260,13 @@ describe("actions", function()
       assert.is_false(occurrence:has_matches())
       local config = Config:new()
       config:get_action_config("mark_word_or_toggle_mark").callback(occurrence, config)
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(2, marked_count) -- All 'foo' occurrences marked
 
       -- Should find and mark all occurrences of 'bar'
       vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
       config:get_action_config("mark_word_or_toggle_mark").callback(occurrence, config)
-      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(4, marked_count) -- All 'foo' and 'bar' occurrences marked
     end)
 
@@ -282,7 +282,7 @@ describe("actions", function()
       config:get_action_config("mark_selection").callback(occurrence, config)
       assert.is_true(occurrence:has_matches())
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(2, marked_count) -- All 'bar' occurrences marked
     end)
 
@@ -297,7 +297,7 @@ describe("actions", function()
       config:get_action_config("mark_last_search").callback(occurrence, config)
       assert.is_true(occurrence:has_matches())
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(2, marked_count) -- All 'foo' occurrences marked
     end)
 
@@ -313,7 +313,7 @@ describe("actions", function()
       config:get_action_config("mark_search_or_word").callback(occurrence, config)
       assert.is_true(occurrence:has_matches())
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(2, marked_count) -- All 'foo' occurrences marked
     end)
   end)

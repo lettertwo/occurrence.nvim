@@ -6,7 +6,7 @@ local util = require("tests.util")
 local builtins = require("occurrence.actions")
 local plugin = require("occurrence")
 
-local NS = vim.api.nvim_create_namespace("Occurrence")
+local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
 
 describe("integration tests", function()
   local bufnr
@@ -57,7 +57,7 @@ describe("integration tests", function()
       feedkeys("q")
 
       -- Verify marks are created
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Should have 2 marks for 'foo'")
 
       -- Check that escape key is mapped to deactivate
@@ -75,7 +75,7 @@ describe("integration tests", function()
       feedkeys(cancel_key)
 
       -- Verify marks are cleared
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "Marks should be cleared after deactivation")
 
       -- Verify keymap is removed after deactivation
@@ -114,23 +114,23 @@ describe("integration tests", function()
       assert(unmark_key, "Unmark key should be mapped")
 
       -- Initially all occurrences should be marked (from activation)
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both 'foo' occurrences should be marked initially")
 
       -- Simulate pressing unmark key to unmark occurrence at cursor
       feedkeys(unmark_key)
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(1, #marks, "One occurrence should remain marked")
       assert.same({ { 2, 0, 12 } }, marks, "Second 'foo' should remain marked")
 
       -- Simulate pressing mark key to mark occurrence at cursor again
       feedkeys(mark_key)
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both occurrences should be marked again")
 
       -- Clean up by pressing escape
       feedkeys("<Esc>")
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "All marks should be cleared after deactivation")
 
       -- Verify keymaps are removed after deactivation
@@ -158,7 +158,7 @@ describe("integration tests", function()
       -- Activate occurrence on 'foo' (marks all occurrences)
       feedkeys(normal_key)
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
 
       -- Check that a key is mapped in normal mode to toggle mark
@@ -176,7 +176,7 @@ describe("integration tests", function()
       feedkeys(toggle_key)
 
       -- Check that one occurrence is toggled off
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(1, #marks, "One occurrence should remain marked")
       assert.same({ { 2, 0, 12 } }, marks, "Second 'foo' should remain marked")
 
@@ -184,12 +184,12 @@ describe("integration tests", function()
       feedkeys("w") -- Move to 'bar'
       feedkeys(toggle_key)
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Should have marks for remaining 'foo' and new 'bar'")
 
       -- Clean up by pressing escape
       feedkeys("<Esc>")
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "All marks should be cleared after deactivation")
 
       -- Verify keymap is removed after deactivation
@@ -285,7 +285,7 @@ describe("integration tests", function()
       feedkeys(normal_key)
 
       -- Verify bar occurrence is marked
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(1, #marks, "Should have 1 mark for 'bar'")
       assert.same({ { 1, 0, 4 } }, marks, "'bar' should be marked at position 4")
 
@@ -308,19 +308,19 @@ describe("integration tests", function()
       feedkeys(toggle_key)
 
       -- Since 'bar' was marked and we toggled in selection, it should be unmarked
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "'bar' should be unmarked after visual toggle")
 
       -- Toggle again should mark it back
       feedkeys(toggle_key)
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(1, #marks, "'bar' should be marked again after second toggle")
 
       -- Clean up
       feedkeys("<Esc>") -- Exit visual mode
       feedkeys("<Esc>") -- Deactivate occurrence
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "All marks should be cleared after deactivation")
 
       -- Verify keymaps are removed after deactivation
@@ -353,7 +353,7 @@ describe("integration tests", function()
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals("no matches on this line", lines[1], "First line should be unchanged")
       assert.equals(" bar baz ", lines[2], "Both 'foo' occurrences should be deleted from second line")
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
 
       feedkeys("dd") -- normal delete operator should work
@@ -374,7 +374,7 @@ describe("integration tests", function()
       feedkeys(normal_key)
       assert.same(
         { { 1, 0, 0 }, { 2, 0, 12 } },
-        vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}),
+        vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {}),
         "Marks for 'foo' should be present"
       )
 
@@ -384,13 +384,17 @@ describe("integration tests", function()
       feedkeys(normal_key)
       assert.same(
         { { 1, 0, 0 }, { 3, 0, 4 }, { 2, 0, 12 } },
-        vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}),
+        vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {}),
         "Marks for 'foo' and 'bar' should be present"
       )
 
       -- simulate pressing escape to exit any pending mappings
       feedkeys("<Esc>")
-      assert.same({}, vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}), "No marks should remain after deactivation")
+      assert.same(
+        {},
+        vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {}),
+        "No marks should remain after deactivation"
+      )
 
       -- Move to start of line
       feedkeys("^")
@@ -398,13 +402,17 @@ describe("integration tests", function()
       feedkeys(normal_key)
       assert.same(
         { { 1, 0, 0 }, { 2, 0, 12 } },
-        vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}),
+        vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {}),
         "Only 'foo' marks should be present after re-marking cursor word"
       )
 
       -- simulate pressing escape to exit any pending mappings
       feedkeys("<Esc>")
-      assert.same({}, vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {}), "No marks should remain after deactivation")
+      assert.same(
+        {},
+        vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {}),
+        "No marks should remain after deactivation"
+      )
     end)
   end)
 
@@ -427,7 +435,7 @@ describe("integration tests", function()
         .was_called_with(match.is_match("Operator 'c' is not supported"), vim.log.levels.WARN, match._)
 
       -- There should be no marks since operator was unsupported.
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(0, #marks, "No 'foo' occurrences should be marked")
     end)
 
@@ -459,7 +467,7 @@ describe("integration tests", function()
       assert.equals("foo bar baz foo", lines[1], "No 'foo' occurrences should be deleted yet")
 
       -- Verify marks are created for all 'foo' occurrences
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
 
       -- Complete a motion to apply delete operator
@@ -468,7 +476,7 @@ describe("integration tests", function()
       lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals(" bar baz ", lines[1], "Both 'foo' occurrences should be deleted")
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
@@ -497,7 +505,7 @@ describe("integration tests", function()
       assert.same({ "foo bar baz foo", "  foo indented" }, lines, "No 'foo' occurrences should be indented yet")
 
       -- Verify marks are created for all 'foo' occurrences
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(3, #marks, "All 'foo' occurrences should be marked")
 
       -- Complete a motion to apply operator
@@ -506,7 +514,7 @@ describe("integration tests", function()
       lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({ "foo bar baz foo", "foo indented" }, lines, "Both 'foo' occurrences should be indented left")
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
@@ -535,7 +543,7 @@ describe("integration tests", function()
       assert.equals("foo bar baz foo", lines[1], "No 'foo' occurrences should be modified yet")
 
       -- Verify marks are created for all 'foo' occurrences
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
 
       -- Complete a motion to apply operator
@@ -544,7 +552,7 @@ describe("integration tests", function()
       lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals("FOO bar baz FOO", lines[1], "Both 'foo' occurrences should be uppercased")
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
@@ -581,7 +589,7 @@ describe("integration tests", function()
       vim.wait(0) -- The operator-modifier action is async.
 
       -- Verify no marks are created
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(0, #marks, "No occurrences should be marked")
 
       -- Verify mode change events were triggered
@@ -645,14 +653,14 @@ describe("integration tests", function()
       vim.wait(0) -- The operator-modifier action is async.
 
       -- Verify marks are created for all 'foo' occurrences
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
 
       -- Simulate pressing escape to cancel operator modification
       feedkeys("<Esc>")
 
       -- Verify marks are cleared
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after cancelling operator modification")
 
       -- Verify no changes have been made to buffer
@@ -711,7 +719,7 @@ describe("integration tests", function()
       feedkeys(normal_key)
 
       -- Verify marks are created
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
 
       -- Check that delete operator is mapped
@@ -731,7 +739,7 @@ describe("integration tests", function()
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals(" bar baz ", lines[1], "Both 'foo' occurrences should be deleted")
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
@@ -755,7 +763,7 @@ describe("integration tests", function()
       feedkeys(normal_key)
 
       -- Verify marks are created
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(3, #marks, "All 'foo' occurrences should be marked")
 
       -- Check that left shift operator is mapped
@@ -775,7 +783,7 @@ describe("integration tests", function()
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({ "foo bar baz foo", "foo indented" }, lines, "Both 'foo' occurrences should be indented left")
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
@@ -799,7 +807,7 @@ describe("integration tests", function()
       feedkeys(normal_key)
 
       -- Verify marks are created
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
 
       -- Check that uppercase operator is mapped
@@ -819,7 +827,7 @@ describe("integration tests", function()
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals("FOO bar baz FOO", lines[1], "Both 'foo' occurrences should be uppercased")
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
@@ -843,7 +851,7 @@ describe("integration tests", function()
       feedkeys(normal_key)
 
       -- Verify marks are created
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
 
       -- Check that uppercase operator is mapped
@@ -864,7 +872,7 @@ describe("integration tests", function()
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals("FOO bar baz foo", lines[1], "First 'foo' should be uppercased")
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(1, #marks, "One mark should remain for second 'foo'")
     end)
 
@@ -888,7 +896,7 @@ describe("integration tests", function()
       feedkeys(normal_key)
 
       -- Verify marks are created
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(4, #marks, "All 'foo' occurrences should be marked")
 
       -- Check that uppercase operator is mapped
@@ -913,7 +921,7 @@ describe("integration tests", function()
         "First 3 'foo' occurrences should be uppercased"
       )
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(1, #marks, "One mark should remain for fourth 'foo'")
     end)
 
@@ -940,7 +948,7 @@ describe("integration tests", function()
       feedkeys("z")
 
       -- Verify marks are created for all 'foo' occurrences
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(3, #marks, "All 'foo' occurrences should be marked")
 
       -- Check that custom operator is mapped
@@ -962,12 +970,12 @@ describe("integration tests", function()
       assert.equals("baz foo bar", final_lines[2], "Second line should be unchanged")
 
       -- Should still have one mark remaining on second line
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.equals(1, #marks, "One mark should remain on second line")
 
       -- Clean up remaining marks
       feedkeys("<Esc>")
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "All marks should be cleared after deactivation")
     end)
   end)

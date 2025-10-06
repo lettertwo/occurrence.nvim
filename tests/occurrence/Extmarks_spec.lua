@@ -4,7 +4,7 @@ local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 local Extmarks = require("occurrence.Extmarks")
 
-local NS = vim.api.nvim_create_namespace("Occurrence")
+local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
 
 describe("Extmarks", function()
   local bufnr
@@ -30,12 +30,12 @@ describe("Extmarks", function()
       local extmarks = Extmarks.new()
 
       assert.is_table(extmarks)
-      assert.is_function(extmarks.has)
-      assert.is_function(extmarks.has_any)
-      assert.is_function(extmarks.add)
-      assert.is_function(extmarks.get)
-      assert.is_function(extmarks.del)
-      assert.is_function(extmarks.iter)
+      assert.is_function(extmarks.has_mark)
+      assert.is_function(extmarks.has_any_marks)
+      assert.is_function(extmarks.mark)
+      assert.is_function(extmarks.get_mark)
+      assert.is_function(extmarks.unmark)
+      assert.is_function(extmarks.iter_marks)
     end)
 
     it("creates independent Extmarks instances", function()
@@ -47,9 +47,9 @@ describe("Extmarks", function()
       -- Adding to one shouldn't affect the other
       local range = Range.new(Location.new(0, 0), Location.new(0, 5))
 
-      extmarks1:add(range)
-      assert.is_true(extmarks1:has(range))
-      assert.is_false(extmarks2:has(range))
+      extmarks1:mark(range)
+      assert.is_true(extmarks1:has_mark(range))
+      assert.is_false(extmarks2:has_mark(range))
     end)
   end)
 
@@ -62,49 +62,49 @@ describe("Extmarks", function()
     end)
 
     it("returns false when no extmarks exist", function()
-      assert.is_false(extmarks:has_any())
+      assert.is_false(extmarks:has_any_marks())
     end)
 
     it("returns true when at least one extmark exists", function()
       local range = Range.new(Location.new(0, 0), Location.new(0, 5))
-      extmarks:add(range)
+      extmarks:mark(range)
 
-      assert.is_true(extmarks:has_any())
+      assert.is_true(extmarks:has_any_marks())
     end)
 
     it("returns false after all extmarks are deleted", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
-      extmarks:add(range1)
-      extmarks:add(range2)
+      extmarks:mark(range1)
+      extmarks:mark(range2)
 
-      assert.is_true(extmarks:has_any())
+      assert.is_true(extmarks:has_any_marks())
 
-      extmarks:del(range1)
-      assert.is_true(extmarks:has_any())
+      extmarks:unmark(range1)
+      assert.is_true(extmarks:has_any_marks())
 
-      extmarks:del(range2)
-      assert.is_false(extmarks:has_any())
+      extmarks:unmark(range2)
+      assert.is_false(extmarks:has_any_marks())
     end)
 
     it("returns false when no extmarks are in the given range", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
-      extmarks:add(range1)
+      extmarks:mark(range1)
 
       local search_range = Range.new(Location.new(1, 0), Location.new(1, 5))
-      assert.is_true(extmarks:has_any()) -- extmarks exist
-      assert.is_false(extmarks:has_any(search_range))
+      assert.is_true(extmarks:has_any_marks()) -- extmarks exist
+      assert.is_false(extmarks:has_any_marks(search_range))
     end)
 
     it("returns true when at least one extmark is in the given range", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
-      extmarks:add(range1)
-      extmarks:add(range2)
+      extmarks:mark(range1)
+      extmarks:mark(range2)
 
       local search_range = Range.new(Location.new(0, 3), Location.new(1, 2))
-      assert.is_true(extmarks:has_any()) -- extmarks exist
-      assert.is_true(extmarks:has_any(search_range))
+      assert.is_true(extmarks:has_any_marks()) -- extmarks exist
+      assert.is_true(extmarks:has_any_marks(search_range))
     end)
   end)
 
@@ -117,31 +117,31 @@ describe("Extmarks", function()
     end)
 
     it("returns false for nil", function()
-      assert.is_false(extmarks:has(nil))
+      assert.is_false(extmarks:has_mark(nil))
     end)
 
     it("returns false for non-existent range", function()
       local range = Range.new(Location.new(0, 0), Location.new(0, 5))
-      assert.is_false(extmarks:has(range))
+      assert.is_false(extmarks:has_mark(range))
     end)
 
     it("returns false for non-existent id", function()
-      assert.is_false(extmarks:has(99999))
+      assert.is_false(extmarks:has_mark(99999))
     end)
 
     it("returns true for existing range", function()
       local range = Range.new(Location.new(0, 5), Location.new(0, 10))
-      extmarks:add(range)
+      extmarks:mark(range)
 
-      assert.is_true(extmarks:has(range))
+      assert.is_true(extmarks:has_mark(range))
     end)
 
     it("returns true for existing id", function()
       local range = Range.new(Location.new(1, 0), Location.new(1, 8))
-      extmarks:add(range)
-      local id = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})[1][1]
+      extmarks:mark(range)
+      local id = vim.api.nvim_buf_get_extmarks(0, MARK_NS, 0, -1, {})[1][1]
       assert.is_not_nil(id)
-      assert.is_true(extmarks:has(id))
+      assert.is_true(extmarks:has_mark(id))
     end)
   end)
 
@@ -156,17 +156,17 @@ describe("Extmarks", function()
     it("adds extmark for range and returns true", function()
       local range = Range.new(Location.new(0, 5), Location.new(0, 10))
 
-      local added = extmarks:add(range)
+      local added = extmarks:mark(range)
 
       assert.is_true(added)
-      assert.is_true(extmarks:has(range))
+      assert.is_true(extmarks:has_mark(range))
     end)
 
     it("does not add duplicate extmarks", function()
       local range = Range.new(Location.new(1, 2), Location.new(1, 8))
 
-      local added1 = extmarks:add(range)
-      local added2 = extmarks:add(range)
+      local added1 = extmarks:mark(range)
+      local added2 = extmarks:mark(range)
 
       assert.is_true(added1)
       assert.is_false(added2) -- second add should return false
@@ -176,21 +176,21 @@ describe("Extmarks", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
 
-      local added1 = extmarks:add(range1)
-      local added2 = extmarks:add(range2)
+      local added1 = extmarks:mark(range1)
+      local added2 = extmarks:mark(range2)
 
       assert.is_true(added1)
       assert.is_true(added2)
-      assert.is_true(extmarks:has(range1))
-      assert.is_true(extmarks:has(range2))
+      assert.is_true(extmarks:has_mark(range1))
+      assert.is_true(extmarks:has_mark(range2))
     end)
 
     it("creates extmarks with correct properties", function()
       local range = Range.new(Location.new(0, 5), Location.new(0, 15))
-      extmarks:add(range)
+      extmarks:mark(range)
 
       -- Check that vim extmark was created
-      local marks = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(0, MARK_NS, 0, -1, {})
       assert.is_true(#marks > 0)
 
       -- Check extmark properties
@@ -204,31 +204,31 @@ describe("Extmarks", function()
     it("handles multi-line ranges", function()
       local range = Range.new(Location.new(1, 5), Location.new(3, 10))
 
-      local added = extmarks:add(range)
+      local added = extmarks:mark(range)
 
       assert.is_true(added)
-      assert.is_true(extmarks:has(range))
+      assert.is_true(extmarks:has_mark(range))
     end)
 
     it("handles zero-width ranges", function()
       local range = Range.new(Location.new(1, 5), Location.new(1, 5))
 
-      local added = extmarks:add(range)
+      local added = extmarks:mark(range)
       assert.is_true(added)
-      assert.is_true(extmarks:has(range))
+      assert.is_true(extmarks:has_mark(range))
     end)
 
     it("handles ranges at buffer boundaries", function()
       -- Start of buffer
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
-      assert.is_true(extmarks:add(range1))
+      assert.is_true(extmarks:mark(range1))
 
       -- End of buffer (approximately)
       local range2 = Range.new(Location.new(4, 30), Location.new(4, 35))
-      assert.is_true(extmarks:add(range2))
+      assert.is_true(extmarks:mark(range2))
 
-      assert.is_true(extmarks:has(range1))
-      assert.is_true(extmarks:has(range2))
+      assert.is_true(extmarks:has_mark(range1))
+      assert.is_true(extmarks:has_mark(range2))
     end)
   end)
 
@@ -242,19 +242,19 @@ describe("Extmarks", function()
 
     it("returns current range for existing extmark by range", function()
       local original_range = Range.new(Location.new(1, 5), Location.new(1, 15))
-      extmarks:add(original_range)
+      extmarks:mark(original_range)
 
-      local current_range = extmarks:get(original_range)
+      local current_range = extmarks:get_mark(original_range)
 
       assert.same({ 1, 5, 1, 15 }, current_range)
     end)
 
     it("returns current range for existing extmark by id", function()
       local range = Range.new(Location.new(0, 8), Location.new(0, 18))
-      extmarks:add(range)
+      extmarks:mark(range)
 
-      local id = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})[1][1]
-      local current_range = extmarks:get(id)
+      local id = vim.api.nvim_buf_get_extmarks(0, MARK_NS, 0, -1, {})[1][1]
+      local current_range = extmarks:get_mark(id)
 
       assert.same({ 0, 8, 0, 18 }, current_range)
     end)
@@ -262,16 +262,16 @@ describe("Extmarks", function()
     it("returns nil for non-existent extmark", function()
       local range = Range.new(Location.new(2, 0), Location.new(2, 5))
 
-      local current_range = extmarks:get(range)
+      local current_range = extmarks:get_mark(range)
 
       assert.is_nil(current_range)
     end)
 
     it("returns updated range after buffer modifications", function()
       local range = Range.new(Location.new(1, 0), Location.new(1, 6))
-      extmarks:add(range)
+      extmarks:mark(range)
 
-      local current_range = extmarks:get(range)
+      local current_range = extmarks:get_mark(range)
 
       assert.is_true(range == current_range)
       assert.same({ 1, 0, 1, 6 }, current_range)
@@ -279,7 +279,7 @@ describe("Extmarks", function()
       -- Modify buffer to shift the extmark
       vim.api.nvim_buf_set_lines(0, 0, 0, false, { "new first line content" })
 
-      current_range = extmarks:get(range)
+      current_range = extmarks:get_mark(range)
 
       assert.is_false(range == current_range)
 
@@ -288,7 +288,7 @@ describe("Extmarks", function()
       -- Further modify buffer to insert text before the extmark to shift it right
       vim.api.nvim_buf_set_text(0, 2, 0, 2, 0, { "old " })
 
-      current_range = extmarks:get(range)
+      current_range = extmarks:get_mark(range)
       assert.same({ 2, 4, 2, 10 }, current_range) -- should have shifted right
     end)
   end)
@@ -303,47 +303,47 @@ describe("Extmarks", function()
 
     it("deletes extmark by range and returns true", function()
       local range = Range.new(Location.new(0, 3), Location.new(0, 8))
-      extmarks:add(range)
+      extmarks:mark(range)
 
-      local deleted = extmarks:del(range)
+      local deleted = extmarks:unmark(range)
 
       assert.is_true(deleted)
-      assert.is_false(extmarks:has(range))
+      assert.is_false(extmarks:has_mark(range))
     end)
 
     it("deletes extmark by id and returns true", function()
       local range = Range.new(Location.new(1, 5), Location.new(1, 12))
-      extmarks:add(range)
+      extmarks:mark(range)
 
-      local id = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})[1][1]
+      local id = vim.api.nvim_buf_get_extmarks(0, MARK_NS, 0, -1, {})[1][1]
 
-      local deleted = extmarks:del(id)
+      local deleted = extmarks:unmark(id)
 
       assert.is_true(deleted)
-      assert.is_false(extmarks:has(range))
-      assert.is_false(extmarks:has(id))
+      assert.is_false(extmarks:has_mark(range))
+      assert.is_false(extmarks:has_mark(id))
     end)
 
     it("returns false for non-existent extmark", function()
       local range = Range.new(Location.new(2, 0), Location.new(2, 5))
 
-      local deleted = extmarks:del(range)
+      local deleted = extmarks:unmark(range)
 
       assert.is_false(deleted)
     end)
 
     it("removes extmark from buffer", function()
       local range = Range.new(Location.new(0, 0), Location.new(0, 10))
-      extmarks:add(range)
+      extmarks:mark(range)
 
       -- Verify extmark exists in vim
-      local marks_before = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
+      local marks_before = vim.api.nvim_buf_get_extmarks(0, MARK_NS, 0, -1, {})
       local count_before = #marks_before
 
-      extmarks:del(range)
+      extmarks:unmark(range)
 
       -- Verify extmark was removed from vim
-      local marks_after = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
+      local marks_after = vim.api.nvim_buf_get_extmarks(0, MARK_NS, 0, -1, {})
       local count_after = #marks_after
 
       assert.is_true(count_after < count_before)
@@ -351,12 +351,12 @@ describe("Extmarks", function()
 
     it("cleans up internal tracking", function()
       local range = Range.new(Location.new(2, 3), Location.new(2, 8))
-      extmarks:add(range)
+      extmarks:mark(range)
 
       local key = range:serialize()
       local id = extmarks[key]
 
-      extmarks:del(range)
+      extmarks:unmark(range)
 
       -- Internal tracking should be cleaned up
       assert.is_nil(extmarks[key])
@@ -377,12 +377,12 @@ describe("Extmarks", function()
       local range2 = Range.new(Location.new(1, 5), Location.new(1, 10))
       local range3 = Range.new(Location.new(2, 10), Location.new(2, 15))
 
-      extmarks:add(range1)
-      extmarks:add(range2)
-      extmarks:add(range3)
+      extmarks:mark(range1)
+      extmarks:mark(range2)
+      extmarks:mark(range3)
 
       local count = 0
-      for original, current in extmarks:iter() do
+      for original, current in extmarks:iter_marks() do
         count = count + 1
         assert.is_not_nil(original)
         assert.is_not_nil(current)
@@ -398,15 +398,15 @@ describe("Extmarks", function()
       local range2 = Range.new(Location.new(1, 5), Location.new(1, 10))
       local range3 = Range.new(Location.new(3, 10), Location.new(3, 15))
 
-      extmarks:add(range1)
-      extmarks:add(range2)
-      extmarks:add(range3)
+      extmarks:mark(range1)
+      extmarks:mark(range2)
+      extmarks:mark(range3)
 
       -- Only iterate over lines 0-2
       local search_range = Range.new(Location.new(0, 0), Location.new(2, 0))
 
       local count = 0
-      for original in extmarks:iter({ range = search_range }) do
+      for original in extmarks:iter_marks({ range = search_range }) do
         count = count + 1
         assert.is_true(original.start.line < 3) -- should not include line 3
       end
@@ -416,11 +416,11 @@ describe("Extmarks", function()
 
     it("returns original and current ranges", function()
       local first_range = Range.new(Location.new(1, 0), Location.new(1, 8))
-      extmarks:add(first_range)
+      extmarks:mark(first_range)
       local second_range = Range.new(Location.new(2, 5), Location.new(2, 15))
-      extmarks:add(second_range)
+      extmarks:mark(second_range)
 
-      local marks = extmarks:iter()
+      local marks = extmarks:iter_marks()
 
       local original, current = marks()
       assert.same({ 1, 0, 1, 8 }, original)
@@ -437,11 +437,11 @@ describe("Extmarks", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
 
-      extmarks:add(range1)
-      extmarks:add(range2)
+      extmarks:mark(range1)
+      extmarks:mark(range2)
 
       local ranges = {}
-      for original in extmarks:iter({ reverse = true }) do
+      for original in extmarks:iter_marks({ reverse = true }) do
         table.insert(ranges, original)
       end
 
@@ -461,21 +461,21 @@ describe("Extmarks", function()
       local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
       local range2 = Range.new(Location.new(1, 5), Location.new(1, 10))
 
-      extmarks:add(range1)
-      extmarks:add(range2)
+      extmarks:mark(range1)
+      extmarks:mark(range2)
 
-      assert.is_true(extmarks:has_any())
+      assert.is_true(extmarks:has_any_marks())
 
       -- Verify extmarks exist in buffer
-      local marks = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(0, MARK_NS, 0, -1, {})
       assert.equals(2, #marks)
 
       extmarks:clear()
 
-      assert.is_false(extmarks:has_any())
+      assert.is_false(extmarks:has_any_marks())
 
       -- Verify no extmarks exist in buffer
-      marks = vim.api.nvim_buf_get_extmarks(0, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(0, MARK_NS, 0, -1, {})
       assert.equals(0, #marks)
     end)
   end)
@@ -490,25 +490,88 @@ describe("Extmarks", function()
 
     it("clears extmarks and makes instance unusable", function()
       local range = Range.new(Location.new(0, 0), Location.new(0, 5))
-      extmarks:add(range)
+      extmarks:mark(range)
 
-      assert.is_true(extmarks:has_any())
+      assert.is_true(extmarks:has_any_marks())
 
       extmarks:dispose()
 
-      assert.is_false(extmarks:has_any())
+      assert.is_false(extmarks:has_any_marks())
 
       assert.has_error(function()
-        extmarks:add(range)
+        extmarks:mark(range)
       end, "Cannot use a disposed Extmarks")
 
       assert.has_error(function()
-        extmarks:del(range)
+        extmarks:unmark(range)
       end, "Cannot use a disposed Extmarks")
 
       assert.has_error(function()
         extmarks:clear()
       end, "Cannot use a disposed Extmarks")
+    end)
+  end)
+
+  describe("highlight groups", function()
+    ---@type occurrence.Extmarks
+    local extmarks
+
+    before_each(function()
+      extmarks = Extmarks.new()
+    end)
+
+    it("uses OccurrenceMark for mark extmarks", function()
+      local range = Range.new(Location.new(0, 0), Location.new(0, 5))
+      extmarks:mark(range)
+
+      local marks = vim.api.nvim_buf_get_extmarks(extmarks.buffer, MARK_NS, 0, -1, { details = true })
+      assert.is_equal(1, #marks)
+      assert.is_equal("OccurrenceMark", marks[1][4].hl_group)
+    end)
+
+    it("uses OccurrenceMatch for match extmarks", function()
+      local range = Range.new(Location.new(0, 0), Location.new(0, 5))
+      extmarks:add(range)
+
+      local MATCH_NS = vim.api.nvim_create_namespace("OccurrenceMatch")
+      local marks = vim.api.nvim_buf_get_extmarks(extmarks.buffer, MATCH_NS, 0, -1, { details = true })
+      assert.is_equal(1, #marks)
+      assert.is_equal("OccurrenceMatch", marks[1][4].hl_group)
+    end)
+
+    it("defaults to mark type when no type specified", function()
+      local range = Range.new(Location.new(0, 0), Location.new(0, 5))
+      extmarks:mark(range)
+
+      local marks = vim.api.nvim_buf_get_extmarks(extmarks.buffer, MARK_NS, 0, -1, { details = true })
+      assert.is_equal(1, #marks)
+      assert.is_equal("OccurrenceMark", marks[1][4].hl_group)
+    end)
+
+    it("allows users to override highlight groups", function()
+      -- Override the highlight groups
+      vim.api.nvim_set_hl(0, "OccurrenceMark", { bg = "#ff0000" })
+      vim.api.nvim_set_hl(0, "OccurrenceMatch", { bg = "#00ff00" })
+
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
+      local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
+      extmarks:mark(range1) -- Adds to both MARK_NS and MATCH_NS
+      extmarks:add(range2) -- Adds only to MATCH_NS
+
+      local MATCH_NS = vim.api.nvim_create_namespace("OccurrenceMatch")
+      local mark_marks = vim.api.nvim_buf_get_extmarks(extmarks.buffer, MARK_NS, 0, -1, { details = true })
+      local match_marks = vim.api.nvim_buf_get_extmarks(extmarks.buffer, MATCH_NS, 0, -1, { details = true })
+      assert.is_equal(1, #mark_marks) -- Only range1 is marked
+      assert.is_equal(2, #match_marks) -- Both range1 and range2 are matches
+      assert.is_equal("OccurrenceMark", mark_marks[1][4].hl_group)
+      assert.is_equal("OccurrenceMatch", match_marks[1][4].hl_group)
+      assert.is_equal("OccurrenceMatch", match_marks[2][4].hl_group)
+
+      -- Verify the highlight groups have our custom colors
+      local mark_hl = vim.api.nvim_get_hl(0, { name = "OccurrenceMark" })
+      local match_hl = vim.api.nvim_get_hl(0, { name = "OccurrenceMatch" })
+      assert.is_equal(0xff0000, mark_hl.bg)
+      assert.is_equal(0x00ff00, match_hl.bg)
     end)
   end)
 end)

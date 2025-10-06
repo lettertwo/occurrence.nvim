@@ -3,7 +3,7 @@ local util = require("tests.util")
 local Occurrence = require("occurrence.Occurrence")
 local Range = require("occurrence.Range")
 
-local NS = vim.api.nvim_create_namespace("Occurrence")
+local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
 
 describe("Occurrence", function()
   local bufnr
@@ -326,11 +326,11 @@ describe("Occurrence", function()
       bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.get(bufnr, "foo", "word")
 
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
       foo:mark()
-      assert.is_true(foo.extmarks:has_any())
+      assert.is_true(foo.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 8 },
@@ -343,11 +343,11 @@ describe("Occurrence", function()
       occ:add_pattern("bar", "word")
       occ:add_pattern("baz", "word")
 
-      assert.is_false(occ.extmarks:has_any())
+      assert.is_false(occ.extmarks:has_any_marks())
       occ:mark()
-      assert.is_true(occ.extmarks:has_any())
+      assert.is_true(occ.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 4 },
@@ -362,11 +362,11 @@ describe("Occurrence", function()
       bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.get(bufnr, "foo", "word")
 
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
       foo:mark(Range.deserialize("0:0::0:4"))
-      assert.is_true(foo.extmarks:has_any())
+      assert.is_true(foo.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({ { 1, 0, 0 } }, marks)
     end)
 
@@ -376,11 +376,11 @@ describe("Occurrence", function()
       occ:add_pattern("bar", "word")
       occ:add_pattern("baz", "word")
 
-      assert.is_false(occ.extmarks:has_any())
+      assert.is_false(occ.extmarks:has_any_marks())
       occ:mark(Range.deserialize("0:0::0:15"))
-      assert.is_true(occ.extmarks:has_any())
+      assert.is_true(occ.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 4 },
@@ -393,20 +393,20 @@ describe("Occurrence", function()
       bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.get(bufnr, "foo", "word")
 
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
       foo:mark()
-      assert.is_true(foo.extmarks:has_any())
+      assert.is_true(foo.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 8 },
       }, marks)
 
       foo:unmark()
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks)
     end)
 
@@ -416,11 +416,11 @@ describe("Occurrence", function()
       occ:add_pattern("bar", "word")
       occ:add_pattern("baz", "word")
 
-      assert.is_false(occ.extmarks:has_any())
+      assert.is_false(occ.extmarks:has_any_marks())
       occ:mark()
-      assert.is_true(occ.extmarks:has_any())
+      assert.is_true(occ.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 4 },
@@ -431,9 +431,9 @@ describe("Occurrence", function()
       }, marks)
 
       occ:unmark()
-      assert.is_false(occ.extmarks:has_any())
+      assert.is_false(occ.extmarks:has_any_marks())
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks)
     end)
 
@@ -441,20 +441,20 @@ describe("Occurrence", function()
       bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.get(bufnr, "foo", "word")
 
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
       foo:mark(Range.deserialize("0:0::1:0"))
-      assert.is_true(foo.extmarks:has_any())
+      assert.is_true(foo.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 8 },
       }, marks)
 
       foo:unmark(Range.deserialize("0:0::0:4"))
-      assert.is_true(foo.extmarks:has_any())
+      assert.is_true(foo.extmarks:has_any_marks())
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({ { 2, 0, 8 } }, marks)
     end)
 
@@ -464,11 +464,11 @@ describe("Occurrence", function()
       occ:add_pattern("bar", "word")
       occ:add_pattern("baz", "word")
 
-      assert.is_false(occ.extmarks:has_any())
+      assert.is_false(occ.extmarks:has_any_marks())
       occ:mark(Range.deserialize("0:8::1:0"))
-      assert.is_true(occ.extmarks:has_any())
+      assert.is_true(occ.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 8 },
         { 2, 0, 12 },
@@ -477,9 +477,9 @@ describe("Occurrence", function()
       }, marks)
 
       occ:unmark(Range.deserialize("0:0::0:15"))
-      assert.is_true(occ.extmarks:has_any())
+      assert.is_true(occ.extmarks:has_any_marks())
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 3, 0, 16 },
         { 4, 0, 20 },
@@ -493,7 +493,7 @@ describe("Occurrence", function()
       foo:mark(Range.deserialize("0:0::1:0"))
 
       local marked = {}
-      for mark in foo.extmarks:iter() do
+      for mark in foo.extmarks:iter_marks() do
         table.insert(marked, tostring(mark))
       end
 
@@ -514,7 +514,7 @@ describe("Occurrence", function()
       occ:mark()
 
       local marked = {}
-      for mark in occ.extmarks:iter() do
+      for mark in occ.extmarks:iter_marks() do
         table.insert(marked, tostring(mark))
       end
       assert.same({
@@ -534,7 +534,7 @@ describe("Occurrence", function()
       foo:mark(Range.deserialize("0:0::1:0"))
 
       local marked = {}
-      for mark in foo.extmarks:iter({ range = Range.deserialize("0:0::0:4") }) do
+      for mark in foo.extmarks:iter_marks({ range = Range.deserialize("0:0::0:4") }) do
         table.insert(marked, tostring(mark))
       end
 
@@ -552,7 +552,7 @@ describe("Occurrence", function()
       occ:mark(Range.deserialize("0:0::1:15"))
 
       local marked = {}
-      for mark in occ.extmarks:iter({ range = Range.deserialize("0:0::0:15") }) do
+      for mark in occ.extmarks:iter_marks({ range = Range.deserialize("0:0::0:15") }) do
         table.insert(marked, tostring(mark))
       end
       assert.same({
@@ -574,7 +574,7 @@ describe("Occurrence", function()
       occ:mark()
 
       local marked = {}
-      for mark in occ.extmarks:iter() do
+      for mark in occ.extmarks:iter_marks() do
         table.insert(marked, tostring(mark))
       end
       assert.same({
@@ -595,7 +595,7 @@ describe("Occurrence", function()
 
       assert.is_true(occ:mark())
 
-      local marked = vim.iter(occ.extmarks:iter()):map(tostring):totable()
+      local marked = vim.iter(occ.extmarks:iter_marks()):map(tostring):totable()
 
       assert.same({
         "Range(start: Location(0, 12), stop: Location(1, 11))",
@@ -614,7 +614,7 @@ describe("Occurrence", function()
 
       assert.is_true(occ:mark())
 
-      local marked = vim.iter(occ.extmarks:iter()):map(tostring):totable()
+      local marked = vim.iter(occ.extmarks:iter_marks()):map(tostring):totable()
 
       assert.same({
         "Range(start: Location(0, 8), stop: Location(1, 11))",
@@ -1180,20 +1180,20 @@ bar foo]])
       bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.get(bufnr, "foo", "word")
 
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
       foo:mark()
-      assert.is_true(foo.extmarks:has_any())
+      assert.is_true(foo.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 8 },
       }, marks)
 
       foo:clear()
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks)
 
       local matches = vim.iter(foo:matches()):map(tostring):totable()
@@ -1206,11 +1206,11 @@ bar foo]])
       occ:add_pattern("bar", "word")
       occ:add_pattern("baz", "word")
 
-      assert.is_false(occ.extmarks:has_any())
+      assert.is_false(occ.extmarks:has_any_marks())
       occ:mark()
-      assert.is_true(occ.extmarks:has_any())
+      assert.is_true(occ.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 4 },
@@ -1222,9 +1222,9 @@ bar foo]])
 
       occ:clear()
       occ:add_pattern("bar", "word")
-      assert.is_false(occ.extmarks:has_any())
+      assert.is_false(occ.extmarks:has_any_marks())
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks)
 
       local matches = vim.iter(occ:matches()):map(tostring):totable()
@@ -1240,23 +1240,23 @@ bar foo]])
       bufnr = util.buffer("foo bar foo")
       local foo = Occurrence.get(bufnr, "foo", "word")
 
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
       foo:mark()
-      assert.is_true(foo.extmarks:has_any())
+      assert.is_true(foo.extmarks:has_any_marks())
 
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({
         { 1, 0, 0 },
         { 2, 0, 8 },
       }, marks)
 
       foo:dispose()
-      assert.is_false(foo.extmarks:has_any())
+      assert.is_false(foo.extmarks:has_any_marks())
       assert.is_true(foo:is_disposed())
       assert.is_true(foo.extmarks:is_disposed())
       assert.is_true(foo.keymap:is_disposed())
 
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, 0, -1, {})
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks)
 
       assert.has.error(function()

@@ -124,10 +124,11 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
     log.debug("range:", range)
   end
 
-  local marks = vim.iter(vim.iter(occurrence.extmarks:iter({ range = range })):fold({}, function(acc, origin, edit)
-    table.insert(acc, { origin, edit })
-    return acc
-  end))
+  local marks =
+    vim.iter(vim.iter(occurrence.extmarks:iter_marks({ range = range })):fold({}, function(acc, origin, edit)
+      table.insert(acc, { origin, edit })
+      return acc
+    end))
 
   if count and count > 0 then
     log.debug("count:", count)
@@ -202,7 +203,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
           cached_replacement = replacement
         end
 
-        occurrence.extmarks:del(mark)
+        occurrence.extmarks:unmark(mark)
         vim.api.nvim_buf_set_text(
           occurrence.buffer,
           edit.start.line,
@@ -218,13 +219,13 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
         -- Maybe we will want to support processing the text in some way in the future,
         -- but that likely means rethinking "direct_api" with a replacement function as
         -- something more general.
-        occurrence.extmarks:del(mark)
+        occurrence.extmarks:unmark(mark)
         edited = edited + 1
       end
     elseif config.method == "command" then
       local start_line, stop_line = edit.start.line + 1, edit.stop.line + 1
       log.debug("execuing command: ", string.format("%d,%d%s", start_line, stop_line, operator_name))
-      occurrence.extmarks:del(mark)
+      occurrence.extmarks:unmark(mark)
       vim.cmd(string.format("%d,%d%s", start_line, stop_line, operator_name))
       edited = edited + 1
     elseif config.method == "visual_feedkeys" then
@@ -233,7 +234,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
       log.debug("executing nvim_feedkeys:", operator_name)
       vim.api.nvim_feedkeys("v", "nx", true)
       Cursor.move(edit.stop)
-      occurrence.extmarks:del(mark)
+      occurrence.extmarks:unmark(mark)
       vim.api.nvim_feedkeys(operator_name, "nx", true)
       edited = edited + 1
     else
@@ -357,7 +358,7 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
 
       cursor = nil
 
-      if occurrence and not occurrence.extmarks:has_any() then
+      if occurrence and not occurrence.extmarks:has_any_marks() then
         log.debug("Occurrence has no marks after operation; deactivating")
         occurrence:dispose()
         occurrence = nil ---@diagnostic disable-line: cast-local-type
