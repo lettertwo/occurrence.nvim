@@ -59,6 +59,14 @@ local indent_right = {
 }
 
 ---@type occurrence.OperatorConfig
+local indent_format = {
+  desc = "Indent/format marked occurrences",
+  method = "visual_feedkeys",
+  uses_register = false,
+  modifies_text = true,
+}
+
+---@type occurrence.OperatorConfig
 local uppercase = {
   desc = "Make marked occurrences uppercase",
   method = "visual_feedkeys",
@@ -98,6 +106,7 @@ local builtin_operators = {
   yank = yank,
   indent_left = indent_left,
   indent_right = indent_right,
+  indent_format = indent_format,
   uppercase = uppercase,
   lowercase = lowercase,
   swap_case = swap_case,

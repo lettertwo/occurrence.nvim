@@ -31,6 +31,7 @@ local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
   ["y"] = "yank",
   ["<"] = "indent_left",
   [">"] = "indent_right",
+  ["="] = "indent_format",
 
   ["gu"] = "lowercase",
   ["gU"] = "uppercase",

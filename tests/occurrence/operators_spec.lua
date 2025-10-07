@@ -250,6 +250,18 @@ describe("operators", function()
         cmd_stub:revert()
       end)
     end)
+
+    it("indent_format formats indents for lines with occurrences", function()
+      bufnr = util.buffer({ "  foo bar foo", "    baz bar", "      baz foo bar" })
+      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      occurrence:mark()
+
+      local operator_config = assert(Config.new():get_operator_config("indent_format"))
+      Operator.apply(occurrence, operator_config, "=")
+
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "foo bar foo", "    baz bar", "    baz foo bar" }, lines) -- change expected output as necessary
+    end)
   end)
 
   describe("case operators", function()
