@@ -29,6 +29,7 @@ local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
   ["c"] = "change",
   ["d"] = "delete",
   ["y"] = "yank",
+  ["p"] = "put",
   ["<"] = "indent_left",
   [">"] = "indent_right",
   ["="] = "indent_format",

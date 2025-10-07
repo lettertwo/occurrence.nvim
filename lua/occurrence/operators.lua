@@ -98,12 +98,32 @@ local rot13 = {
   modifies_text = true,
 }
 
+---@type occurrence.OperatorConfig
+local put = {
+  desc = "Put text from register at marked occurrences",
+  method = "direct_api",
+  uses_register = false,
+  modifies_text = true,
+  replacement = function(_, ctx, index)
+    if index == 1 then
+      local ok, reg = pcall(vim.fn.getreg, ctx.register or vim.v.register)
+      if not ok then
+        -- Failed to get register content, abort operation
+        return false
+      end
+      return reg
+    end
+    return nil
+  end,
+}
+
 -- Supported operators
 ---@enum (key) occurrence.BuiltinOperator
 local builtin_operators = {
   change = change,
   delete = delete,
   yank = yank,
+  put = put,
   indent_left = indent_left,
   indent_right = indent_right,
   indent_format = indent_format,

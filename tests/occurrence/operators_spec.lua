@@ -141,6 +141,49 @@ describe("operators", function()
     end)
   end)
 
+  describe("put operator", function()
+    it("replaces marked occurrences with register content", function()
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      occurrence:mark()
+
+      -- Set register 'a' content
+      vim.fn.setreg("a", "inserted")
+
+      -- Apply put operator using register 'a'
+      local operator_config = assert(Config.new():get_operator_config("put"))
+      Operator.apply(occurrence, operator_config, "p", nil, nil, "a")
+
+      -- Check that all 'foo' occurrences were replaced with "inserted"
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "inserted bar inserted", "baz inserted bar" }, final_lines)
+    end)
+
+    it("handles empty register gracefully", function()
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.get(bufnr, "foo", "word")
+
+      -- Mark first occurrence
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+        break
+      end
+
+      -- Ensure register 'a' is empty
+      vim.fn.setreg("a", "")
+
+      -- Should not error
+      assert.has_no.errors(function()
+        local operator_config = assert(Config.new():get_operator_config("put"))
+        Operator.apply(occurrence, operator_config, "p", nil, nil, "a")
+      end)
+
+      -- Check that the occurrence was replaced with empty string (deleted)
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ " bar foo", "baz foo bar" }, final_lines)
+    end)
+  end)
+
   describe("change operator", function()
     it("replaces marked occurrences with user input", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")

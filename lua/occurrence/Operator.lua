@@ -49,9 +49,14 @@ local log = require("occurrence.log")
 ---@class (exact) occurrence.CommandOperator: occurrence.OperatorBase
 ---@field method "command"
 
+---@class occurrence.ReplacementContext
+---@field location occurrence.Location
+---@field register? string
+---@field register_type? string
+
 -- Function to generate replacement text for direct_api method.
 -- If nil is returned on any n + 1 edits, the first edit replacement value is reused.
----@alias occurrence.ReplacementFunction fun(text?: string | string[], edit: occurrence.Location, index: integer): string | string[] | false | nil
+---@alias occurrence.ReplacementFunction fun(text?: string | string[], ctx: occurrence.ReplacementContext, index: integer): string | string[] | false | nil
 
 ---@class (exact) occurrence.DirectApiOperator: occurrence.OperatorBase
 ---@field method "direct_api"
@@ -181,7 +186,12 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
       if config.modifies_text then
         local replacement
         if type(config.replacement) == "function" then
-          replacement = config.replacement(text, edit, i)
+          local ctx = {
+            location = edit,
+            register = register,
+            register_type = register_type,
+          }
+          replacement = config.replacement(text, ctx, i)
         else
           replacement = config.replacement
         end
