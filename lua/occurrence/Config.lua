@@ -37,15 +37,6 @@ local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
 
   ["g~"] = "swap_case",
   ["g?"] = "rot13",
-
-  -- TODO: implement these
-  ["p"] = false, -- put
-  ["gq"] = false, -- text formatting
-  ["gw"] = false, -- text formatting with no cursor movement
-  ["zf"] = false, -- define a fold
-  ["="] = false, -- filter through 'equalprg' or C-indenting if empty
-  ["!"] = false, -- filter through an external program
-  ["g@"] = false, -- call function set with 'operatorfunc'
 }
 
 local DEFAULT_CONFIG = {

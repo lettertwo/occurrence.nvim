@@ -43,8 +43,6 @@ local DEFAULT_PRESET_KEYMAP = {
   },
   v = {
     go = "toggle_selection",
-    ga = "mark",
-    gx = "unmark",
   },
 }
 
@@ -62,16 +60,19 @@ local function activate_preset(occurrence, config)
   elseif config.default_keymaps then
     -- Use default keymaps
 
+    -- Disable the default operator-pending mapping.
+    -- Note that this isn't strictly necessary, since the modify operator
+    -- command is a no-op when there is a preset keymap active,
+    -- but it gives some descriptive feedback to the user to update the binding.
+    occurrence.keymap:set("o", "o", "<Nop>")
+
     -- Set up buffer-local keymaps for normal mode preset actions
     local builtin_actions = require("occurrence.actions")
     for key, action_name in pairs(DEFAULT_PRESET_KEYMAP.n) do
       local capcase = to_capcase(action_name)
       local action_config = builtin_actions[action_name]
       local desc = action_config and action_config.desc or ("Occurrence: " .. action_name)
-      occurrence.keymap:set("n", key, "<Plug>Occurrence" .. capcase, {
-        buffer = buffer,
-        desc = desc,
-      })
+      occurrence.keymap:set("n", key, "<Plug>Occurrence" .. capcase, { desc = desc })
     end
 
     -- Set up buffer-local keymaps for visual mode preset actions
@@ -79,10 +80,7 @@ local function activate_preset(occurrence, config)
       local capcase = to_capcase(action_name)
       local action_config = builtin_actions[action_name]
       local desc = action_config and action_config.desc or ("Occurrence: " .. action_name)
-      occurrence.keymap:set("v", key, "<Plug>Occurrence" .. capcase, {
-        buffer = buffer,
-        desc = desc,
-      })
+      occurrence.keymap:set("v", key, "<Plug>Occurrence" .. capcase, { desc = desc })
     end
 
     -- Set up buffer-local keymaps for operators
@@ -97,11 +95,7 @@ local function activate_preset(occurrence, config)
         end
 
         -- Normal mode operator
-        occurrence.keymap:set("n", operator_key, operator, {
-          buffer = buffer,
-          desc = desc,
-          expr = true,
-        })
+        occurrence.keymap:set("n", operator_key, operator, { desc = desc, expr = true })
 
         -- Visual mode operator
         local visual_desc = "'" .. operator_key .. "' on marked occurrences in selection"
@@ -109,11 +103,7 @@ local function activate_preset(occurrence, config)
           visual_desc = operator_config.desc .. " in selection"
         end
 
-        occurrence.keymap:set("v", operator_key, operator, {
-          buffer = buffer,
-          desc = visual_desc,
-          expr = true,
-        })
+        occurrence.keymap:set("v", operator_key, operator, { desc = visual_desc, expr = true })
       end
     end
   end

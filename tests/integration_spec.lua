@@ -291,16 +291,12 @@ describe("integration tests", function()
 
       -- Check that keys are mapped in visual mode to narrow marks
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
-      local mark_key = nil
       local toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.mark.desc then
-          mark_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == builtins.toggle_selection.desc then
+        if map.lhs ~= nil and map.desc == builtins.toggle_selection.desc then
           toggle_key = map.lhs
         end
       end
-      assert(mark_key, "Mark key should be mapped in visual mode")
       assert(toggle_key, "Toggle mark key should be mapped in visual mode")
 
       -- Test visual selection to toggle marks within selection
@@ -325,16 +321,12 @@ describe("integration tests", function()
 
       -- Verify keymaps are removed after deactivation
       mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
-      mark_key = nil
       toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.mark.desc then
-          mark_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == builtins.toggle_selection.desc then
+        if map.lhs ~= nil and map.desc == builtins.toggle_selection.desc then
           toggle_key = map.lhs
         end
       end
-      assert.is_nil(mark_key, "Mark key should be unmapped after deactivation")
       assert.is_nil(toggle_key, "Toggle mark key should be unmapped after deactivation")
     end)
 

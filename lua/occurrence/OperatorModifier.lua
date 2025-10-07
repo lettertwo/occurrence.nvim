@@ -57,20 +57,10 @@ local function modify_operator(occurrence, occurrence_config)
       occurrence:dispose()
     end
 
-    occurrence.keymap:set("o", "<Esc>", deactivate, {
-      buffer = occurrence.buffer,
-      desc = "Clear occurrence",
-    })
-
-    occurrence.keymap:set("o", "<C-c>", deactivate, {
-      buffer = occurrence.buffer,
-      desc = "Clear occurrence",
-    })
-
-    occurrence.keymap:set("o", "<C-[>", deactivate, {
-      buffer = occurrence.buffer,
-      desc = "Clear occurrence",
-    })
+    occurrence.keymap:set("o", "o", "<Nop>")
+    occurrence.keymap:set("o", "<Esc>", deactivate, { desc = "Clear occurrence" })
+    occurrence.keymap:set("o", "<C-c>", deactivate, { desc = "Clear occurrence" })
+    occurrence.keymap:set("o", "<C-[>", deactivate, { desc = "Clear occurrence" })
 
     Operator.create_opfunc("o", occurrence, operator_config, operator, count, register)
 
@@ -85,6 +75,12 @@ end
 local function create_operator_modifier(config, occurrence_config)
   return function()
     local occurrence = Occurrence.get()
+
+    if occurrence.keymap:is_active() then
+      log.debug("Operator modifier skipped; preset occurrence is active!")
+      return
+    end
+
     local ok, result = pcall(config.callback, occurrence, occurrence_config)
     if not ok or result == false then
       log.debug("Operator modifier cancelled")

@@ -35,22 +35,6 @@ local delete = {
 }
 
 ---@type occurrence.OperatorConfig
-local delete_line = {
-  desc = "Delete marked occurrences on [count] lines",
-  method = "command",
-  uses_register = true,
-  modifies_text = true,
-}
-
----@type occurrence.OperatorConfig
-local delete_to_end_of_line = {
-  desc = "Delete marked occurrences to end of line and [count] additional lines",
-  method = "command",
-  uses_register = true,
-  modifies_text = true,
-}
-
----@type occurrence.OperatorConfig
 local yank = {
   desc = "Yank marked occurrences",
   method = "direct_api",
@@ -74,6 +58,7 @@ local indent_right = {
   modifies_text = true,
 }
 
+---@type occurrence.OperatorConfig
 local uppercase = {
   desc = "Make marked occurrences uppercase",
   method = "visual_feedkeys",
@@ -81,6 +66,7 @@ local uppercase = {
   modifies_text = true,
 }
 
+---@type occurrence.OperatorConfig
 local lowercase = {
   desc = "Make marked occurrences lowercase",
   method = "visual_feedkeys",
@@ -88,6 +74,7 @@ local lowercase = {
   modifies_text = true,
 }
 
+---@type occurrence.OperatorConfig
 local swap_case = {
   desc = "Swap case of marked occurrences",
   method = "visual_feedkeys",
@@ -95,6 +82,7 @@ local swap_case = {
   modifies_text = true,
 }
 
+---@type occurrence.OperatorConfig
 local rot13 = {
   desc = "Rot13 encode marked occurrences",
   method = "visual_feedkeys",
@@ -107,8 +95,6 @@ local rot13 = {
 local builtin_operators = {
   change = change,
   delete = delete,
-  delete_line = delete_line,
-  delete_to_end_of_line = delete_to_end_of_line,
   yank = yank,
   indent_left = indent_left,
   indent_right = indent_right,
