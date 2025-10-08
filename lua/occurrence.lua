@@ -31,7 +31,7 @@ function occurrence.setup(opts)
   })
 
   -- Register global <Plug> mappings for all commands using CapCase convention
-  local actions = require("occurrence.actions")
+  local api = require("occurrence.api")
 
   -- Helper to convert snake_case to CapCase
   local function to_capcase(snake_str)
@@ -41,7 +41,7 @@ function occurrence.setup(opts)
     return result:sub(1, 1):upper() .. result:sub(2)
   end
 
-  for name, action in pairs(actions) do
+  for name, action in pairs(api) do
     local capcase = to_capcase(name)
     local plug_name = "<Plug>Occurrence" .. capcase
     local cmd = "<Cmd>Occurrence " .. name .. "<CR>"

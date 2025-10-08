@@ -287,7 +287,7 @@ describe("Config", function()
 
     it("resolves builtin action strings", function()
       local str = "deactivate"
-      local deactivate_spy = spy.on(require("occurrence.actions").deactivate, "callback")
+      local deactivate_spy = spy.on(require("occurrence.api").deactivate, "callback")
       local wrapped = Config.new():wrap_action(str)
       wrapped()
       assert.spy(deactivate_spy).was_called()

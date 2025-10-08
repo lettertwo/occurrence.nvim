@@ -3,7 +3,7 @@ local Range = require("occurrence.Range")
 
 local log = require("occurrence.log")
 
----@module 'occurrence.actions'
+---@module 'occurrence.api'
 
 ---@type occurrence.PresetConfig
 local find_word = {
@@ -352,8 +352,8 @@ local modify_operator = {
   end,
 }
 
----@enum (key) occurrence.BuiltinAction
-local actions = {
+---@enum (key) occurrence.Api
+local api = {
   find_word = find_word,
   find_selection = find_selection,
   find_last_search = find_last_search,
@@ -380,4 +380,4 @@ local actions = {
   deactivate = deactivate,
 }
 
-return actions
+return api

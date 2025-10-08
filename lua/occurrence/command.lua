@@ -1,5 +1,5 @@
 local log = require("occurrence.log")
-local actions = require("occurrence.actions")
+local api = require("occurrence.api")
 
 ---@module "occurrence.command"
 local command = {}
@@ -28,10 +28,10 @@ local function create_command_impl(wrapped)
   end
 end
 
--- Register all builtin actions as commands
+-- Register all api actions as commands
 ---@param config occurrence.Config
-local function register_builtin_commands(config)
-  for name, action_config in pairs(actions) do
+local function register_api_commands(config)
+  for name, action_config in pairs(api) do
     subcommands[name] = {
       impl = create_command_impl(config:wrap_action(action_config)),
     }
@@ -41,7 +41,7 @@ end
 ---Initialize the command system with the given config
 ---@param config occurrence.Config
 function command.init(config)
-  register_builtin_commands(config)
+  register_api_commands(config)
 end
 
 ---@param name string

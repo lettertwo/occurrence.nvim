@@ -10,7 +10,7 @@ local config = {}
 -- The second argument will be the current `Config`.
 ---@alias occurrence.ActionCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): nil
 
----@alias occurrence.KeymapAction occurrence.PresetConfig | occurrence.OperatorModifierConfig | occurrence.BuiltinAction | occurrence.ActionCallback | false
+---@alias occurrence.KeymapAction occurrence.PresetConfig | occurrence.OperatorModifierConfig | occurrence.Api | occurrence.ActionCallback | false
 
 ---@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.BuiltinOperator | boolean
 ---@class occurrence.OperatorKeymapConfig: { [string]: occurrence.OperatorKeymapEntry }
@@ -163,7 +163,7 @@ end
 ---@param name string
 ---@return occurrence.ActionConfig | nil
 function Config:get_action_config(name)
-  local builtins = require("occurrence.actions")
+  local builtins = require("occurrence.api")
   return builtins[name]
 end
 

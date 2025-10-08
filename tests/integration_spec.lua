@@ -3,7 +3,7 @@ local match = require("luassert.match")
 local stub = require("luassert.stub")
 local util = require("tests.util")
 
-local builtins = require("occurrence.actions")
+local builtins = require("occurrence.api")
 local plugin = require("occurrence")
 
 local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")

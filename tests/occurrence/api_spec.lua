@@ -6,7 +6,7 @@ local util = require("tests.util")
 local Config = require("occurrence.Config")
 local Occurrence = require("occurrence.Occurrence")
 
-describe("actions", function()
+describe("api", function()
   local bufnr
 
   after_each(function()

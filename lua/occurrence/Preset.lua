@@ -67,10 +67,10 @@ local function activate_preset(occurrence, config)
     occurrence.keymap:set("o", "o", "<Nop>")
 
     -- Set up buffer-local keymaps for normal mode preset actions
-    local builtin_actions = require("occurrence.actions")
+    local api = require("occurrence.api")
     for key, action_name in pairs(DEFAULT_PRESET_KEYMAP.n) do
       local capcase = to_capcase(action_name)
-      local action_config = builtin_actions[action_name]
+      local action_config = api[action_name]
       local desc = action_config and action_config.desc or ("Occurrence: " .. action_name)
       occurrence.keymap:set("n", key, "<Plug>Occurrence" .. capcase, { desc = desc })
     end
@@ -78,7 +78,7 @@ local function activate_preset(occurrence, config)
     -- Set up buffer-local keymaps for visual mode preset actions
     for key, action_name in pairs(DEFAULT_PRESET_KEYMAP.v) do
       local capcase = to_capcase(action_name)
-      local action_config = builtin_actions[action_name]
+      local action_config = api[action_name]
       local desc = action_config and action_config.desc or ("Occurrence: " .. action_name)
       occurrence.keymap:set("v", key, "<Plug>Occurrence" .. capcase, { desc = desc })
     end
