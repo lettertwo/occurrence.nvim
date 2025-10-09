@@ -38,7 +38,7 @@ describe("integration tests", function()
       bufnr = util.buffer("unique_word_that_appears_only_once")
 
       plugin.setup({})
-      vim.keymap.set("n", "q", "<Plug>OccurrenceMarkSearchOrWord", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>OccurrenceFindCurrent", { buffer = bufnr })
 
       vim.cmd([[silent! /nonexistent_pattern<CR>]]) -- Search for a pattern that won't match anything
 
@@ -51,7 +51,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({})
-      vim.keymap.set("n", "q", "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -94,7 +94,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({})
-      vim.keymap.set("n", "q", "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -153,7 +153,7 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({})
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all occurrences)
       feedkeys(normal_key)
@@ -165,7 +165,7 @@ describe("integration tests", function()
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       local toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.mark_word_or_toggle_mark.desc then
+        if map.lhs ~= nil and map.desc == builtins.toggle_mark.desc then
           toggle_key = map.lhs
           break
         end
@@ -196,7 +196,7 @@ describe("integration tests", function()
       mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
       toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.mark_word_or_toggle_mark.desc then
+        if map.lhs ~= nil and map.desc == builtins.toggle_mark.desc then
           toggle_key = map.lhs
           break
         end
@@ -209,7 +209,7 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({})
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (cursor at position 0)
       feedkeys(normal_key)
@@ -221,13 +221,13 @@ describe("integration tests", function()
       local next_marked_key = nil
       local prev_marked_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.goto_next.desc then
+        if map.lhs ~= nil and map.desc == builtins.goto_next_match.desc then
           next_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == builtins.goto_previous.desc then
+        elseif map.lhs ~= nil and map.desc == builtins.goto_previous_match.desc then
           prev_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == builtins.goto_next_mark.desc then
+        elseif map.lhs ~= nil and map.desc == builtins.goto_next.desc then
           next_marked_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == builtins.goto_previous_mark.desc then
+        elseif map.lhs ~= nil and map.desc == builtins.goto_previous.desc then
           prev_marked_key = map.lhs
         end
       end
@@ -263,9 +263,9 @@ describe("integration tests", function()
       next_key = nil
       prev_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.goto_next.desc then
+        if map.lhs ~= nil and map.desc == builtins.goto_next_match.desc then
           next_key = map.lhs
-        elseif map.lhs ~= nil and map.desc == builtins.goto_previous.desc then
+        elseif map.lhs ~= nil and map.desc == builtins.goto_previous_match.desc then
           prev_key = map.lhs
         end
       end
@@ -278,7 +278,7 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({})
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Move to 'bar' and activate occurrence
       feedkeys("w") -- Move to 'bar'
@@ -293,7 +293,7 @@ describe("integration tests", function()
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
       local toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.toggle_selection.desc then
+        if map.lhs ~= nil and map.desc == builtins.toggle_in_selection.desc then
           toggle_key = map.lhs
         end
       end
@@ -323,7 +323,7 @@ describe("integration tests", function()
       mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
       toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.toggle_selection.desc then
+        if map.lhs ~= nil and map.desc == builtins.toggle_in_selection.desc then
           toggle_key = map.lhs
         end
       end
@@ -334,7 +334,7 @@ describe("integration tests", function()
       bufnr = util.buffer({ "no matches on this line", "foo bar baz foo" })
 
       plugin.setup({})
-      vim.keymap.set("n", "q", "<Plug>OccurrenceMarkSearchOrWord", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>OccurrenceFindCurrent", { buffer = bufnr })
 
       feedkeys("j") -- Move to second line
       feedkeys("q") -- Activate occurrence (marks all 'foo')
@@ -360,7 +360,7 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({})
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- simulate pressing normal keymap to find 'foo'
       feedkeys(normal_key)
@@ -705,7 +705,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -749,7 +749,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -793,7 +793,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -837,7 +837,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -882,7 +882,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceMarkWord", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -934,7 +934,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", "z", "<Plug>OccurrenceMarkSearchOrWord", { buffer = bufnr })
+      vim.keymap.set("n", "z", "<Plug>OccurrenceFindCurrent", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys("z")

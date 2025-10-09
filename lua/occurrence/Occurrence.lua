@@ -3,9 +3,23 @@ local Disposable = require("occurrence.Disposable")
 local Extmarks = require("occurrence.Extmarks")
 local Keymap = require("occurrence.Keymap")
 local Location = require("occurrence.Location")
+local Operator = require("occurrence.Operator")
 local Range = require("occurrence.Range")
 
+local log = require("occurrence.log")
 local resolve_buffer = require("occurrence.resolve_buffer")
+
+local function callable(fn)
+  return type(fn) == "function" or (type(fn) == "table" and getmetatable(fn) and getmetatable(fn).__call)
+end
+
+-- Helper to convert snake_case to CapCase for <Plug> names
+local function to_capcase(snake_str)
+  local result = snake_str:gsub("_(%w)", function(c)
+    return c:upper()
+  end)
+  return result:sub(1, 1):upper() .. result:sub(2)
+end
 
 ---@alias occurrence.PatternType 'pattern' | 'selection' | 'word'
 
@@ -15,6 +29,51 @@ local OCCURRENCE_CACHE = {}
 
 ---@module 'occurrence.Occurrence'
 local occurrence = {}
+
+-- Function to be used as a callback for an action.
+-- The first argument will always be the `Occurrence` for the current buffer.
+-- The second argument will be the current `Config`.
+-- If the function returns `false`, the occurrence will be disposed.
+---@alias occurrence.ActionCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): false?
+
+-- An action that will activate operator-pending keymaps after running.
+---@class (exact) occurrence.OperatorModifierConfig
+---@field type "operator-modifier"
+---@field mode "o"
+---@field expr true
+---@field plug? string
+---@field desc? string
+---@field callback? occurrence.ActionCallback
+
+-- An action that will activate preset keymaps after running.
+---@class (exact) occurrence.PresetConfig
+---@field type "preset"
+---@field mode? "n" | "v" | ("n" | "v")[]
+---@field plug? string
+---@field desc? string
+---@field callback? occurrence.ActionCallback
+
+-- A descriptor for an action to be applied to occurrences.
+---@alias occurrence.ActionConfig
+---   | occurrence.PresetConfig
+---   | occurrence.OperatorModifierConfig
+---   | { callback: occurrence.ActionCallback }
+
+---@alias occurrence.PresetKeymapEntry occurrence.ActionConfig | occurrence.Api
+
+---@class occurrence.PresetKeymapConfig: { [string]: occurrence.PresetKeymapEntry }
+
+---@type occurrence.PresetKeymapConfig
+local DEFAULT_PRESET_ACTIONS = {
+  ["<Esc>"] = "deactivate",
+  ["n"] = "goto_next",
+  ["N"] = "goto_previous",
+  ["gn"] = "goto_next_match",
+  ["gN"] = "goto_previous_match",
+  ["go"] = "toggle_mark",
+  ["ga"] = "mark",
+  ["gx"] = "unmark",
+}
 
 ---@class occurrence.SearchFlags
 ---@field cursor? boolean Whether to accept a match at the cursor position.
@@ -388,6 +447,181 @@ function Occurrence:clear()
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
   self.extmarks:clear()
   self.patterns = {}
+end
+
+---@param occurrence_config occurrence.Config
+function Occurrence:modify_operator(occurrence_config)
+  local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
+  local operator_config = occurrence_config:get_operator_config(operator)
+
+  if not operator_config then
+    log.warn(string.format("Operator '%s' is not supported", operator))
+    self:dispose()
+    return
+  end
+
+  -- send <C-\><C\n> immediately to cancel pending op.
+  -- see `:h CTRL-\_CTRL-N` and `:h g@`
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
+
+  -- Schedule sending `g@` to trigger custom opfunc on the next frame.
+  -- This is async to allow the first mode change event to cycle.
+  -- If we did this synchronously, there would be no opportunity for
+  -- other plugins (e.g. which-key) to react to the modified operator mode change.
+  -- see `:h CTRL-\_CTRL-N` and `:h g@`
+  vim.schedule(function()
+    if vim.v.operator ~= operator then
+      log.debug("Operator changed from", operator, "to", vim.v.operator, "cancelling operator modifier")
+      self:dispose()
+      return
+    end
+
+    log.debug("Activating operator-pending keymaps for buffer", self.buffer)
+
+    -- Set up buffer-local operator-pending escape keymaps
+    local deactivate = function()
+      self:dispose()
+    end
+
+    self.keymap:set("o", "o", "<Nop>")
+    self.keymap:set("o", "<Esc>", deactivate, { desc = "Clear occurrence" })
+    self.keymap:set("o", "<C-c>", deactivate, { desc = "Clear occurrence" })
+    self.keymap:set("o", "<C-[>", deactivate, { desc = "Clear occurrence" })
+
+    Operator.create_opfunc("o", self, operator_config, operator, count, register)
+
+    -- re-enter operator-pending mode
+    vim.api.nvim_feedkeys("g@", "n", true)
+  end)
+end
+
+---@param config occurrence.Config
+function Occurrence:activate_preset(config)
+  local buffer = self.buffer
+
+  if config.on_preset_activate then
+    -- Call user callback with keymap setter
+    config:on_preset_activate(function(mode, lhs, rhs, opts)
+      opts = vim.tbl_extend("force", opts or {}, { buffer = buffer })
+      self.keymap:set(mode, lhs, rhs, opts)
+    end)
+  elseif config.default_keymaps then
+    -- Use default keymaps
+
+    -- Disable the default operator-pending mapping.
+    -- Note that this isn't strictly necessary, since the modify operator
+    -- command is a no-op when there is a preset keymap active,
+    -- but it gives some descriptive feedback to the user to update the binding.
+    self.keymap:set("o", "o", "<Nop>")
+
+    -- Set up buffer-local keymaps for normal mode preset actions
+    local api = require("occurrence.api")
+    for key, action_name in pairs(DEFAULT_PRESET_ACTIONS) do
+      local action_config = api[action_name]
+      if action_config then
+        local plug = action_config.plug or ("<Plug>Occurrence" .. to_capcase(action_name))
+        local desc = action_config.desc
+        local mode = action_config.mode or { "n", "v" }
+        self.keymap:set(mode, key, plug, { desc = desc })
+      end
+    end
+
+    -- Set up buffer-local keymaps for operators
+    -- TODO: Figure out if this should happen regardless of `default_keymaps` setting
+    for operator_key in pairs(config:operators()) do
+      local operator_config = config:get_operator_config(operator_key)
+      local operator = operator_config and Operator.new(operator_key, operator_config)
+
+      if operator then
+        local desc = "'" .. operator_key .. "' on marked occurrences"
+        if type(operator_config) == "table" and operator_config.desc then
+          desc = operator_config.desc
+        end
+
+        -- Normal mode operator
+        self.keymap:set("n", operator_key, operator, { desc = desc, expr = true })
+
+        -- Visual mode operator
+        local visual_desc = "'" .. operator_key .. "' on marked occurrences in selection"
+        if type(operator_config) == "table" and operator_config.desc then
+          visual_desc = operator_config.desc .. " in selection"
+        end
+
+        self.keymap:set("v", operator_key, operator, { desc = visual_desc, expr = true })
+      end
+    end
+  end
+end
+
+-- Apply the given `action` and `config` to this occurrence.
+-- If `action` is a string, it will be resolved to an API action config.
+-- If `action` is a table with a `callback` field, it will be treated as an action config:
+--   - If `action.type == "preset"`, `self:activate_preset` will be called after the callback.
+--   - If `action.type == "operator-modifier"`, `self:modify_operator` will be called after the callback.
+-- Finally, if `action` is callable, it will be called directly.
+-- In all cases, the action callback will receive this `Occurrence` and the `config` as arguments,
+-- and if it returns `false`, any followup behavior (as with "preset" and "operator-modifier" types)
+-- will be skipped, and this occurrence will be disposed.
+---@param action occurrence.Api | occurrence.ActionConfig | occurrence.ActionCallback
+---@param config occurrence.Config
+function Occurrence:apply(action, config)
+  local callback = nil
+  local action_config = nil
+
+  if type(action) == "string" then
+    action_config = require("occurrence.api")[action]
+  elseif callable(action) then
+    callback = action
+  elseif type(action) == "table" then
+    action_config = action
+  end
+
+  if action_config and (action_config.type or action_config.callback) then
+    if action_config.type == "preset" then
+      ---@cast action_config occurrence.PresetConfig
+      local ok, result = pcall(action_config.callback, self, config)
+      if not ok or result == false then
+        log.debug("Preset action cancelled")
+        self:dispose()
+      elseif not self:has_matches() then
+        log.warn("No matches found for pattern(s):", table.concat(self.patterns, ", "), "skipping activation")
+        self:dispose()
+      elseif not self.keymap:is_active() then
+        log.debug("Activating preset keymaps for buffer", self.buffer)
+        self:activate_preset(config)
+      end
+      return
+    elseif action_config.type == "operator-modifier" then
+      ---@cast action_config occurrence.OperatorModifierConfig
+      if self.keymap:is_active() then
+        log.debug("Operator modifier skipped; preset occurrence is active!")
+        return
+      end
+
+      local ok, result = pcall(action_config.callback, self, config)
+      if not ok or result == false then
+        log.debug("Operator modifier cancelled")
+        self:dispose()
+        return
+      end
+
+      self:modify_operator(config)
+      return
+    else
+      callback = action_config.callback
+    end
+  end
+
+  if callback and callable(callback) then
+    local result = callback(self, config)
+    if result == false then
+      self:dispose()
+      return
+    end
+    return result
+  else
+    error("Invalid action: " .. vim.inspect(action))
+  end
 end
 
 ---@param buffer integer

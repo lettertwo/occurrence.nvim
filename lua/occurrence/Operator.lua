@@ -1,5 +1,4 @@
 local Cursor = require("occurrence.Cursor")
-local Occurrence = require("occurrence.Occurrence")
 local Range = require("occurrence.Range")
 local Register = require("occurrence.Register")
 
@@ -317,7 +316,7 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
     ---@cast occurrence +nil
     if not occurrence then
       -- Get word at current cursor position before restoring
-      occurrence = Occurrence.get()
+      occurrence = require("occurrence.Occurrence").get()
       local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
       if word == "" then
         log.warn("No word under cursor")
@@ -398,7 +397,7 @@ end
 ---@return function
 local function create_operator(operator_name, operator_config)
   return function()
-    local occurrence = Occurrence.get()
+    local occurrence = require("occurrence.Occurrence").get()
     local count, register = vim.v.count, vim.v.register
     local mode = vim.fn.mode():match("[vV]") and "v" or "n"
     create_opfunc(mode, occurrence, operator_config, operator_name, count, register)

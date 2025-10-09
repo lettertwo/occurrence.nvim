@@ -65,7 +65,7 @@ function occurrence.setup(opts)
   -- Set up default keymaps if user hasn't disabled them
   if config.default_keymaps then
     -- Normal mode default
-    vim.keymap.set("n", "go", "<Plug>OccurrenceMarkSearchOrWord", {
+    vim.keymap.set("n", "go", "<Plug>OccurrenceFindCurrent", {
       desc = "Mark occurrences of search or word",
     })
 

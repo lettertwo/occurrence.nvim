@@ -1,5 +1,5 @@
-local log = require("occurrence.log")
 local api = require("occurrence.api")
+local log = require("occurrence.log")
 
 ---@module "occurrence.command"
 local command = {}
@@ -47,12 +47,10 @@ end
 ---@param name string
 ---@param opts occurrence.Subcommand
 function command.add(name, opts)
-  vim.validate({
-    name = { name, "string" },
-    opts = { opts, "table" },
-    impl = { opts.impl, "function" },
-    complete = { opts.complete, "function", true },
-  })
+  vim.validate("name", name, "string")
+  vim.validate("opts", opts, "table")
+  vim.validate("impl", opts.impl, "function")
+  vim.validate("complete", opts.complete, "function", true)
   subcommands[name] = opts
 end
 

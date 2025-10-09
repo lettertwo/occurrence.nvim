@@ -3,15 +3,6 @@ local log = require("occurrence.log")
 ---@module 'occurrence.Config'
 local config = {}
 
----@alias occurrence.ActionConfig occurrence.PresetConfig | occurrence.OperatorModifierConfig
-
--- Function to be used as a callback for an action.
--- The first argument will always be the `Occurrence` for the current buffer.
--- The second argument will be the current `Config`.
----@alias occurrence.ActionCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): nil
-
----@alias occurrence.KeymapAction occurrence.PresetConfig | occurrence.OperatorModifierConfig | occurrence.Api | occurrence.ActionCallback | false
-
 ---@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.BuiltinOperator | boolean
 ---@class occurrence.OperatorKeymapConfig: { [string]: occurrence.OperatorKeymapEntry }
 ---@class occurrence.OperatorKeymapOptions: { [string]?: occurrence.OperatorKeymapEntry }
@@ -168,39 +159,14 @@ function Config:get_action_config(name)
 end
 
 -- Wrap the given `action` in a function to be used as a keymap callback.
--- If `action` is a string, it will be resolved to a builtin action.
--- If `action` is a preset, operator, or operator-modifier config it will be created.
--- If `action` is a function, it will be treated as an action callback.
----@param action occurrence.KeymapAction
+-- See `occurrence.Occurrence:apply()`.
+---@param action occurrence.Api | occurrence.ActionConfig | occurrence.ActionCallback
 ---@return function
 function Config:wrap_action(action)
-  ---@type { callback: occurrence.ActionCallback } | nil
-  local action_config = nil
-
-  if type(action) == "string" then
-    action_config = self:get_action_config(action)
-  elseif type(action) == "table" and action.type ~= nil then
-    action_config = action
-  elseif action and callable(action) then
-    local Occurrence = require("occurrence.Occurrence")
-    return function()
-      return action(Occurrence.get(), self)
-    end
+  local Occurrence = require("occurrence.Occurrence")
+  return function()
+    return Occurrence.get():apply(action, self)
   end
-
-  if action_config and action_config.type then
-    if action_config.type == "preset" then
-      ---@cast action_config occurrence.PresetConfig
-      return require("occurrence.Preset").new(action_config, self)
-    elseif action_config.type == "operator-modifier" then
-      ---@cast action_config occurrence.OperatorModifierConfig
-      return require("occurrence.OperatorModifier").new(action_config, self)
-    else
-      error("Unsupported action type: " .. tostring(action_config.type))
-    end
-  end
-
-  error("Invalid action " .. tostring(action))
 end
 
 ---Get a copy of the default configuration.
