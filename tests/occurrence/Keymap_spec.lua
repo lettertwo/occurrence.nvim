@@ -18,7 +18,6 @@ describe("Keymap", function()
       local km = Keymap.new(bufnr)
       assert.equals(bufnr, km.buffer)
       assert.is_function(km.set)
-      assert.is_function(km.del)
       assert.is_function(km.is_active)
       assert.is_function(km.add)
       assert.is_function(km.dispose)
@@ -52,24 +51,6 @@ describe("Keymap", function()
         end
       end
       assert.is_true(found)
-    end)
-  end)
-
-  describe(":del", function()
-    it("deletes a keymap in the buffer", function()
-      bufnr = util.buffer()
-      local km = Keymap.new(bufnr)
-      km:set("n", "x", "<Nop>")
-      km:del("n", "x")
-      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
-      local found = false
-      for _, map in ipairs(mappings) do
-        if map.lhs == "x" then
-          found = true
-          break
-        end
-      end
-      assert.is_false(found)
     end)
   end)
 
@@ -115,9 +96,6 @@ describe("Keymap", function()
       km:dispose()
       assert.has_error(function()
         km:set("n", "y", "<Nop>")
-      end, "Cannot use a disposed Keymap")
-      assert.has_error(function()
-        km:del("n", "y")
       end, "Cannot use a disposed Keymap")
     end)
   end)

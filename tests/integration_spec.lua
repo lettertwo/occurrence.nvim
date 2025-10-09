@@ -26,6 +26,8 @@ describe("integration tests", function()
     if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
       vim.api.nvim_buf_delete(bufnr, { force = true })
     end
+    vim.fn.setreg("/", "")
+    vim.v.hlsearch = 0
     bufnr = nil
     plugin.reset()
 

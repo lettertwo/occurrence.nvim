@@ -96,10 +96,6 @@ local function is_config(opts)
   return type(opts) == "table" and type(opts.validate) == "function"
 end
 
-local function callable(fn)
-  return type(fn) == "function" or (type(fn) == "table" and getmetatable(fn) and getmetatable(fn).__call)
-end
-
 ---@param key string
 ---@param operators_config occurrence.OperatorKeymapConfig
 ---@return string
@@ -149,24 +145,6 @@ end
 ---@return boolean
 function Config:operator_is_supported(name)
   return not not self:get_operator_config(name)
-end
-
----@param name string
----@return occurrence.ActionConfig | nil
-function Config:get_action_config(name)
-  local builtins = require("occurrence.api")
-  return builtins[name]
-end
-
--- Wrap the given `action` in a function to be used as a keymap callback.
--- See `occurrence.Occurrence:apply()`.
----@param action occurrence.Api | occurrence.ActionConfig | occurrence.ActionCallback
----@return function
-function Config:wrap_action(action)
-  local Occurrence = require("occurrence.Occurrence")
-  return function()
-    return Occurrence.get():apply(action, self)
-  end
 end
 
 ---Get a copy of the default configuration.

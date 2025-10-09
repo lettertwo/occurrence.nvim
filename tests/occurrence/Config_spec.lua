@@ -117,23 +117,6 @@ describe("Config", function()
     end)
   end)
 
-  describe("Config:get_action_config", function()
-    it("returns nil for unsupported actions", function()
-      local conf = Config.new()
-      assert.is_nil(conf:get_action_config("nonexistent_action"))
-    end)
-
-    it("resolves builtin actions", function()
-      local conf = Config.new()
-
-      local action =
-        assert(conf:get_action_config("deactivate"), "Expected action config for 'deactivate' in normal mode")
-      assert.is_function(action.callback)
-      assert.is_string(action.desc)
-      assert.equals("preset", action.type)
-    end)
-  end)
-
   describe("Config:get_operator_config", function()
     it("returns nil for unsupported operators", function()
       local conf = Config.new()
@@ -255,43 +238,6 @@ describe("Config", function()
       }
       local conf = Config.new(opts)
       assert.is_false(conf:operator_is_supported("x"))
-    end)
-  end)
-
-  describe("Config:wrap_action", function()
-    it("wraps table actions", function()
-      local action = {
-        call = function()
-          return "called"
-        end,
-      }
-      setmetatable(action, {
-        __call = function(self)
-          return self.call()
-        end,
-      })
-
-      local wrapped = Config.new():wrap_action(action)
-
-      assert.is_function(wrapped)
-      assert.equals("called", wrapped())
-    end)
-
-    it("wraps functions", function()
-      local func = function()
-        return "test"
-      end
-      local wrapped = Config.new():wrap_action(func)
-      assert.equals("test", wrapped())
-    end)
-
-    it("resolves builtin action strings", function()
-      local str = "deactivate"
-      local deactivate_spy = spy.on(require("occurrence.api").deactivate, "callback")
-      local wrapped = Config.new():wrap_action(str)
-      wrapped()
-      assert.spy(deactivate_spy).was_called()
-      deactivate_spy:revert()
     end)
   end)
 end)

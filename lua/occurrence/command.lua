@@ -1,4 +1,3 @@
-local api = require("occurrence.api")
 local log = require("occurrence.log")
 
 ---@module "occurrence.command"
@@ -18,31 +17,6 @@ local command = {}
 
 ---@type { [string]: occurrence.Subcommand }
 local subcommands = {}
-
--- Create a command impl that wraps a single action
----@param wrapped fun()
----@return fun(args:string[], opts: vim.api.keyset.create_user_command.command_args)
-local function create_command_impl(wrapped)
-  return function()
-    wrapped()
-  end
-end
-
--- Register all api actions as commands
----@param config occurrence.Config
-local function register_api_commands(config)
-  for name, action_config in pairs(api) do
-    subcommands[name] = {
-      impl = create_command_impl(config:wrap_action(action_config)),
-    }
-  end
-end
-
----Initialize the command system with the given config
----@param config occurrence.Config
-function command.init(config)
-  register_api_commands(config)
-end
 
 ---@param name string
 ---@param opts occurrence.Subcommand
