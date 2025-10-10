@@ -22,7 +22,7 @@ local DEFAULT_PRESET_ACTIONS = {
   ["N"] = "goto_previous",
   ["gn"] = "goto_next_match",
   ["gN"] = "goto_previous_match",
-  ["go"] = "toggle_mark",
+  ["go"] = "toggle",
   ["ga"] = "mark",
   ["gx"] = "unmark",
 }

@@ -179,30 +179,6 @@ local unmark = {
   end,
 }
 
----@type occurrence.PresetConfig
-local toggle_mark = {
-  mode = "n",
-  plug = "<Plug>OccurrenceToggleMark",
-  desc = "Add/Toggle occurrence mark",
-  type = "preset",
-  callback = function(occurrence, ...)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count == 0 then
-      return find_word.callback(occurrence, ...)
-    end
-    local cursor = Cursor.save()
-    local range = occurrence:match_cursor()
-    if range and range:contains(cursor.location) then
-      if not occurrence:mark(range) then
-        occurrence:unmark(range)
-      end
-    else
-      cursor:restore()
-      return find_word.callback(occurrence, ...)
-    end
-  end,
-}
-
 -- Add marks and highlights for all matches of the given occurrence.
 ---@type occurrence.PresetConfig
 local mark_all = {
@@ -261,27 +237,43 @@ local unmark_in_selection = {
   end,
 }
 
--- Toggle marks and highlights for matches of the given occurrence within the current selection.
 ---@type occurrence.PresetConfig
-local toggle_in_selection = {
-  mode = "v",
-  plug = "<Plug>OccurrenceToggleInSelection",
+local toggle = {
+  mode = { "n", "v" },
+  plug = "<Plug>OccurrenceToggle",
+  desc = "Add/Toggle occurrence mark(s)",
   type = "preset",
-  desc = "Add/Toggle occurrence marks",
   callback = function(occurrence, ...)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count == 0 then
-      return find_selection.callback(occurrence, ...)
-    end
-    local selection_range = Range.of_selection()
-    if selection_range and occurrence:has_matches(selection_range) then
-      for range in occurrence:matches(selection_range) do
+    if vim.fn.mode():match("[vV]") then
+      local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+      if pattern_count == 0 then
+        return find_selection.callback(occurrence, ...)
+      end
+      local selection_range = Range.of_selection()
+      if selection_range and occurrence:has_matches(selection_range) then
+        for range in occurrence:matches(selection_range) do
+          if not occurrence:mark(range) then
+            occurrence:unmark(range)
+          end
+        end
+      else
+        return find_selection.callback(occurrence, ...)
+      end
+    else
+      local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+      if pattern_count == 0 then
+        return find_word.callback(occurrence, ...)
+      end
+      local cursor = Cursor.save()
+      local range = occurrence:match_cursor()
+      if range and range:contains(cursor.location) then
         if not occurrence:mark(range) then
           occurrence:unmark(range)
         end
+      else
+        cursor:restore()
+        return find_word.callback(occurrence, ...)
       end
-    else
-      return find_selection.callback(occurrence, ...)
     end
   end,
 }
@@ -328,15 +320,15 @@ local api = {
   goto_previous_match = goto_previous_match,
 
   mark = mark,
-  toggle_mark = toggle_mark,
   unmark = unmark,
 
   mark_all = mark_all,
   unmark_all = unmark_all,
 
   mark_in_selection = mark_in_selection,
-  toggle_in_selection = toggle_in_selection,
   unmark_in_selection = unmark_in_selection,
+
+  toggle = toggle,
 
   modify_operator = modify_operator,
   deactivate = deactivate,

@@ -273,7 +273,7 @@ describe("api", function()
     end)
   end)
 
-  describe("toggle_mark", function()
+  describe("toggle", function()
     it("should toggle existing occurrence", function()
       bufnr = util.buffer("foo bar baz foo")
 
@@ -281,13 +281,13 @@ describe("api", function()
       local occurrence = Occurrence.get(bufnr, "foo", "word")
 
       -- First call should toggle mark (mark the current occurrence)
-      api.toggle_mark.callback(occurrence, Config.new())
+      api.toggle.callback(occurrence, Config.new())
 
       local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(1, marked_count, "Should mark the one at cursor")
 
       -- Second call should toggle (unmark)
-      api.toggle_mark.callback(occurrence, Config.new())
+      api.toggle.callback(occurrence, Config.new())
 
       marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(0, marked_count, "Should unmark the one at cursor")
@@ -298,13 +298,13 @@ describe("api", function()
 
       local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
-      api.toggle_mark.callback(occurrence, Config.new())
+      api.toggle.callback(occurrence, Config.new())
       local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(2, marked_count, "Should find and mark both 'foo' occurrences")
 
       -- Should find and mark all occurrences of 'bar'
       vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
-      api.toggle_mark.callback(occurrence, Config.new())
+      api.toggle.callback(occurrence, Config.new())
       marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
       assert.equals(4, marked_count, "Should find and mark both 'bar' occurrences")
     end)
