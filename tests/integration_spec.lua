@@ -295,7 +295,7 @@ describe("integration tests", function()
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
       local toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.toggle_in_selection.desc then
+        if map.lhs ~= nil and map.desc == builtins.toggle.desc then
           toggle_key = map.lhs
         end
       end
@@ -325,7 +325,7 @@ describe("integration tests", function()
       mappings = vim.api.nvim_buf_get_keymap(bufnr, "x")
       toggle_key = nil
       for _, map in ipairs(mappings) do
-        if map.lhs ~= nil and map.desc == builtins.toggle_in_selection.desc then
+        if map.lhs ~= nil and map.desc == builtins.toggle.desc then
           toggle_key = map.lhs
         end
       end
