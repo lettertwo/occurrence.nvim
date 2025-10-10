@@ -13,14 +13,6 @@ local function callable(fn)
   return type(fn) == "function" or (type(fn) == "table" and getmetatable(fn) and getmetatable(fn).__call)
 end
 
--- Helper to convert snake_case to CapCase for <Plug> names
-local function to_capcase(snake_str)
-  local result = snake_str:gsub("_(%w)", function(c)
-    return c:upper()
-  end)
-  return result:sub(1, 1):upper() .. result:sub(2)
-end
-
 ---@alias occurrence.PatternType 'pattern' | 'selection' | 'word'
 
 -- A map of Buffer ids to their Occurrence instances.
@@ -28,7 +20,6 @@ end
 local OCCURRENCE_CACHE = {}
 
 ---@module 'occurrence.Occurrence'
-local occurrence = {}
 
 -- Function to be used as a callback for an action.
 -- The first argument will always be the `Occurrence` for the current buffer.
@@ -58,22 +49,6 @@ local occurrence = {}
 ---   | occurrence.PresetConfig
 ---   | occurrence.OperatorModifierConfig
 ---   | { callback: occurrence.ActionCallback }
-
----@alias occurrence.PresetKeymapEntry occurrence.ActionConfig | occurrence.Api
-
----@class occurrence.PresetKeymapConfig: { [string]: occurrence.PresetKeymapEntry }
-
----@type occurrence.PresetKeymapConfig
-local DEFAULT_PRESET_ACTIONS = {
-  ["<Esc>"] = "deactivate",
-  ["n"] = "goto_next",
-  ["N"] = "goto_previous",
-  ["gn"] = "goto_next_match",
-  ["gN"] = "goto_previous_match",
-  ["go"] = "toggle_mark",
-  ["ga"] = "mark",
-  ["gx"] = "unmark",
-}
 
 ---@class occurrence.SearchFlags
 ---@field cursor? boolean Whether to accept a match at the cursor position.
@@ -449,115 +424,11 @@ function Occurrence:clear()
   self.patterns = {}
 end
 
----@param occurrence_config occurrence.Config
-function Occurrence:modify_operator(occurrence_config)
-  local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
-  local operator_config = occurrence_config:get_operator_config(operator)
-
-  if not operator_config then
-    log.warn(string.format("Operator '%s' is not supported", operator))
-    self:dispose()
-    return
-  end
-
-  -- send <C-\><C\n> immediately to cancel pending op.
-  -- see `:h CTRL-\_CTRL-N` and `:h g@`
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
-
-  -- Schedule sending `g@` to trigger custom opfunc on the next frame.
-  -- This is async to allow the first mode change event to cycle.
-  -- If we did this synchronously, there would be no opportunity for
-  -- other plugins (e.g. which-key) to react to the modified operator mode change.
-  -- see `:h CTRL-\_CTRL-N` and `:h g@`
-  vim.schedule(function()
-    if vim.v.operator ~= operator then
-      log.debug("Operator changed from", operator, "to", vim.v.operator, "cancelling operator modifier")
-      self:dispose()
-      return
-    end
-
-    log.debug("Activating operator-pending keymaps for buffer", self.buffer)
-
-    -- Set up buffer-local operator-pending escape keymaps
-    local deactivate = function()
-      self:dispose()
-    end
-
-    self.keymap:set("o", "o", "<Nop>")
-    self.keymap:set("o", "<Esc>", deactivate, { desc = "Clear occurrence" })
-    self.keymap:set("o", "<C-c>", deactivate, { desc = "Clear occurrence" })
-    self.keymap:set("o", "<C-[>", deactivate, { desc = "Clear occurrence" })
-
-    Operator.create_opfunc("o", self, operator_config, operator, count, register)
-
-    -- re-enter operator-pending mode
-    vim.api.nvim_feedkeys("g@", "n", true)
-  end)
-end
-
----@param config occurrence.Config
-function Occurrence:activate_preset(config)
-  local buffer = self.buffer
-
-  if config.on_preset_activate then
-    -- Call user callback with keymap setter
-    config:on_preset_activate(function(mode, lhs, rhs, opts)
-      opts = vim.tbl_extend("force", opts or {}, { buffer = buffer })
-      self.keymap:set(mode, lhs, rhs, opts)
-    end)
-  elseif config.default_keymaps then
-    -- Use default keymaps
-
-    -- Disable the default operator-pending mapping.
-    -- Note that this isn't strictly necessary, since the modify operator
-    -- command is a no-op when there is a preset keymap active,
-    -- but it gives some descriptive feedback to the user to update the binding.
-    self.keymap:set("o", "o", "<Nop>")
-
-    -- Set up buffer-local keymaps for normal mode preset actions
-    local api = require("occurrence.api")
-    for key, action_name in pairs(DEFAULT_PRESET_ACTIONS) do
-      local action_config = api[action_name]
-      if action_config then
-        local plug = action_config.plug or ("<Plug>Occurrence" .. to_capcase(action_name))
-        local desc = action_config.desc
-        local mode = action_config.mode or { "n", "v" }
-        self.keymap:set(mode, key, plug, { desc = desc })
-      end
-    end
-
-    -- Set up buffer-local keymaps for operators
-    -- TODO: Figure out if this should happen regardless of `default_keymaps` setting
-    for operator_key in pairs(config:operators()) do
-      local operator_config = config:get_operator_config(operator_key)
-      local operator = operator_config and Operator.new(operator_key, operator_config)
-
-      if operator then
-        local desc = "'" .. operator_key .. "' on marked occurrences"
-        if type(operator_config) == "table" and operator_config.desc then
-          desc = operator_config.desc
-        end
-
-        -- Normal mode operator
-        self.keymap:set("n", operator_key, operator, { desc = desc, expr = true })
-
-        -- Visual mode operator
-        local visual_desc = "'" .. operator_key .. "' on marked occurrences in selection"
-        if type(operator_config) == "table" and operator_config.desc then
-          visual_desc = operator_config.desc .. " in selection"
-        end
-
-        self.keymap:set("v", operator_key, operator, { desc = visual_desc, expr = true })
-      end
-    end
-  end
-end
-
 -- Apply the given `action` and `config` to this occurrence.
 -- If `action` is a string, it will be resolved to an API action config.
 -- If `action` is a table with a `callback` field, it will be treated as an action config:
---   - If `action.type == "preset"`, `self:activate_preset` will be called after the callback.
---   - If `action.type == "operator-modifier"`, `self:modify_operator` will be called after the callback.
+--   - If `action.type == "preset"`, `config:activate_preset` will be called after the callback.
+--   - If `action.type == "operator-modifier"`, `config:modify_operator` will be called after the callback.
 -- Finally, if `action` is callable, it will be called directly.
 -- In all cases, the action callback will receive this `Occurrence` and the `config` as arguments,
 -- and if it returns `false`, any followup behavior (as with "preset" and "operator-modifier" types)
@@ -588,7 +459,7 @@ function Occurrence:apply(action, config)
         self:dispose()
       elseif not self.keymap:is_active() then
         log.debug("Activating preset keymaps for buffer", self.buffer)
-        self:activate_preset(config)
+        config:activate_preset(self)
       end
       return
     elseif action_config.type == "operator-modifier" then
@@ -605,7 +476,7 @@ function Occurrence:apply(action, config)
         return
       end
 
-      self:modify_operator(config)
+      config:modify_operator(self)
       return
     else
       callback = action_config.callback
@@ -624,36 +495,6 @@ function Occurrence:apply(action, config)
   end
 end
 
----@param buffer integer
----@return occurrence.Occurrence
-local function create_occurrence(buffer)
-  local self = {}
-  local state = {
-    extmarks = Extmarks.new(buffer),
-    keymap = Keymap.new(buffer),
-    patterns = {},
-  }
-  local disposable = Disposable.new()
-  disposable:add(state.extmarks)
-  disposable:add(state.keymap)
-  setmetatable(self, {
-    __index = function(tbl, key)
-      if rawget(tbl, key) ~= nil then
-        return rawget(tbl, key)
-      elseif key == "buffer" then
-        return buffer
-      elseif state[key] ~= nil then
-        return state[key]
-      elseif Occurrence[key] ~= nil then
-        return Occurrence[key]
-      elseif disposable[key] ~= nil then
-        return disposable[key]
-      end
-    end,
-  })
-  return self
-end
-
 -- Get or create an Occurrence for the given buffer and text.
 -- If no `buffer` is provided, the current buffer will be used.
 -- If a `text` pattern is provided, it will be added to the active occurrence patterns.
@@ -662,11 +503,34 @@ end
 ---@param text? string
 ---@param pattern_type? occurrence.PatternType
 ---@return occurrence.Occurrence
-function occurrence.get(buffer, text, pattern_type)
+local function get_or_create_occurrence(buffer, text, pattern_type)
   buffer = resolve_buffer(buffer, true)
   local self = OCCURRENCE_CACHE[buffer]
   if not self then
-    self = create_occurrence(buffer)
+    self = {} ---@diagnostic disable-line: missing-fields
+    local state = {
+      extmarks = Extmarks.new(buffer),
+      keymap = Keymap.new(buffer),
+      patterns = {},
+    }
+    local disposable = Disposable.new()
+    disposable:add(state.extmarks)
+    disposable:add(state.keymap)
+    setmetatable(self, {
+      __index = function(tbl, key)
+        if rawget(tbl, key) ~= nil then
+          return rawget(tbl, key)
+        elseif key == "buffer" then
+          return buffer
+        elseif state[key] ~= nil then
+          return state[key]
+        elseif Occurrence[key] ~= nil then
+          return Occurrence[key]
+        elseif disposable[key] ~= nil then
+          return disposable[key]
+        end
+      end,
+    })
     self:add(function()
       OCCURRENCE_CACHE[buffer] = nil
     end)
@@ -682,7 +546,7 @@ end
 -- If no `buffer` is provided, the current buffer will be used.
 ---@param buffer? integer
 ---@return boolean deleted Whether an Occurrence was deleted.
-function occurrence.del(buffer)
+local function delete_occurrence(buffer)
   buffer = resolve_buffer(buffer, true)
   local self = OCCURRENCE_CACHE[buffer]
   if self then
@@ -697,8 +561,11 @@ end
 vim.api.nvim_create_autocmd({ "BufDelete" }, {
   group = vim.api.nvim_create_augroup("OccurrenceCleanup", { clear = true }),
   callback = function(args)
-    occurrence.del(args.buf)
+    delete_occurrence(args.buf)
   end,
 })
 
-return occurrence
+return {
+  get = get_or_create_occurrence,
+  del = delete_occurrence,
+}
