@@ -693,8 +693,9 @@ describe("integration tests", function()
     it("applies direct_api operator to all marked occurrences", function()
       bufnr = util.buffer("foo bar baz foo")
 
-      local normal_key = "q"
       plugin.setup({
+        default_operators = false,
+        default_keymaps = false,
         operators = {
           d = {
             desc = "Delete",
@@ -707,10 +708,11 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>OccurrenceFindWord", { buffer = bufnr })
+
+      vim.keymap.set("n", "q", "<Plug>OccurrenceFindWord", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
-      feedkeys(normal_key)
+      feedkeys("q")
 
       -- Verify marks are created
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})

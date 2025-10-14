@@ -381,103 +381,10 @@ describe("operators", function()
       assert.is_true(Operator.is(indent_right_op))
     end)
 
-    it("supports aliasing operators", function()
-      local config = Config.new({
-        operators = {
-          ["del"] = "delete",
-          ["yd"] = "yank",
-          ["ch"] = "change",
-        },
-      })
-
-      assert.is_true(config:operator_is_supported("del"))
-      assert.is_true(config:operator_is_supported("yd"))
-      assert.is_true(config:operator_is_supported("ch"))
-
-      local del_op = config:get_operator_config("del")
-      local yd_op = config:get_operator_config("yd")
-      local ch_op = config:get_operator_config("ch")
-
-      assert.is_true(Operator.is(del_op))
-      assert.is_true(Operator.is(yd_op))
-      assert.is_true(Operator.is(ch_op))
-
-      local delete_op = config:get_operator_config("delete")
-      local yank_op = config:get_operator_config("yank")
-      local change_op = config:get_operator_config("change")
-
-      assert.is_true(Operator.is(delete_op))
-      assert.is_true(Operator.is(yank_op))
-      assert.is_true(Operator.is(change_op))
-    end)
-
-    it("errors for recursive aliasing", function()
-      local config = Config.new({
-        operators = {
-          ["change"] = "delete",
-          ["delete"] = "change",
-        },
-      })
-
-      assert.error(function()
-        config:operator_is_supported("change")
-      end, "Circular operator alias detected: 'change' <-> 'delete'")
-
-      assert.error(function()
-        config:operator_is_supported("delete")
-      end, "Circular operator alias detected: 'delete' <-> 'change'")
-
-      assert.error(function()
-        config:get_operator_config("change")
-      end, "Circular operator alias detected: 'change' <-> 'delete'")
-
-      assert.error(function()
-        config:get_operator_config("delete")
-      end, "Circular operator alias detected: 'delete' <-> 'change'")
-    end)
-
-    it("returns nil for disabled operators", function()
-      local config = Config.new({
-        operators = {
-          ["disabled_op"] = false,
-        },
-      })
-      assert.is_false(config:operator_is_supported("disabled_op"))
-      assert.is_nil(config:get_operator_config("disabled_op"))
-    end)
-
     it("returns nil for unknown operators", function()
       local config = Config.new()
       assert.is_false(config:operator_is_supported("unknown")) -- Unknown operators are supported by default
       assert.is_nil(config:get_operator_config("unknown"))
-    end)
-
-    it("uses visual_feedkeys method by default", function()
-      bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
-      for range in occurrence:matches() do
-        occurrence:mark(range)
-        break
-      end
-
-      -- Mock vim functions to test the visual_feedkeys path
-      local feedkeys_stub = stub(vim.api, "nvim_feedkeys")
-
-      local config = Config.new({
-        operators = {
-          ["test_op"] = true,
-        },
-      })
-
-      local fallback_op = assert(config:get_operator_config("test_op"))
-      assert.is_true(Operator.is(fallback_op))
-      Operator.apply(occurrence, fallback_op, "test_op", nil, nil, nil)
-
-      -- Should feed visual selection and then the operator keys
-      assert.stub(feedkeys_stub).was_called_with("v", "nx", true)
-      assert.stub(feedkeys_stub).was_called_with("test_op", "nx", true)
-
-      feedkeys_stub:revert()
     end)
   end)
 

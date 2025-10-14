@@ -23,11 +23,15 @@ describe("Config", function()
           d = "delete",
         },
         default_keymaps = true,
+        on_preset_activate = setmetatable({}, {
+          __call = function() end,
+        }),
       }
 
       assert.has_no.errors(function()
         Config.new(valid_opts)
       end)
+      assert.spy(vim.notify).was_not_called_with(match._, vim.log.levels.WARN, match._)
     end)
 
     it("handles invalid options gracefully with warning", function()
@@ -48,17 +52,10 @@ describe("Config", function()
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
-      ---@diagnostic disable-next-line: missing-fields
-      local conf4 = Config.new({ operators = { test = {} } })
-      assert.spy(vim.notify).was_called_with(match.has_match("method: expected string"), vim.log.levels.WARN, match._)
-      ---@diagnostic disable-next-line: undefined-field
-      vim.notify:clear()
-
       -- Should still create configs with defaults
       assert.is_table(conf1)
       assert.is_table(conf2)
       assert.is_table(conf3)
-      assert.is_table(conf4)
     end)
   end)
 
@@ -66,54 +63,47 @@ describe("Config", function()
     it("creates config with default values when no options provided", function()
       local conf = Config.new()
       local defaults = Config.default()
-      assert.is_same(defaults.operators, conf:operators())
       assert.equals(defaults.default_keymaps, conf.default_keymaps)
+      assert.equals(defaults.default_operators, conf.default_operators)
+      assert.same(defaults.operators, conf.operators)
     end)
 
     it("creates config with nil options", function()
       local conf = Config.new(nil)
       local defaults = Config.default()
-      assert.is_same(defaults.operators, conf:operators())
       assert.equals(defaults.default_keymaps, conf.default_keymaps)
+      assert.equals(defaults.default_operators, conf.default_operators)
+      assert.same(defaults.operators, conf.operators)
     end)
 
     it("overrides defaults with provided options", function()
       local opts = {
-        operators = {
-          p = "other",
-          y = "fake",
-        },
         default_keymaps = false,
+        default_operators = false,
+        operators = {
+          c = "change",
+          d = "delete",
+        },
       }
 
       local defaults = Config.default()
       local conf = Config.new(opts)
 
-      assert.is_not_same(defaults.operators, conf:operators())
-      assert.is_same(vim.tbl_deep_extend("force", defaults.operators, opts.operators), conf:operators())
-      assert.is_not_same(defaults.default_keymaps, conf.default_keymaps)
       assert.equals(false, conf.default_keymaps)
+      assert.equals(false, conf.default_operators)
+      assert.not_same(defaults.operators, conf.operators)
     end)
 
     it("passes through an existing config", function()
       local opts = {
-        operators = {
-          x = "delete",
-        },
+        default_operators = false,
+        on_preset_activate = function() end,
       }
 
       local conf1 = Config.new(opts)
       local conf2 = Config.new(conf1)
 
       assert.equals(conf1, conf2)
-    end)
-
-    it("has correct operator defaults", function()
-      local conf = Config.new()
-
-      assert.equals("change", conf:operators().c)
-      assert.equals("delete", conf:operators().d)
-      assert.equals("yank", conf:operators().y)
     end)
   end)
 
@@ -123,19 +113,15 @@ describe("Config", function()
       assert.is_nil(conf:get_operator_config("nonexistent_operator"))
     end)
 
-    it("returns nil for aliased to unsupported operators", function()
-      local opts = {
-        operators = {
-          x = "nonexistent_operator",
-        },
-      }
-      local conf = Config.new(opts)
-      assert.is_nil(conf:get_operator_config("x"))
+    it("returns operator config by key", function()
+      local conf = Config.new()
+      local op = assert(conf:get_operator_config("d"), "Expected operator config for 'd'")
+      assert.same(require("occurrence.operators").delete, op)
     end)
 
-    it("returns builtin operator configs", function()
+    it("returns operator config by name", function()
       local conf = Config.new()
-      local op = assert(conf:get_operator_config("delete"), "Expected operator config for 'p'")
+      local op = assert(conf:get_operator_config("delete"), "Expected operator config for 'delete'")
       assert.same(require("occurrence.operators").delete, op)
     end)
 
@@ -166,18 +152,6 @@ describe("Config", function()
       local op = assert(conf:get_operator_config("custom"), "Expected operator config for 'custom'")
       assert.equals(custom_op, op)
     end)
-
-    it("returns default operator config when none specified", function()
-      local conf = Config.new({
-        operators = {
-          custom = true,
-        },
-      })
-      local op = assert(conf:get_operator_config("custom"), "Expected operator config for 'change'")
-      assert.equals("visual_feedkeys", op.method)
-      assert.is_false(op.uses_register)
-      assert.is_true(op.modifies_text)
-    end)
   end)
 
   describe("Config:operator_is_supported", function()
@@ -186,58 +160,50 @@ describe("Config", function()
       assert.is_false(conf:operator_is_supported("nonexistent_operator"))
     end)
 
-    it("returns true for supported builtin operators", function()
+    it("returns true for supported operators and their default keys", function()
       local conf = Config.new()
       assert.is_true(conf:operator_is_supported("change"))
       assert.is_true(conf:operator_is_supported("delete"))
       assert.is_true(conf:operator_is_supported("yank"))
+      assert.is_true(conf:operator_is_supported("c"))
+      assert.is_true(conf:operator_is_supported("d"))
+      assert.is_true(conf:operator_is_supported("y"))
+    end)
+  end)
+
+  describe("Config:get_api_config", function()
+    it("returns nil for unsupported API", function()
+      local conf = Config.new()
+      assert.is_nil(conf:get_api_config("nonexistent_api"))
     end)
 
-    it("returns true for supported aliased operators", function()
-      local opts = {
-        operators = {
-          x = "delete",
-        },
-      }
-      local conf = Config.new(opts)
-      assert.is_true(conf:operator_is_supported("x"))
+    it("returns API config by key", function()
+      local conf = Config.new()
+      local api = assert(conf:get_api_config("ga"), "Expected API config for 'ga'")
+      assert.same(require("occurrence.api").mark, api)
     end)
 
-    it("returns true for supported custom operators", function()
-      local custom_op = {
-        desc = "Custom operator",
-        method = "command",
-        uses_register = false,
-        modifies_text = true,
-      }
-      local opts = {
-        operators = {
-          custom = custom_op,
-        },
-      }
-      local conf = Config.new(opts)
-      assert.is_true(conf:operator_is_supported("custom"))
+    it("returns API config by name", function()
+      local conf = Config.new()
+      local api = assert(conf:get_api_config("mark"), "Expected API config for 'mark'")
+      assert.same(require("occurrence.api").mark, api)
+    end)
+  end)
+
+  describe("Config:api_is_supported", function()
+    it("returns false for unsupported API", function()
+      local conf = Config.new()
+      assert.is_false(conf:api_is_supported("nonexistent_api"))
     end)
 
-    it("returns false for disabled operators", function()
-      local opts = {
-        operators = {
-          delete = false,
-        },
-      }
-      local conf = Config.new(opts)
-      assert.is_false(conf:operator_is_supported("delete"))
-    end)
-
-    it("returns false for aliased disabled operators", function()
-      local opts = {
-        operators = {
-          x = "delete",
-          delete = false,
-        },
-      }
-      local conf = Config.new(opts)
-      assert.is_false(conf:operator_is_supported("x"))
+    it("returns true for supported API names and their default keys", function()
+      local conf = Config.new()
+      assert.is_true(conf:api_is_supported("mark"))
+      assert.is_true(conf:api_is_supported("unmark"))
+      assert.is_true(conf:api_is_supported("deactivate"))
+      assert.is_true(conf:api_is_supported("ga"))
+      assert.is_true(conf:api_is_supported("gx"))
+      assert.is_true(conf:api_is_supported("<Esc>"))
     end)
   end)
 end)

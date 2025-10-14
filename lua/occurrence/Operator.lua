@@ -392,15 +392,15 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
   _set_opfunc(opfunc)
 end
 
----@param operator_name string
+---@param operator_key string
 ---@param operator_config occurrence.OperatorConfig
----@return function
-local function create_operator(operator_name, operator_config)
-  return function()
-    local occurrence = require("occurrence.Occurrence").get()
+---@return fun(occurrence: occurrence.Occurrence?): "g@"
+local function create_operator(operator_key, operator_config)
+  return function(occurrence)
+    occurrence = occurrence or require("occurrence.Occurrence").get()
     local count, register = vim.v.count, vim.v.register
     local mode = vim.fn.mode():match("[vV]") and "v" or "n"
-    create_opfunc(mode, occurrence, operator_config, operator_name, count, register)
+    create_opfunc(mode, occurrence, operator_config, operator_key, count, register)
     -- send g@ to trigger custom opfunc
     return "g@"
   end

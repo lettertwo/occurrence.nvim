@@ -5,15 +5,17 @@ local config = {}
 
 ---@alias occurrence.KeymapSetFn fun(mode: string|string[], lhs: string, rhs: string|function, opts?: vim.keymap.set.Opts)
 
+---@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.BuiltinOperator | string | false
+---@alias occurrence.OperatorKeymapConfig { [string]: occurrence.OperatorKeymapEntry }
+
 ---@class occurrence.Options
 ---@field default_keymaps? boolean
 ---@field default_operators? boolean
+---@field operators? occurrence.OperatorKeymapConfig
 ---@field on_preset_activate? fun(map: occurrence.KeymapSetFn): nil
----@field on_modify_operator? fun(operator: string): occurrence.OperatorConfig | nil
+---@field get_operator_config? fun(operator: string): occurrence.OperatorConfig | nil
 
----@alias occurrence.PresetKeymapEntry occurrence.ActionConfig | occurrence.Api
----@class occurrence.PresetKeymapConfig: { [string]: occurrence.PresetKeymapEntry }
----@type occurrence.PresetKeymapConfig
+---@type { [string]: occurrence.Api }
 local DEFAULT_PRESET_ACTIONS = {
   ["<Esc>"] = "deactivate",
   ["<C-c>"] = "deactivate",
@@ -27,12 +29,8 @@ local DEFAULT_PRESET_ACTIONS = {
   ["gx"] = "unmark",
 }
 
----@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.BuiltinOperator | boolean
----@class occurrence.OperatorKeymapConfig: { [string]: occurrence.OperatorKeymapEntry }
-
----@type occurrence.OperatorKeymapConfig
-local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
-  -- operators
+---@type { [string]: occurrence.BuiltinOperator }
+local DEFAULT_OPERATORS = {
   ["c"] = "change",
   ["d"] = "delete",
   ["y"] = "yank",
@@ -49,19 +47,10 @@ local DEFAULT_OPERATOR_KEYMAP_CONFIG = {
 }
 
 local DEFAULT_CONFIG = {
+  operators = DEFAULT_OPERATORS,
   default_keymaps = true,
   default_operators = true,
   on_preset_activate = nil,
-  on_modify_operator = nil,
-}
-
--- Default operator configuration that is used
--- when an operator is enabled with `true`.
----@type occurrence.OperatorConfig
-local DEFAULT_OPERATOR_CONFIG = {
-  method = "visual_feedkeys",
-  uses_register = false,
-  modifies_text = true,
 }
 
 local function callable(fn)
@@ -76,92 +65,77 @@ local function to_capcase(snake_str)
   return result:sub(1, 1):upper() .. result:sub(2)
 end
 
----Validate the given options.
----Returns error message if the options represent an invalid configuration.
----@param opts occurrence.Options
----@return string? error_message
-local function validate(opts)
-  local ok, err = pcall(function()
-    vim.validate("opts", opts, "table")
-
-    local valid_keys = {
-      default_keymaps = "boolean",
-      default_operators = "boolean",
-      on_preset_activate = "function",
-      on_modify_operator = "function",
-    }
-
-    for key, validator in pairs(valid_keys) do
-      vim.validate(key, opts[key], validator, true)
-    end
-
-    for key in pairs(opts) do
-      assert(valid_keys[key], string.format('unknown option "%s"', key))
-    end
-  end)
-
-  if not ok then
-    return tostring(err)
+---@param value occurrence.OperatorConfig
+local function validate_operator_config(value)
+  vim.validate("config", value, "table")
+  vim.validate("method", value.method, function(val)
+    return val == "visual_feedkeys" or val == "command" or val == "direct_api"
+  end, '"visual_feedkeys", "command", or "direct_api"')
+  vim.validate("uses_register", value.uses_register, "boolean")
+  vim.validate("modifies_text", value.modifies_text, "boolean")
+  if value.method == "direct_api" and value.modifies_text then
+    vim.validate("replacement", value.replacement, { "string", "table", "callable", "nil" }, true)
   end
-
-  return nil
-end
-
----Check if the given options is already a config.
----@param opts any
----@return boolean
-local function is_config(opts)
-  return type(opts) == "table" and type(opts.validate) == "function"
 end
 
 ---@class occurrence.Config
 ---@field validate fun(self: occurrence.Config, opts: occurrence.Options): string? error_message
 ---@field default_keymaps boolean
 ---@field default_operators boolean
----@field on_preset_activate? fun(self: occurrence.Config, map: occurrence.KeymapSetFn): nil
----@field on_modify_operator? fun(self: occurrence.Config, operator: string): occurrence.OperatorConfig | nil
+---@field operators occurrence.OperatorKeymapConfig
+---@field on_preset_activate? fun(map: occurrence.KeymapSetFn): nil
 local Config = {}
-
----@param key string
----@return string
-function Config:resolve_operator_key(key)
-  local resolved = DEFAULT_OPERATOR_KEYMAP_CONFIG[key]
-  local seen = {}
-  while type(resolved) == "string" do
-    if seen[key] then
-      error("Circular operator alias detected: '" .. key .. "' <-> '" .. resolved .. "'")
-    end
-    seen[key] = true
-    key = resolved
-    resolved = DEFAULT_OPERATOR_KEYMAP_CONFIG[key]
-  end
-  return key
-end
-
----@param name string
----@return occurrence.OperatorConfig | nil
-function Config:get_operator_config(name)
-  name = self:resolve_operator_key(name)
-  local operator_config = DEFAULT_OPERATOR_KEYMAP_CONFIG[name]
-
-  if operator_config == nil then
-    local builtins = require("occurrence.operators")
-    operator_config = builtins[name]
-  end
-
-  if operator_config == true then
-    operator_config = DEFAULT_OPERATOR_CONFIG
-  end
-
-  if type(operator_config) == "table" then
-    return operator_config
-  end
-end
 
 ---@param name string
 ---@return boolean
 function Config:operator_is_supported(name)
   return not not self:get_operator_config(name)
+end
+
+---@param name occurrence.Api | string
+---@return occurrence.ActionConfig | nil
+function Config:get_api_config(name)
+  local api_name = DEFAULT_PRESET_ACTIONS[name] or name
+  local api = require("occurrence.api")
+  return api[api_name]
+end
+
+---@param name string
+---@return boolean
+function Config:api_is_supported(name)
+  return not not self:get_api_config(name)
+end
+
+---@param name string
+---@return occurrence.OperatorConfig | nil
+function Config:get_operator_config(name)
+  local operator_config = nil
+  operator_config = self.operators[name]
+  -- Explicitly disabled operator
+  if operator_config == false then
+    return nil
+  end
+
+  if type(operator_config) == "string" then
+    name = operator_config
+    operator_config = nil
+  end
+
+  if operator_config == nil then
+    local builtins = require("occurrence.operators")
+    operator_config = builtins[name]
+    ---@cast operator_config -occurrence.BuiltinOperator
+  end
+
+  if operator_config ~= nil then
+    local ok, err = pcall(validate_operator_config, operator_config)
+    if not ok then
+      log.warn_once(string.format("Invalid operator config for '%s': %s", name, err))
+      return nil
+    end
+  end
+
+  return operator_config
 end
 
 ---@param occurrence occurrence.Occurrence
@@ -174,66 +148,48 @@ function Config:activate_preset(occurrence)
     occurrence.keymap:set("o", "o", "<Nop>")
 
     -- Set up buffer-local keymaps for normal mode preset actions
-    local api = require("occurrence.api")
-    for key, action_name in pairs(DEFAULT_PRESET_ACTIONS) do
-      local action_config = api[action_name]
+    for preset_key, action_name in pairs(DEFAULT_PRESET_ACTIONS) do
+      local action_config = self:get_api_config(preset_key)
       if action_config then
         local plug = action_config.plug or ("<Plug>Occurrence" .. to_capcase(action_name))
         local desc = action_config.desc
         local mode = action_config.mode or { "n", "v" }
-        occurrence.keymap:set(mode, key, plug, { desc = desc })
+        occurrence.keymap:set(mode, preset_key, plug, { desc = desc })
       end
     end
   end
 
-  if self.default_operators then
-    -- Set up buffer-local keymaps for operators
-    for operator_key in pairs(DEFAULT_OPERATOR_KEYMAP_CONFIG) do
-      local operator_config = self:get_operator_config(operator_key)
-      local operator = operator_config and require("occurrence.Operator").new(operator_key, operator_config)
-
-      if operator then
-        local desc = "'" .. operator_key .. "' on marked occurrences"
-        if type(operator_config) == "table" and operator_config.desc then
-          desc = operator_config.desc
-        end
-
-        -- Normal mode operator
-        occurrence.keymap:set("n", operator_key, operator, { desc = desc, expr = true })
-
-        -- Visual mode operator
-        local visual_desc = "'" .. operator_key .. "' on marked occurrences in selection"
-        if type(operator_config) == "table" and operator_config.desc then
-          visual_desc = operator_config.desc .. " in selection"
-        end
-
-        occurrence.keymap:set("v", operator_key, operator, { desc = visual_desc, expr = true })
-      end
+  -- Set up buffer-local keymaps for operators
+  for operator_key in pairs(self.operators) do
+    local operator_config = self:get_operator_config(operator_key)
+    local operator = operator_config and require("occurrence.Operator").new(operator_key, operator_config)
+    if operator_config and operator then
+      local desc = operator_config.desc or ("'" .. operator_key .. "' on marked occurrences")
+      occurrence.keymap:set({ "n", "v" }, operator_key, operator, { desc = desc, expr = true })
+    else
+      log.warn_once(string.format("Operator '%s' is not supported", operator_key))
     end
   end
 
   if callable(self.on_preset_activate) then
-    self:on_preset_activate(function(mode, lhs, rhs, opts)
+    self.on_preset_activate(function(mode, lhs, rhs, opts)
       occurrence.keymap:set(mode, lhs, rhs, opts)
     end)
   end
 end
 
 ---@param occurrence occurrence.Occurrence
-function Config:modify_operator(occurrence)
-  local operator, count, register = vim.v.operator, vim.v.count, vim.v.register
-  local operator_config = nil
+---@param operator_key? string If nil, modifies the pending operator.
+function Config:modify_operator(occurrence, operator_key)
+  local count, register = vim.v.count, vim.v.register
+  operator_key = operator_key or vim.v.operator
 
-  if callable(self.on_modify_operator) then
-    operator_config = self:on_modify_operator(operator)
-  end
-
-  if not operator_config and self.default_operators then
-    operator_config = self:get_operator_config(operator)
-  end
+  local operator_config = self:get_operator_config(operator_key)
 
   if not operator_config then
-    log.warn(string.format("Operator '%s' is not supported", operator))
+    log.warn(string.format("Operator '%s' is not supported", operator_key))
+    -- If we have failed to modify the pending operator
+    -- to use the occurrence, we should dispose of it.
     occurrence:dispose()
     return
   end
@@ -248,12 +204,6 @@ function Config:modify_operator(occurrence)
   -- other plugins (e.g. which-key) to react to the modified operator mode change.
   -- see `:h CTRL-\_CTRL-N` and `:h g@`
   vim.schedule(function()
-    if vim.v.operator ~= operator then
-      log.debug("Operator changed from", operator, "to", vim.v.operator, "cancelling operator modifier")
-      occurrence:dispose()
-      return
-    end
-
     log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
 
     vim.api.nvim_create_autocmd("ModeChanged", {
@@ -265,12 +215,70 @@ function Config:modify_operator(occurrence)
       end,
     })
 
-    require("occurrence.Operator").create_opfunc("o", occurrence, operator_config, operator, count, register)
+    require("occurrence.Operator").create_opfunc("o", occurrence, operator_config, operator_key, count, register)
 
     -- re-enter operator-pending mode
     vim.api.nvim_feedkeys("g@", "n", true)
     vim.cmd("redraw") -- ensure the screen is redrawn
   end)
+end
+
+---Check if the given options is already a config.
+---@param opts any
+---@return boolean
+function config.is_config(opts)
+  if type(opts) ~= "table" then
+    return false
+  end
+  for key in pairs(Config) do
+    if opts[key] == nil then
+      return false
+    end
+  end
+  return true
+end
+
+---Validate the given options.
+---Returns error message if the options represent an invalid configuration.
+---@param opts occurrence.Options
+---@return string? error_message
+function config.validate(opts)
+  local ok, err = pcall(function()
+    vim.validate("opts", opts, "table")
+
+    ---@type { [string]: { [1]: string, [2]: boolean? } }
+    local valid_keys = {
+      operators = { "table", true },
+      default_keymaps = { "boolean", true },
+      default_operators = { "boolean", true },
+      on_preset_activate = { "callable", true },
+    }
+
+    for key, validator in pairs(valid_keys) do
+      ---@diagnostic disable-next-line: param-type-mismatch
+      vim.validate(key, opts[key], unpack(validator))
+    end
+
+    if opts.operators then
+      for op_key, op_value in pairs(opts.operators) do
+        vim.validate("operator key", op_key, "string")
+        vim.validate("operator value", op_value, { "table", "string", "boolean" })
+        if type(op_value) == "table" then
+          validate_operator_config(op_value)
+        end
+      end
+    end
+
+    for key in pairs(opts) do
+      assert(valid_keys[key], string.format('unknown option "%s"', key))
+    end
+  end)
+
+  if not ok then
+    return tostring(err)
+  end
+
+  return nil
 end
 
 ---Get a copy of the default configuration.
@@ -288,35 +296,30 @@ function config.new(opts, ...)
     return config.new(...)
   end
 
-  if is_config(opts) then
+  if config.is_config(opts) then
     ---@cast opts occurrence.Config
     return opts
   end
   ---@cast opts -occurrence.Config
 
   if opts ~= nil then
-    local err = validate(opts)
+    local err = config.validate(opts)
     if err then
       log.warn_once(err)
       opts = nil
     end
   end
 
+  local self = vim.tbl_deep_extend("force", {}, DEFAULT_CONFIG, opts or {})
+
+  if not self.default_operators then
+    self.operators = (opts and opts.operators) or {}
+  end
+
   return setmetatable({}, {
     __index = function(_, key)
-      if key == "validate" then
-        return function(_, o)
-          return validate(o or opts)
-        end
-      end
-      if key == "default_keymaps" or key == "default_operators" then
-        if opts and opts[key] ~= nil then
-          return opts[key]
-        end
-        return true -- default to true if not specified
-      end
-      if key == "on_preset_activate" or key == "on_modify_operator" then
-        return opts and opts[key] or nil
+      if self[key] ~= nil then
+        return self[key]
       end
       if Config[key] ~= nil then
         return Config[key]
