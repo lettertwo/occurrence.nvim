@@ -3,7 +3,6 @@ local Disposable = require("occurrence.Disposable")
 local Extmarks = require("occurrence.Extmarks")
 local Keymap = require("occurrence.Keymap")
 local Location = require("occurrence.Location")
-local Operator = require("occurrence.Operator")
 local Range = require("occurrence.Range")
 
 local log = require("occurrence.log")
@@ -27,7 +26,9 @@ local OCCURRENCE_CACHE = {}
 -- If the function returns `false`, the occurrence will be disposed.
 ---@alias occurrence.ActionCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): false?
 
--- An action that will activate operator-pending keymaps after running.
+-- An action that will exit operator_pending mode, set occurrences
+-- of the current word and then re-enter operator-pending mode
+-- with `:h opfunc`.
 ---@class (exact) occurrence.OperatorModifierConfig
 ---@field type "operator-modifier"
 ---@field mode "o"
@@ -36,7 +37,8 @@ local OCCURRENCE_CACHE = {}
 ---@field desc? string
 ---@field callback? occurrence.ActionCallback
 
--- An action that will activate preset keymaps after running.
+-- An action that will run and then activate preset keymaps,
+-- if not already active.
 ---@class (exact) occurrence.PresetConfig
 ---@field type "preset"
 ---@field mode? "n" | "v" | ("n" | "v")[]
@@ -388,7 +390,6 @@ function Occurrence:matches(range, patterns)
       for _, next_pattern_match in ipairs(pattern_matchers) do
         if next_pattern_match.match == next_best_match then
           next_pattern_match.pop()
-          break
         end
       end
       last_location = next_best_match.start
@@ -401,6 +402,7 @@ function Occurrence:matches(range, patterns)
 end
 
 -- Add an additional text pattern to search for.
+-- If the pattern was already added, this is a no-op.
 ---@param text string
 ---@param pattern_type? occurrence.PatternType The type of occurrence matching to use. Default is 'pattern'.
 function Occurrence:add_pattern(text, pattern_type)
@@ -410,6 +412,12 @@ function Occurrence:add_pattern(text, pattern_type)
     pattern = string.format([[\V\C%s]], pattern)
   elseif pattern_type == "word" then
     pattern = string.format([[\V\C\<%s\>]], pattern)
+  end
+
+  for _, existing in ipairs(self.patterns) do
+    if existing == pattern then
+      return
+    end
   end
 
   table.insert(self.patterns, pattern)

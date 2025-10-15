@@ -319,6 +319,21 @@ describe("Occurrence", function()
         "Range(start: Location(0, 12), stop: Location(0, 15))",
       }, matches)
     end)
+
+    it("deduplicates identical matches from multiple patterns", function()
+      bufnr = util.buffer("foo foo foo")
+      local occ = Occurrence.get(bufnr)
+      occ:add_pattern([[fo*]], "pattern")
+      occ:add_pattern("foo", "selection")
+      occ:add_pattern("foo", "word")
+
+      local matches = vim.iter(occ:matches()):map(tostring):totable()
+      assert.same({
+        "Range(start: Location(0, 0), stop: Location(0, 3))",
+        "Range(start: Location(0, 4), stop: Location(0, 7))",
+        "Range(start: Location(0, 8), stop: Location(0, 11))",
+      }, matches) -- only three unique matches
+    end)
   end)
 
   describe(":marks", function()
@@ -591,7 +606,7 @@ describe("Occurrence", function()
         foo bar baz
         foo bar baz
       ]])
-      local occ = Occurrence.get(bufnr, [[baz\n        foo]], "word")
+      local occ = Occurrence.get(bufnr, [[baz\n        foo]], "pattern")
 
       assert.is_true(occ:mark())
 
@@ -609,8 +624,8 @@ describe("Occurrence", function()
         foo bar baz
         foo bar baz
       ]])
-      local occ = Occurrence.get(bufnr, [[baz\n        foo]], "word")
-      occ:add_pattern([[bar baz\n        foo]], "word")
+      local occ = Occurrence.get(bufnr, [[baz\n        foo]], "pattern")
+      occ:add_pattern([[bar baz\n        foo]], "pattern")
 
       assert.is_true(occ:mark())
 
@@ -937,11 +952,12 @@ describe("Occurrence", function()
     end)
   end)
 
-  describe("pattern types", function()
+  describe(":add_pattern", function()
     describe("'word' type", function()
       it("matches whole words only", function()
         bufnr = util.buffer("foo foobar barfoo")
-        local occ = Occurrence.get(bufnr, "foo", "word")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo", "word")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -951,7 +967,8 @@ describe("Occurrence", function()
 
       it("respects word boundaries with special chars", function()
         bufnr = util.buffer("foo foo.bar foo-baz")
-        local occ = Occurrence.get(bufnr, "foo", "word")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo", "word")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -963,7 +980,8 @@ describe("Occurrence", function()
 
       it("does not match partial words", function()
         bufnr = util.buffer("testing test retest")
-        local occ = Occurrence.get(bufnr, "test", "word")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("test", "word")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -973,18 +991,35 @@ describe("Occurrence", function()
 
       it("matches special characters as whole words", function()
         bufnr = util.buffer([[foo.bar foo.bar.baz]])
-        local occ = Occurrence.get(bufnr, "foo.bar", "word")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo.bar", "word")
 
         assert.is_true(occ:has_matches())
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.equals(2, #matches)
+      end)
+
+      it("does not add the same pattern multiple times", function()
+        bufnr = util.buffer("foo foo foo")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo", "word")
+        occ:add_pattern("foo", "word") -- duplicate
+        assert.equal(1, #occ.patterns, "Pattern was added twice")
+
+        local matches = vim.iter(occ:matches()):map(tostring):totable()
+        assert.same({
+          "Range(start: Location(0, 0), stop: Location(0, 3))",
+          "Range(start: Location(0, 4), stop: Location(0, 7))",
+          "Range(start: Location(0, 8), stop: Location(0, 11))",
+        }, matches) -- only three matches, not six
       end)
     end)
 
     describe("'selection' type", function()
       it("matches literal text without word boundaries", function()
         bufnr = util.buffer("foo foobar barfoo")
-        local occ = Occurrence.get(bufnr, "foo", "selection")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -996,7 +1031,8 @@ describe("Occurrence", function()
 
       it("matches special regex chars literally", function()
         bufnr = util.buffer("foo.* foo.* test")
-        local occ = Occurrence.get(bufnr, "foo.*", "selection")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo.*", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1007,7 +1043,8 @@ describe("Occurrence", function()
 
       it("is case-sensitive", function()
         bufnr = util.buffer("Foo foo FOO")
-        local occ = Occurrence.get(bufnr, "foo", "selection")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1017,7 +1054,8 @@ describe("Occurrence", function()
 
       it("matches regex metacharacters literally", function()
         bufnr = util.buffer([[foo[bar] foo[bar] test]])
-        local occ = Occurrence.get(bufnr, "foo[bar]", "selection")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo[bar]", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1028,7 +1066,8 @@ describe("Occurrence", function()
 
       it("matches parentheses literally", function()
         bufnr = util.buffer("foo(bar) test foo(bar)")
-        local occ = Occurrence.get(bufnr, "foo(bar)", "selection")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo(bar)", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1039,7 +1078,8 @@ describe("Occurrence", function()
 
       it("matches partial words", function()
         bufnr = util.buffer("testing test retest")
-        local occ = Occurrence.get(bufnr, "test", "selection")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("test", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1050,11 +1090,9 @@ describe("Occurrence", function()
       end)
 
       it("handles multiline selections", function()
-        bufnr = util.buffer([[foo
-bar
-foo
-bar]])
-        local occ = Occurrence.get(bufnr, "foo\nbar", "selection")
+        bufnr = util.buffer({ "foo", "bar", "foo", "bar" })
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo\nbar", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1062,12 +1100,28 @@ bar]])
           "Range(start: Location(2, 0), stop: Location(3, 3))",
         }, matches)
       end)
+
+      it("does not add the same pattern multiple times", function()
+        bufnr = util.buffer("foo foo foo")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo", "selection")
+        occ:add_pattern("foo", "selection") -- duplicate
+        assert.equal(1, #occ.patterns, "Pattern was added twice")
+
+        local matches = vim.iter(occ:matches()):map(tostring):totable()
+        assert.same({
+          "Range(start: Location(0, 0), stop: Location(0, 3))",
+          "Range(start: Location(0, 4), stop: Location(0, 7))",
+          "Range(start: Location(0, 8), stop: Location(0, 11))",
+        }, matches) -- only three matches, not six
+      end)
     end)
 
     describe("'pattern' type", function()
       it("uses raw vim regex", function()
         bufnr = util.buffer("foo foobar barfoo")
-        local occ = Occurrence.get(bufnr, "foo", "pattern")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo", "pattern")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1079,7 +1133,8 @@ bar]])
 
       it("supports word boundaries when explicit", function()
         bufnr = util.buffer("foo foobar barfoo")
-        local occ = Occurrence.get(bufnr, [[\<foo\>]], "pattern")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern([[\<foo\>]], "pattern")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1089,7 +1144,8 @@ bar]])
 
       it("supports character classes", function()
         bufnr = util.buffer("foo fao fbo fco")
-        local occ = Occurrence.get(bufnr, [[f[ao]o]], "pattern")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern([[f[ao]o]], "pattern")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1100,7 +1156,8 @@ bar]])
 
       it("supports alternation", function()
         bufnr = util.buffer("foo bar baz test")
-        local occ = Occurrence.get(bufnr, [[foo\|bar]], "pattern")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern([[foo\|bar]], "pattern")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1111,7 +1168,8 @@ bar]])
 
       it("supports quantifiers", function()
         bufnr = util.buffer("fo foo fooo test")
-        local occ = Occurrence.get(bufnr, [[foo*]], "pattern")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern([[foo*]], "pattern")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
@@ -1122,21 +1180,37 @@ bar]])
       end)
 
       it("supports anchors", function()
-        bufnr = util.buffer([[foo bar
-bar foo]])
-        local occ = Occurrence.get(bufnr, [[^foo]], "pattern")
+        bufnr = util.buffer({ "foo bar", "bar foo" })
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern([[^foo]], "pattern")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
         assert.same({
           "Range(start: Location(0, 0), stop: Location(0, 3))",
         }, matches) -- only "foo" at start of line
       end)
+
+      it("does not add the same pattern multiple times", function()
+        bufnr = util.buffer("fo foo fooo")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern([[fo*]], "pattern")
+        occ:add_pattern([[fo*]], "pattern") -- duplicate
+        assert.equal(1, #occ.patterns, "Pattern was added twice")
+
+        local matches = vim.iter(occ:matches()):map(tostring):totable()
+        assert.same({
+          "Range(start: Location(0, 0), stop: Location(0, 2))",
+          "Range(start: Location(0, 3), stop: Location(0, 6))",
+          "Range(start: Location(0, 7), stop: Location(0, 11))",
+        }, matches) -- only three matches, not six
+      end)
     end)
 
     describe("mixed pattern types", function()
       it("supports multiple patterns with different types", function()
         bufnr = util.buffer("foo foobar test.* test.*")
-        local occ = Occurrence.get(bufnr, "foo", "word")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("foo", "word")
         occ:add_pattern("test.*", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
@@ -1149,7 +1223,8 @@ bar foo]])
 
       it("allows word and selection types together", function()
         bufnr = util.buffer("testing test retest")
-        local occ = Occurrence.get(bufnr, "test", "word")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("test", "word")
         occ:add_pattern("ing", "selection")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
@@ -1161,7 +1236,8 @@ bar foo]])
 
       it("allows pattern and word types together", function()
         bufnr = util.buffer("bar foobar fo fooo")
-        local occ = Occurrence.get(bufnr, "bar", "word")
+        local occ = Occurrence.get(bufnr)
+        occ:add_pattern("bar", "word")
         occ:add_pattern([[fo*]], "pattern")
 
         local matches = vim.iter(occ:matches()):map(tostring):totable()
