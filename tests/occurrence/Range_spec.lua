@@ -2,6 +2,7 @@ local assert = require("luassert")
 local util = require("tests.util")
 local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
+local feedkeys = require("occurrence.feedkeys")
 
 describe("Range", function()
   describe(".new", function()
@@ -319,7 +320,7 @@ describe("Range", function()
         vim.api.nvim_win_set_cursor(0, { 1, 6 }) -- position at "world" in first line
 
         -- Enter visual mode and move cursor to create selection
-        vim.api.nvim_feedkeys("v", "nx", false)
+        feedkeys("v")
         vim.api.nvim_win_set_cursor(0, { 1, 10 }) -- select "world"
 
         local range = assert(Range.of_selection())
@@ -335,7 +336,7 @@ describe("Range", function()
         vim.api.nvim_win_set_cursor(0, { 2, 10 })
 
         -- Enter line-wise visual mode
-        vim.api.nvim_feedkeys("V", "nx", false)
+        feedkeys("V")
 
         local range = assert(Range.of_selection())
         assert.equals(1, range.start.line) -- 0-indexed line 1
@@ -348,7 +349,7 @@ describe("Range", function()
       it("handles multi-line character-wise selection", function()
         -- Start selection on line 1
         vim.api.nvim_win_set_cursor(0, { 1, 6 })
-        vim.api.nvim_feedkeys("v", "nx", false)
+        feedkeys("v")
 
         -- End selection on line 4
         vim.api.nvim_win_set_cursor(0, { 4, 10 })
@@ -363,7 +364,7 @@ describe("Range", function()
       it("handles reversed selections correctly", function()
         -- Start at end position and select backwards
         vim.api.nvim_win_set_cursor(0, { 1, 15 })
-        vim.api.nvim_feedkeys("v", "nx", false)
+        feedkeys("v")
         vim.api.nvim_win_set_cursor(0, { 1, 5 })
 
         local range = assert(Range.of_selection())
@@ -375,7 +376,7 @@ describe("Range", function()
         vim.api.nvim_win_set_cursor(0, { 1, 5 })
 
         -- Try to enter blockwise visual mode (Ctrl-V)
-        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-v>", true, false, true), "nx", false)
+        feedkeys.change_mode("^V") -- visual block mode
 
         -- Should error for blockwise mode
         assert.is_true(vim.api.nvim_get_mode().mode == "") -- visual block mode
@@ -403,7 +404,7 @@ describe("Range", function()
         vim.api.nvim_win_set_cursor(0, { 1, 5 }) -- position in first line
 
         -- Yank word to set [ and ] marks
-        vim.api.nvim_feedkeys("yw", "nx", false)
+        feedkeys("yw")
         local range = assert(Range.of_motion("char"))
         -- Should have a range from the yank operation
         assert.equals(0, range.start.line)
@@ -415,7 +416,7 @@ describe("Range", function()
         vim.api.nvim_win_set_cursor(0, { 2, 0 })
 
         -- Yank line to set marks
-        vim.api.nvim_feedkeys("yy", "nx", false)
+        feedkeys("yy")
         vim.wait(10)
 
         local range = assert(Range.of_motion("line"))
@@ -433,7 +434,7 @@ describe("Range", function()
         -- Yank 3 lines
         local report = vim.opt.report
         vim.opt.report = 9999 -- suppress "3 lines yanked" message
-        vim.api.nvim_feedkeys("3yy", "nx", false)
+        feedkeys("3yy")
         vim.opt.report = report
 
         local range = assert(Range.of_motion("line"))
@@ -448,7 +449,7 @@ describe("Range", function()
         vim.api.nvim_win_set_cursor(0, { 1, 6 })
 
         -- Yank 5 characters
-        vim.api.nvim_feedkeys("5yl", "nx", false)
+        feedkeys("5yl")
 
         local range = assert(Range.of_motion("char"))
         assert.equals(0, range.start.line)
@@ -475,8 +476,8 @@ describe("Range", function()
         vim.api.nvim_win_set_cursor(0, { 2, 0 })
 
         -- Change word (this should set marks)
-        vim.api.nvim_feedkeys("cw", "nx", false)
-        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "nx", false)
+        feedkeys("cw")
+        feedkeys("<Esc>")
 
         local range = assert(Range.of_motion("char"))
         assert.equals(1, range.start.line)
@@ -488,7 +489,7 @@ describe("Range", function()
       it("handles delete operations", function()
         -- Position cursor and delete some text
         vim.api.nvim_win_set_cursor(0, { 2, 5 })
-        vim.api.nvim_feedkeys("dw", "nx", false)
+        feedkeys("dw")
 
         local range = assert(Range.of_motion("char"))
         assert.equals(1, range.start.line) -- 0-indexed
@@ -500,7 +501,7 @@ describe("Range", function()
       it("converts char motion to line motion correctly", function()
         -- Set up a character range
         vim.api.nvim_win_set_cursor(0, { 2, 10 })
-        vim.api.nvim_feedkeys("yw", "nx", false)
+        feedkeys("yw")
 
         -- Get both char and line versions of the same motion
         local char_range = assert(Range.of_motion("char"))

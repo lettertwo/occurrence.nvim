@@ -1,6 +1,7 @@
 local Cursor = require("occurrence.Cursor")
 local Range = require("occurrence.Range")
 
+local feedkeys = require("occurrence.feedkeys")
 local log = require("occurrence.log")
 
 ---@module 'occurrence.api'
@@ -48,7 +49,7 @@ local find_selection = {
     end
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
     -- Clear visual selection
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
+    feedkeys.change_mode("n", { noflush = true, silent = true })
     -- mark all occurrences of the newest pattern
     occurrence:add_pattern(text, "selection")
     if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then

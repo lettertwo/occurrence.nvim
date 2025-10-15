@@ -2,6 +2,7 @@ local assert = require("luassert")
 local stub = require("luassert.stub")
 local util = require("tests.util")
 
+local feedkeys = require("occurrence.feedkeys")
 local plugin = require("occurrence")
 
 local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
@@ -9,11 +10,6 @@ local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
 describe("dot repeat functionality", function()
   local bufnr
   local notify_stub
-
-  local feedkeys = function(keys)
-    keys = vim.api.nvim_replace_termcodes(keys, true, false, true)
-    vim.api.nvim_feedkeys(keys, "mx", false)
-  end
 
   before_each(function()
     notify_stub = stub(vim, "notify")

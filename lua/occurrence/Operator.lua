@@ -2,6 +2,7 @@ local Cursor = require("occurrence.Cursor")
 local Range = require("occurrence.Range")
 local Register = require("occurrence.Register")
 
+local feedkeys = require("occurrence.feedkeys")
 local log = require("occurrence.log")
 
 ---@module "occurrence.Operator"
@@ -239,12 +240,11 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
       edited = edited + 1
     elseif config.method == "visual_feedkeys" then
       -- Clear any visual selection before (re-)entering visual mode
-      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
-      log.debug("executing nvim_feedkeys:", operator_name)
-      vim.api.nvim_feedkeys("v", "nx", true)
+      feedkeys.change_mode("v", { force = true, silent = true })
       Cursor.move(edit.stop)
       occurrence.extmarks:unmark(mark)
-      vim.api.nvim_feedkeys(operator_name, "nx", true)
+      log.debug("executing nvim_feedkeys:", operator_name)
+      feedkeys(operator_name, { noremap = true })
       edited = edited + 1
     else
       ---@diagnostic disable-next-line: undefined-field
@@ -357,7 +357,7 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
     then
       if mode == "v" then
         -- Clear visual selection
-        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
+        feedkeys.change_mode("n", { noflush = true, silent = true })
         if cursor and range then
           -- Move the cursor back to the start of the selection.
           -- This seems to be what nvim does after a visual operation?
@@ -379,7 +379,7 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
         log.debug("Restoring operator to g@ for dot-repeat")
         -- set opfunc to a noop so we can get `g@` back into `vim.v.operator` with no side effects.
         _set_opfunc(function() end)
-        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("g@$", true, false, true), "nx", false)
+        feedkeys("g@$", { noremap = true })
         -- Restore our original opfunc.
         _set_opfunc(opfunc)
       end

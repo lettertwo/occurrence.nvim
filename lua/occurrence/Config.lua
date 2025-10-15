@@ -1,3 +1,4 @@
+local feedkeys = require("occurrence.feedkeys")
 local log = require("occurrence.log")
 
 ---@module 'occurrence.Config'
@@ -194,9 +195,8 @@ function Config:modify_operator(occurrence, operator_key)
     return
   end
 
-  -- send <C-\><C\n> immediately to cancel pending op.
-  -- see `:h CTRL-\_CTRL-N` and `:h g@`
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true), "n", false)
+  -- cancel the pending op.
+  feedkeys.change_mode("n", { force = true, noflush = true, silent = true })
 
   -- Schedule sending `g@` to trigger custom opfunc on the next frame.
   -- This is async to allow the first mode change event to cycle.
@@ -210,15 +210,15 @@ function Config:modify_operator(occurrence, operator_key)
       once = true,
       pattern = "*o*:*",
       callback = function()
-        log.debug("Operator-pending mode exited, clearing occurrence for buffer", occurrence.buffer)
-        occurrence:dispose()
+        vim.schedule(function()
+          log.debug("Operator-pending mode exited, clearing occurrence for buffer", occurrence.buffer)
+          occurrence:dispose()
+        end)
       end,
     })
-
     require("occurrence.Operator").create_opfunc("o", occurrence, operator_config, operator_key, count, register)
-
     -- re-enter operator-pending mode
-    vim.api.nvim_feedkeys("g@", "n", true)
+    feedkeys.change_mode("o", { silent = true })
     vim.cmd("redraw") -- ensure the screen is redrawn
   end)
 end

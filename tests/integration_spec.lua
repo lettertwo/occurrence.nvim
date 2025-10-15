@@ -4,6 +4,7 @@ local stub = require("luassert.stub")
 local util = require("tests.util")
 
 local builtins = require("occurrence.api")
+local feedkeys = require("occurrence.feedkeys")
 local plugin = require("occurrence")
 
 local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
@@ -11,11 +12,6 @@ local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
 describe("integration tests", function()
   local bufnr
   local notify_stub
-
-  local feedkeys = function(keys)
-    keys = vim.api.nvim_replace_termcodes(keys, true, false, true)
-    vim.api.nvim_feedkeys(keys, "mx", false)
-  end
 
   before_each(function()
     -- stub out notify to avoid polluting test output
@@ -652,6 +648,8 @@ describe("integration tests", function()
 
       -- Simulate pressing escape to cancel operator modification
       feedkeys("<Esc>")
+
+      vim.wait(0) -- The operator-modifier action is async.
 
       -- Verify marks are cleared
       marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
