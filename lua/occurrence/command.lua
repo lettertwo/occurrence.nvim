@@ -44,13 +44,15 @@ end
 ---@param arglead string The leading portion of the argument being completed
 ---@param cmdline string The entire command line
 ---@param cursorpos integer The cursor position in the command line
----@return string[] A list of completion matches
+---@return string[]? A list of completion matches
 function command.complete(arglead, cmdline, cursorpos)
-  local subcommand_key = cmdline:match("^%s*%S+%s+(%S*)")
+  local subcommand_key, subcommand_arglead = cmdline:match("^['<,'>]*%S+[!]*%s+(%S*)%s(.*)$")
   if subcommand_key and subcommands[subcommand_key] and subcommands[subcommand_key].complete then
-    return subcommands[subcommand_key].complete(arglead, cursorpos)
+    return subcommands[subcommand_key].complete(subcommand_arglead, cursorpos)
+  elseif arglead then
+    -- `:Occurrence <TAB>` or `:Occurrence <subcommand> <TAB>`
+    return vim.tbl_keys(subcommands)
   end
-  return vim.tbl_keys(subcommands)
 end
 
 ---@param opts vim.api.keyset.create_user_command.command_args :h lua-guide-commands-create
