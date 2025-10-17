@@ -208,7 +208,7 @@ function Config:modify_operator(occurrence, operator_key)
 
     vim.api.nvim_create_autocmd("ModeChanged", {
       once = true,
-      pattern = "*o*:*",
+      pattern = "*:n",
       callback = function()
         vim.schedule(function()
           log.debug("Operator-pending mode exited, clearing occurrence for buffer", occurrence.buffer)
