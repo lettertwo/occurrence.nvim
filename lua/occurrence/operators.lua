@@ -11,7 +11,6 @@ local change = {
     if index == 1 then
       local ok, input = pcall(vim.fn.input, {
         prompt = "Change to: ",
-        default = type(text) == "table" and table.concat(text) or (text or ""),
         cancelreturn = false,
       })
       if not ok then

@@ -209,7 +209,6 @@ describe("operators", function()
       -- Verify input was called
       assert.stub(input_stub).was_called_with({
         prompt = "Change to: ",
-        default = "foo",
         cancelreturn = false,
       })
 
