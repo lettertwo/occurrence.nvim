@@ -37,7 +37,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>OccurrenceFindWord", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
 
     -- Mark all 'foo' occurrences
     feedkeys("q")
@@ -77,7 +77,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>OccurrenceFindWord", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
 
     -- Mark all 'foo' occurrences
     feedkeys("q")
@@ -108,7 +108,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>OccurrenceFindWord", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
 
     -- Mark 'foo'
     feedkeys("q")
@@ -142,7 +142,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("o", "o", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
+    vim.keymap.set("o", "o", "<Plug>(OccurrenceModifyOperator)", { buffer = bufnr })
 
     -- Delete first 2 occurrences of 'foo' to end of line using operator-modifier
     feedkeys("d2o")
@@ -193,7 +193,7 @@ describe("dot repeat functionality", function()
       },
     })
 
-    vim.keymap.set("o", "o", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
+    vim.keymap.set("o", "o", "<Plug>(OccurrenceModifyOperator)", { buffer = bufnr })
 
     feedkeys("4w") -- move to first 'text'
     feedkeys("co")
@@ -254,7 +254,7 @@ describe("dot repeat functionality", function()
       },
     })
 
-    vim.keymap.set("n", "go", "<Plug>OccurrenceFindWord", { buffer = bufnr })
+    vim.keymap.set("n", "go", "<Plug>(OccurrenceWord)", { buffer = bufnr })
 
     feedkeys("4w") -- move to first 'text'
     feedkeys("go")
@@ -303,7 +303,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("o", "o", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
+    vim.keymap.set("o", "o", "<Plug>(OccurrenceModifyOperator)", { buffer = bufnr })
 
     -- Delete first 2 occurrences of 'foo' to end of line into register 'a'
     feedkeys('"ad2o')
@@ -340,7 +340,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("o", "o", "<Plug>OccurrenceModifyOperator", { buffer = bufnr })
+    vim.keymap.set("o", "o", "<Plug>(OccurrenceModifyOperator)", { buffer = bufnr })
 
     -- Delete first 2 occurrences of 'foo' to end of line using operator-modifier
     feedkeys("d2o")
@@ -379,7 +379,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>OccurrenceFindWord", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
 
     -- Mark all 'foo' occurrences
     feedkeys("q")
@@ -421,7 +421,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>OccurrenceFindWord", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
 
     -- Mark 'foo'
     feedkeys("q")

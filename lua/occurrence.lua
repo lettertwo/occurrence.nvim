@@ -28,10 +28,10 @@ for name, api_config in pairs(api) do
   -- Register `Occurrence <name>` subcommand
   command.add(name, { impl = occurrence[name] })
 
-  -- Register `<Plug>OccurrenceName` keymap
+  -- Register `<Plug>(OccurrenceName)` keymap
   vim.keymap.set(
     api_config.mode or { "n", "v" },
-    api_config.plug or ("<Plug>Occurrence" .. to_capcase(name)),
+    api_config.plug or ("<Plug>(Occurrence" .. to_capcase(name) .. ")"),
     occurrence[name],
     {
       desc = api_config.desc or ("Occurrence: " .. name),
@@ -67,10 +67,7 @@ function occurrence.reset()
   for _, mode in ipairs({ "n", "v", "o" }) do
     local keymap = vim.api.nvim_get_keymap(mode)
     for _, km in ipairs(keymap) do
-      if
-        (km.lhs == "go" and km.rhs == api.find_current.plug)
-        or (km.lhs == "o" and km.rhs == api.modify_operator.plug)
-      then
+      if (km.lhs == "go" and km.rhs == api.current.plug) or (km.lhs == "o" and km.rhs == api.modify_operator.plug) then
         pcall(vim.keymap.del, mode, km.lhs)
       end
     end
@@ -89,8 +86,8 @@ function occurrence.setup(opts)
     -- Set up default keymaps if enabled
     if config.default_keymaps then
       -- Normal and visual mode default
-      vim.keymap.set({ "n", "v" }, "go", api.find_current.plug, {
-        desc = api.find_current.desc,
+      vim.keymap.set({ "n", "v" }, "go", api.current.plug, {
+        desc = api.current.desc,
       })
       -- Operator-pending mode default
       vim.keymap.set("o", "o", api.modify_operator.plug, {

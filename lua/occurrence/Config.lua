@@ -21,10 +21,10 @@ local DEFAULT_PRESET_ACTIONS = {
   ["<Esc>"] = "deactivate",
   ["<C-c>"] = "deactivate",
   ["<C-[>"] = "deactivate",
-  ["n"] = "goto_next",
-  ["N"] = "goto_previous",
-  ["gn"] = "goto_next_match",
-  ["gN"] = "goto_previous_match",
+  ["n"] = "next",
+  ["N"] = "previous",
+  ["gn"] = "match_next",
+  ["gN"] = "match_previous",
   ["go"] = "toggle",
   ["ga"] = "mark",
   ["gx"] = "unmark",
@@ -152,7 +152,7 @@ function Config:activate_preset(occurrence)
     for preset_key, action_name in pairs(DEFAULT_PRESET_ACTIONS) do
       local action_config = self:get_api_config(preset_key)
       if action_config then
-        local plug = action_config.plug or ("<Plug>Occurrence" .. to_capcase(action_name))
+        local plug = action_config.plug or ("<Plug>(Occurrence" .. to_capcase(action_name) .. ")")
         local desc = action_config.desc
         local mode = action_config.mode or { "n", "v" }
         occurrence.keymap:set(mode, preset_key, plug, { desc = desc })

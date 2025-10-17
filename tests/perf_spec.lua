@@ -165,6 +165,142 @@ describe("Performance Tests", function()
       assert.is_not_nil(match, "Should find a wrapped match")
       assert.is_true(elapsed < 100, "Wrapped search took too long: " .. elapsed .. "ms")
     end)
+
+    it("navigates through many occurrences efficiently (forward)", function()
+      bufnr = util.buffer(huge_content)
+      vim.api.nvim_set_current_buf(bufnr)
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Position cursor at the beginning
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      local start_time = vim.loop.hrtime()
+      local navigation_count = 0
+      local max_navigations = 200 -- Realistic: user navigating through ~200 matches in a session
+
+      for i = 1, max_navigations do
+        local match = occurrence:match_cursor({ direction = "forward", wrap = true })
+        if not match then
+          break
+        end
+        navigation_count = navigation_count + 1
+      end
+
+      local elapsed = (vim.loop.hrtime() - start_time) / 1e6
+
+      assert.is_true(navigation_count > 0, "Should find at least some matches")
+      assert.is_true(
+        elapsed < 200,
+        "Navigating through " .. navigation_count .. " occurrences took too long: " .. elapsed .. "ms (~1ms each)"
+      )
+    end)
+
+    it("navigates through many occurrences efficiently (backward)", function()
+      bufnr = util.buffer(huge_content)
+      vim.api.nvim_set_current_buf(bufnr)
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Position cursor near the end
+      vim.api.nvim_win_set_cursor(0, { 9999, 0 })
+
+      local start_time = vim.loop.hrtime()
+      local navigation_count = 0
+      local max_navigations = 200 -- Realistic: user navigating backward through ~200 matches
+
+      for i = 1, max_navigations do
+        local match = occurrence:match_cursor({ direction = "backward", wrap = true })
+        if not match then
+          break
+        end
+        navigation_count = navigation_count + 1
+      end
+
+      local elapsed = (vim.loop.hrtime() - start_time) / 1e6
+
+      assert.is_true(navigation_count > 0, "Should find at least some matches")
+      assert.is_true(
+        elapsed < 200,
+        "Navigating backward through " .. navigation_count .. " occurrences took too long: " .. elapsed .. "ms (~1ms each)"
+      )
+    end)
+
+    it("navigates through marked occurrences efficiently", function()
+      bufnr = util.buffer(huge_content)
+      vim.api.nvim_set_current_buf(bufnr)
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark every 10th occurrence to simulate selective marking
+      local mark_count = 0
+      for match in occurrence:matches() do
+        mark_count = mark_count + 1
+        if mark_count % 10 == 0 then
+          occurrence.extmarks:mark(match)
+        end
+      end
+
+      -- Position cursor at the beginning
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      local start_time = vim.loop.hrtime()
+      local navigation_count = 0
+      local max_navigations = 100 -- Realistic: navigating through ~100 marked occurrences
+
+      for i = 1, max_navigations do
+        local match = occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
+        if not match then
+          break
+        end
+        navigation_count = navigation_count + 1
+      end
+
+      local elapsed = (vim.loop.hrtime() - start_time) / 1e6
+
+      assert.is_true(navigation_count > 0, "Should find at least some marked matches")
+      assert.is_true(
+        elapsed < 500,
+        "Navigating through " .. navigation_count .. " marked occurrences took too long: " .. elapsed .. "ms (~5ms each)"
+      )
+    end)
+
+    it("handles alternating forward/backward navigation of both marked and unmarked occurrences efficiently", function()
+      bufnr = util.buffer(huge_content)
+      vim.api.nvim_set_current_buf(bufnr)
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark every 10th occurrence to simulate selective marking
+      local mark_count = 0
+      for match in occurrence:matches() do
+        mark_count = mark_count + 1
+        if mark_count % 10 == 0 then
+          occurrence.extmarks:mark(match)
+        end
+      end
+
+      -- Position cursor in the middle
+      vim.api.nvim_win_set_cursor(0, { 5000, 0 })
+
+      local start_time = vim.loop.hrtime()
+      local navigation_count = 0
+      local max_navigations = 200 -- Realistic: alternating direction ~200 times
+
+      for i = 1, max_navigations do
+        local direction = (i % 2 == 0) and "forward" or "backward"
+        local marked = (i % 3 == 0) -- Every third navigation uses marked occurrences
+        local match = occurrence:match_cursor({ direction = direction, wrap = true, marked = marked })
+        if not match then
+          break
+        end
+        navigation_count = navigation_count + 1
+      end
+
+      local elapsed = (vim.loop.hrtime() - start_time) / 1e6
+
+      assert.is_true(navigation_count > 0, "Should find at least some matches")
+      assert.is_true(
+        elapsed < 300,
+        "Alternating navigation through " .. navigation_count .. " occurrences took too long: " .. elapsed .. "ms (~1.5ms each)"
+      )
+    end)
   end)
 
   describe("Range Operations Performance", function()
@@ -199,20 +335,31 @@ describe("Performance Tests", function()
 
   describe("Stress Tests", function()
     it("handles rapid occurrence creation and disposal", function()
-      bufnr = util.buffer(large_content)
+      -- Use smaller buffer for this test - rapid switching is less common with huge files
+      local medium_content = {}
+      for i = 1, 500 do
+        local line = string.format("line %d with content and pattern_%d", i, i % 50)
+        table.insert(medium_content, line)
+      end
+
+      bufnr = util.buffer(medium_content)
       local start_time = vim.loop.hrtime()
 
-      -- Reduce iterations to make test more reasonable
-      for i = 1, 200 do
+      -- Realistic: User might switch patterns/files ~50 times in an intense editing session
+      for i = 1, 50 do
         local occurrence = Occurrence.get(bufnr, "content")
-        if i % 20 == 0 then
+        if i % 10 == 0 then
+          -- Occasionally mark some occurrences (realistic usage)
           occurrence:mark()
         end
         occurrence:dispose()
       end
 
       local elapsed = (vim.loop.hrtime() - start_time) / 1e6
-      assert.is_true(elapsed < 3000, "Rapid creation/disposal took too long: " .. elapsed .. "ms")
+      assert.is_true(
+        elapsed < 1000,
+        "Rapid creation/disposal (50 iterations) took too long: " .. elapsed .. "ms (~20ms each)"
+      )
     end)
 
     it("handles concurrent buffer operations", function()

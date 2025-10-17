@@ -7,9 +7,9 @@ local log = require("occurrence.log")
 ---@module 'occurrence.api'
 
 ---@type occurrence.PresetConfig
-local find_word = {
+local word = {
   mode = "n",
-  plug = "<Plug>OccurrenceFindWord",
+  plug = "<Plug>(OccurrenceWord)",
   desc = "Find occurrences of word",
   type = "preset",
   callback = function(occurrence)
@@ -31,9 +31,9 @@ local find_word = {
 }
 
 ---@type occurrence.PresetConfig
-local find_selection = {
+local selection = {
   mode = "v",
-  plug = "<Plug>OccurrenceFindSelection",
+  plug = "<Plug>(OccurrenceSelection)",
   desc = "Find occurrences of selection",
   type = "preset",
   callback = function(occurrence)
@@ -62,9 +62,9 @@ local find_selection = {
 }
 
 ---@type occurrence.PresetConfig
-local find_pattern = {
+local pattern = {
   mode = "n",
-  plug = "<Plug>OccurrenceFindPattern",
+  plug = "<Plug>(OccurrencePattern)",
   desc = "Find occurrences of search pattern",
   type = "preset",
   callback = function(occurrence)
@@ -91,25 +91,25 @@ local find_pattern = {
 -- or the current search pattern if available,
 -- or the word under the cursor.
 ---@type occurrence.PresetConfig
-local find_current = {
-  plug = "<Plug>OccurrenceFindCurrent",
+local current = {
+  plug = "<Plug>(OccurrenceCurrent)",
   desc = "Find occurrences",
   type = "preset",
   callback = function(occurrence, ...)
     if vim.fn.mode():match("[vV]") then
-      return find_selection.callback(occurrence, ...)
+      return selection.callback(occurrence, ...)
     elseif vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "" then
-      return find_pattern.callback(occurrence, ...)
+      return pattern.callback(occurrence, ...)
     else
-      return find_word.callback(occurrence, ...)
+      return word.callback(occurrence, ...)
     end
   end,
 }
 
 ---@type occurrence.PresetConfig
-local goto_next_match = {
+local match_next = {
   mode = "n",
-  plug = "<Plug>OccurrenceNextMatch",
+  plug = "<Plug>(OccurrenceMatchNext)",
   desc = "Next occurrence match",
   type = "preset",
   callback = function(occurrence)
@@ -118,9 +118,9 @@ local goto_next_match = {
 }
 
 ---@type occurrence.PresetConfig
-local goto_previous_match = {
+local match_previous = {
   mode = "n",
-  plug = "<Plug>OccurrencePreviousMatch",
+  plug = "<Plug>(OccurrenceMatchPrevious)",
   desc = "Previous occurrence match",
   type = "preset",
   callback = function(occurrence)
@@ -129,9 +129,9 @@ local goto_previous_match = {
 }
 
 ---@type occurrence.PresetConfig
-local goto_next = {
+local next = {
   mode = "n",
-  plug = "<Plug>OccurrenceNext",
+  plug = "<Plug>(OccurrenceNext)",
   desc = "Next marked occurrence",
   type = "preset",
   callback = function(occurrence)
@@ -140,9 +140,9 @@ local goto_next = {
 }
 
 ---@type occurrence.PresetConfig
-local goto_previous = {
+local previous = {
   mode = "n",
-  plug = "<Plug>OccurrencePrevious",
+  plug = "<Plug>(OccurrencePrevious)",
   desc = "Previous marked occurrence",
   type = "preset",
   callback = function(occurrence)
@@ -154,7 +154,7 @@ local goto_previous = {
 ---@type occurrence.PresetConfig
 local mark = {
   mode = "n",
-  plug = "<Plug>OccurrenceMark",
+  plug = "<Plug>(OccurrenceMark)",
   desc = "Mark occurrence",
   type = "preset",
   callback = function(occurrence)
@@ -169,7 +169,7 @@ local mark = {
 ---@type occurrence.PresetConfig
 local unmark = {
   mode = "n",
-  plug = "<Plug>OccurrenceUnmark",
+  plug = "<Plug>(OccurrenceUnmark)",
   desc = "Unmark occurrence",
   type = "preset",
   callback = function(occurrence)
@@ -241,14 +241,14 @@ local unmark_in_selection = {
 ---@type occurrence.PresetConfig
 local toggle = {
   mode = { "n", "v" },
-  plug = "<Plug>OccurrenceToggle",
+  plug = "<Plug>(OccurrenceToggle)",
   desc = "Add/Toggle occurrence mark(s)",
   type = "preset",
   callback = function(occurrence, ...)
     if vim.fn.mode():match("[vV]") then
       local pattern_count = occurrence.patterns and #occurrence.patterns or 0
       if pattern_count == 0 then
-        return find_selection.callback(occurrence, ...)
+        return selection.callback(occurrence, ...)
       end
       local selection_range = Range.of_selection()
       if selection_range and occurrence:has_matches(selection_range) then
@@ -258,12 +258,12 @@ local toggle = {
           end
         end
       else
-        return find_selection.callback(occurrence, ...)
+        return selection.callback(occurrence, ...)
       end
     else
       local pattern_count = occurrence.patterns and #occurrence.patterns or 0
       if pattern_count == 0 then
-        return find_word.callback(occurrence, ...)
+        return word.callback(occurrence, ...)
       end
       local cursor = Cursor.save()
       local range = occurrence:match_cursor()
@@ -273,7 +273,7 @@ local toggle = {
         end
       else
         cursor:restore()
-        return find_word.callback(occurrence, ...)
+        return word.callback(occurrence, ...)
       end
     end
   end,
@@ -282,7 +282,7 @@ local toggle = {
 local deactivate = {
   mode = "n",
   desc = "Clear occurrence",
-  plug = "<Plug>OccurrenceDeactivate",
+  plug = "<Plug>(OccurrenceDeactivate)",
   type = "preset",
   callback = function(occurrence)
     if occurrence.extmarks:has_any() then
@@ -297,11 +297,11 @@ local deactivate = {
 local modify_operator = {
   mode = "o",
   expr = true,
-  plug = "<Plug>OccurrenceModifyOperator",
+  plug = "<Plug>(OccurrenceModifyOperator)",
   desc = "Occurrences",
   type = "operator-modifier",
   callback = function(occurrence, ...)
-    find_word.callback(occurrence, ...)
+    word.callback(occurrence, ...)
     if not occurrence.extmarks:has_any_marks() then
       return false
     end
@@ -310,15 +310,15 @@ local modify_operator = {
 
 ---@enum (key) occurrence.Api
 local api = {
-  find_word = find_word,
-  find_selection = find_selection,
-  find_pattern = find_pattern,
-  find_current = find_current,
+  word = word,
+  selection = selection,
+  pattern = pattern,
+  current = current,
 
-  goto_next = goto_next,
-  goto_previous = goto_previous,
-  goto_next_match = goto_next_match,
-  goto_previous_match = goto_previous_match,
+  next = next,
+  previous = previous,
+  match_next = match_next,
+  match_previous = match_previous,
 
   mark = mark,
   unmark = unmark,

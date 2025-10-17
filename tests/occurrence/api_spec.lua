@@ -19,14 +19,14 @@ describe("api", function()
     bufnr = nil
   end)
 
-  describe("find_word", function()
+  describe("word", function()
     it("finds and marks all occurrences of word under cursor", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local occurrence = Occurrence.get(bufnr)
 
-      api.find_word.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after find_word")
+      api.word.callback(occurrence, Config.new())
+      assert.is_true(occurrence:has_matches(), "Should have matches after word")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(2, match_count, "Should find 2 'foo' occurrences")
@@ -49,9 +49,9 @@ describe("api", function()
 
       -- Move cursor to 'bar' and mark
       vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
-      api.find_word.callback(occurrence, Config.new())
+      api.word.callback(occurrence, Config.new())
 
-      assert.is_true(occurrence:has_matches(), "Should still have matches after find_word")
+      assert.is_true(occurrence:has_matches(), "Should still have matches after word")
       match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(3, match_count, "Should find 1 additional 'bar' occurrence")
 
@@ -61,7 +61,7 @@ describe("api", function()
     end)
   end)
 
-  describe("find_selection", function()
+  describe("selection", function()
     it("finds and marks all occurrences of selection", function()
       bufnr = util.buffer("foo bar baz foo bar")
       vim.api.nvim_win_set_cursor(0, { 1, 5 }) -- Position at 'bar'
@@ -69,8 +69,8 @@ describe("api", function()
 
       local occurrence = Occurrence.get(bufnr)
 
-      api.find_selection.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after find_selection")
+      api.selection.callback(occurrence, Config.new())
+      assert.is_true(occurrence:has_matches(), "Should have matches after selection")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(2, match_count, "Should find 2 'bar' occurrences")
@@ -80,15 +80,15 @@ describe("api", function()
     end)
   end)
 
-  describe("find_pattern", function()
+  describe("pattern", function()
     it("finds and marks all occurrences of last search", function()
       bufnr = util.buffer("foo bar baz foo")
       vim.fn.setreg("/", [[\woo]])
 
       local occurrence = Occurrence.get(bufnr)
 
-      api.find_pattern.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after find_pattern")
+      api.pattern.callback(occurrence, Config.new())
+      assert.is_true(occurrence:has_matches(), "Should have matches after pattern")
       assert.is_same({ [[\woo]] }, occurrence.patterns, "Should use '\\woo' search pattern")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
@@ -108,7 +108,7 @@ describe("api", function()
       bufnr = util.buffer("foo bar baz foo")
       local occurrence = Occurrence.get(bufnr)
 
-      api.find_pattern.callback(occurrence, Config.new())
+      api.pattern.callback(occurrence, Config.new())
 
       assert
         .spy(vim.notify)
@@ -120,7 +120,7 @@ describe("api", function()
     end)
   end)
 
-  describe("find_current", function()
+  describe("current", function()
     it("it uses selection when active", function()
       vim.v.hlsearch = 1
       vim.fn.setreg("/", "bar")
@@ -131,8 +131,8 @@ describe("api", function()
       local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
 
-      api.find_current.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after find_current")
+      api.current.callback(occurrence, Config.new())
+      assert.is_true(occurrence:has_matches(), "Should have matches after current")
       assert.is_same({ [[\V\Cbaz]] }, occurrence.patterns, "Should use escaped 'baz' selection as pattern")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
@@ -148,9 +148,9 @@ describe("api", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local occurrence = Occurrence.get(bufnr)
-      api.find_current.callback(occurrence, Config.new())
+      api.current.callback(occurrence, Config.new())
 
-      assert.is_true(occurrence:has_matches(), "Should have matches after find_current")
+      assert.is_true(occurrence:has_matches(), "Should have matches after current")
       assert.is_same({ "bar" }, occurrence.patterns, "Should use 'bar' search pattern")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
@@ -167,8 +167,8 @@ describe("api", function()
 
       local occurrence = Occurrence.get(bufnr)
 
-      api.find_current.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after find_current")
+      api.current.callback(occurrence, Config.new())
+      assert.is_true(occurrence:has_matches(), "Should have matches after current")
       assert.is_same({ [[\V\C\<foo\>]] }, occurrence.patterns, "Should use escaped '<foo>' cursor word as pattern")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
