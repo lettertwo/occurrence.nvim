@@ -216,6 +216,57 @@ require("occurrence").setup({
 })
 ```
 
+### Statusline Integration
+
+Display occurrence count in your statusline similar to Neovim's search count using the `status()` API:
+
+```lua
+-- Example: lualine component
+local function occurrence_status()
+  local count = require('occurrence').status()
+  if not count then
+    return ""
+  end
+  return string.format("[%d/%d]", count.current, count.total)
+end
+
+require('lualine').setup({
+  sections = {
+    lualine_c = { 'filename', occurrence_status },
+  }
+})
+```
+
+```lua
+-- Example: statusline function with icons
+function _G.occurrence_statusline()
+  local count = require('occurrence').status({ marked = true })
+  if not count then
+    return ""
+  end
+
+  local icon = count.exact_match == 1 and "" or "󰍉"
+  return string.format("%s %d/%d", icon, count.current, count.total)
+end
+
+-- Add to your statusline
+vim.opt.statusline = "%f %{%v:lua.occurrence_statusline()%}"
+```
+
+**API: `require('occurrence').status(opts)`**
+
+Returns `nil` if no active occurrence, otherwise returns:
+
+- `current` (integer): Current match index (1-based)
+- `total` (integer): Total number of matches
+- `exact_match` (integer): 1 if cursor is on a match, 0 otherwise
+- `marked_only` (boolean): Whether counting only marked occurrences
+
+Options:
+
+- `marked` (boolean): Count only marked occurrences (default: false)
+- `buffer` (integer): Buffer number (default: current buffer)
+
 ## Available Actions
 
 ### Entry Actions

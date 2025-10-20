@@ -270,6 +270,86 @@ function Occurrence:match_cursor(opts)
   end
 end
 
+---@class occurrence.Status
+---@field current integer Current match index (1-based)
+---@field total integer Total number of matches
+---@field exact_match integer 1 if cursor is exactly on a match, 0 otherwise
+---@field marked_only boolean Whether counting only marked occurrences
+
+-- Get search count information similar `:h searchcount()`.
+-- Returns the position of the cursor within matches and the total count.
+-- If `marked` is `true`, only marked occurrences will be counted.
+-- If `pos` is provided, it will be used as the cursor position instead of the actual cursor.
+---@param opts? { marked?: boolean, pos?: occurrence.Location } Options for status
+---@return occurrence.Status
+function Occurrence:status(opts)
+  opts = opts or {}
+  local marked_only = opts.marked or false
+  local pos = opts.pos or Location.of_cursor()
+
+  local current = 0
+  local total = 0
+  local exact_match = 0
+  local current_match = nil
+
+  if not pos then
+    return {
+      current = 0,
+      total = 0,
+      exact_match = 0,
+      marked_only = marked_only,
+    }
+  end
+
+  if marked_only then
+    -- Count marked occurrences
+    for _, range in self.extmarks:iter_marks() do
+      total = total + 1
+      if range:contains(pos) then
+        current = total
+        exact_match = 1
+        current_match = range
+      elseif not current_match and range.start > pos then
+        -- First match after cursor
+        current = total
+        current_match = range
+      elseif not current_match then
+        -- Before cursor, increment current
+        current = total
+      end
+    end
+  else
+    -- Count all matches
+    for range in self:matches() do
+      total = total + 1
+      if range:contains(pos) then
+        current = total
+        exact_match = 1
+        current_match = range
+      elseif not current_match and range.start > pos then
+        -- First match after cursor
+        current = total
+        current_match = range
+      elseif not current_match then
+        -- Before cursor, increment current
+        current = total
+      end
+    end
+  end
+
+  -- If we never found a match after cursor and there are matches, we're past the last match
+  if total > 0 and current == 0 then
+    current = total
+  end
+
+  return {
+    current = current,
+    total = total,
+    exact_match = exact_match,
+    marked_only = marked_only,
+  }
+end
+
 -- Mark the occurrences contained within the given `Range`.
 -- If no `range` is provided, the entire buffer will be marked.
 ---@param range? occurrence.Range

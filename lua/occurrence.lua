@@ -97,6 +97,25 @@ function occurrence.setup(opts)
   end
 end
 
+-- Get occurrence count information for the current buffer.
+-- Similar to `:h searchcount()` but for occurrence matches.
+-- Returns the position of the cursor within matches and the total count.
+-- If `marked` is `true`, only marked occurrences will be counted.
+-- If `buffer` is provided, it will be used instead of the current buffer.
+---@param opts? { marked?: boolean, buffer?: integer }
+---@return occurrence.Status | nil `nil` if there is no activate occurrence for the buffer.
+function occurrence.status(opts)
+  opts = opts or {}
+  local buffer = opts.buffer or vim.api.nvim_get_current_buf()
+
+  local occ = require("occurrence.Occurrence").get(buffer)
+  if not occ or occ:is_disposed() or #occ.patterns == 0 then
+    return nil
+  end
+
+  return occ:status({ marked = opts.marked })
+end
+
 -- Create the main Occurrence command with subcommands
 vim.api.nvim_create_user_command("Occurrence", command.execute, {
   nargs = "+",
