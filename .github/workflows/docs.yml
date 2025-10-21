@@ -8,6 +8,8 @@ on:
 
 jobs:
   docs:
+    # Skip docs validation for Dependabot PRs since they don't modify README
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
