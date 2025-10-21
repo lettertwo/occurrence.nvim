@@ -1,4 +1,4 @@
-*occurrence.nvim.txt*     For NVIM >= v0.10.0     Last change: 2025 October 20
+*occurrence.nvim.txt*     For NVIM >= v0.10.0     Last change: 2025 October 21
 
 ==============================================================================
 Table of Contents                          *occurrence.nvim-table-of-contents*
