@@ -16,9 +16,4 @@ jobs:
       - uses: googleapis/release-please-action@v4
         id: release
         with:
-          # This should match the repository name
-          release-type: simple
-          # Use conventional commits
-          bump-minor-pre-major: true
-          # Include all commit types in changelog
-          include-component-in-tag: false
+          token: ${{ secrets.GITHUB_TOKEN }}
