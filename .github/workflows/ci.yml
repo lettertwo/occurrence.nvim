@@ -165,7 +165,7 @@ jobs:
           version: ${{ matrix.nvim-version }}
 
       - name: Setup Lua
-        uses: leafo/gh-actions-lua@v10
+        uses: leafo/gh-actions-lua@v12
         with:
           luaVersion: "5.1"
 
