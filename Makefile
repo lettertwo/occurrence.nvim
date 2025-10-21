@@ -35,3 +35,7 @@ test: ./lua_modules/bin/busted ./lua_modules/bin/nlua
 .PHONY: test-perf
 test-perf: ./lua_modules/bin/busted ./lua_modules/bin/nlua
 	@LUA_PATH=$(LUA_PATH) LUA_CPATH=$(LUA_CPATH) $< --lua $(word 2,$^) $(or $(filter-out $@,$(MAKECMDGOALS)),tests/perf_*)
+
+.PHONY: install-hooks
+install-hooks:
+	@./git-hooks/install.sh
