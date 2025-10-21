@@ -187,17 +187,20 @@ jobs:
           eval $(luarocks --local path)
           busted tests/perf_spec.lua
 
-  # Type checking with Lua Language Server
+  # Type checking
   typecheck:
-    name: Type Check
+    name: Type Check (Neovim ${{ matrix.nvim-version }})
+    strategy:
+      matrix:
+        nvim-version: [stable, nightly]
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Setup Lua Language Server
-        uses: junnplus/setup-lua-language-server@v1
-
       - name: Run type checking
-        run: |
-          lua-language-server --check . --checklevel=Error
+        uses: stevearc/nvim-typecheck-action@v2
+        with:
+          path: lua
+          level: warning
+          nvim-version: ${{ matrix.nvim-version }}
