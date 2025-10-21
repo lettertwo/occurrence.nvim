@@ -203,11 +203,11 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
         end
 
         if type(replacement) == "string" then
-          ---@cast replacement string[]
           replacement = { replacement }
         end
 
         replacement = replacement or cached_replacement or {}
+        ---@cast replacement string[]
 
         if replacement and replacement ~= cached_replacement then
           cached_replacement = replacement
