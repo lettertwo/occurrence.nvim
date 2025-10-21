@@ -220,7 +220,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
           edit.start.col,
           edit.stop.line,
           edit.stop.col,
-          replacement or {}
+          replacement
         )
         edited = edited + 1
       else

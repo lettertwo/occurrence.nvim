@@ -68,6 +68,7 @@ do
   end
 end
 
+---@diagnostic disable-next-line: param-type-mismatch
 setmetatable(log, {
   __call = function(_, ...)
     log.info(...)

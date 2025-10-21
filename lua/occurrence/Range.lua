@@ -62,7 +62,7 @@ end
 ---@return occurrence.Range?
 function range.of_selection()
   local mode = vim.api.nvim_get_mode().mode
-  if mode == "\x16" then
+  if mode == "\22" then -- CTRL-V (blockwise visual mode)
     error("selection is blockwise, which is not yet supported")
   end
   if mode == "v" or mode == "V" then
