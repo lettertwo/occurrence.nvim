@@ -194,6 +194,47 @@ Closes #89
 └── CONTRIBUTING.md              # This file
 ```
 
+## Release Process
+
+Releases are **fully automated** using [Release Please](https://github.com/googleapis/release-please):
+
+### How It Works
+
+1. **Commit to main**: Push commits following [Conventional Commits](#commit-message-convention) to the `main` branch
+2. **Automatic PR Creation**: Release Please automatically:
+   - Analyzes commits since last release
+   - Determines next version based on commit types (feat = minor, fix = patch, breaking = major)
+   - Generates/updates CHANGELOG.md
+   - Creates a "Release PR" with all changes
+3. **Review and Merge**: Review the Release PR and merge when ready
+4. **Automatic Release**: On merge, Release Please:
+   - Creates a GitHub release with the changelog
+   - Tags the release (e.g., `v1.2.3`)
+   - Triggers the release workflow (tests + publish)
+
+### Manual Release (if needed)
+
+If you need to create a release manually:
+
+1. Ensure all changes are merged to `main`
+2. Create and push a version tag:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+3. GitHub Actions will:
+   - Run all tests
+   - Create GitHub release
+
+### Version Bumping Rules
+
+Release Please uses commit types to determine version bumps:
+
+- `feat:` → Minor version bump (0.1.0 → 0.2.0)
+- `fix:`, `perf:` → Patch version bump (0.1.0 → 0.1.1)
+- `feat!:`, `fix!:`, or `BREAKING CHANGE:` → Major version bump (0.1.0 → 1.0.0)
+- `docs:`, `style:`, `refactor:`, `test:`, `chore:` → No version bump (included in next release)
+
 ## Getting Help
 
 - Check existing documentation in README.md
