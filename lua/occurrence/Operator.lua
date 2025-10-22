@@ -326,7 +326,7 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
     end
 
     ---@cast occurrence +nil
-    if not occurrence then
+    if not occurrence or occurrence:is_disposed() then
       -- Get word at current cursor position before restoring
       occurrence = require("occurrence.Occurrence").get()
       local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
@@ -334,6 +334,9 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
         log.warn("No word under cursor")
       else
         occurrence:add_pattern(word, "word")
+        for match_range in occurrence:matches(range) do
+          occurrence:mark(match_range)
+        end
       end
     end
 
