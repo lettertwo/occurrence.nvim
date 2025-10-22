@@ -265,12 +265,3 @@ jobs:
           echo ""
           git diff doc/
           exit 1
-
-      - name: Commit and push if docs changed (main branch only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check_docs.outputs.has_changes == 'true'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add doc/
-          git commit -m "docs: auto-update vimdoc [skip ci]"
-          git push
