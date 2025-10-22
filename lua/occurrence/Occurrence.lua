@@ -5,6 +5,7 @@ local Keymap = require("occurrence.Keymap")
 local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 
+local feedkeys = require("occurrence.feedkeys")
 local log = require("occurrence.log")
 local resolve_buffer = require("occurrence.resolve_buffer")
 
@@ -580,6 +581,61 @@ function Occurrence:apply(action, config)
     return result
   else
     error("Invalid action: " .. vim.inspect(action))
+  end
+end
+
+-- Apply an operator to marked occurrences.
+--
+-- The `operator_name` may be a built-in operator (e.g., `"change"`, `"delete"`, etc),
+-- or a key for an operator as defined in the `config.operators` table
+-- (e.g., `"c"`, `"d"`, or any custom operator).
+--
+-- If `motion` is a `Range`, it will be used to create the visual selection.
+-- If `motion` is a string like `"$"`,`"ip"`, etc., it will be used to create a motion via `:h feedkeys()`.
+--
+-- If `motion_type` is provided and `motion` is a `Range`, it will be used to determine
+-- how the visual selection is created:
+--   - `'char'` (default) for character-wise selection
+--   - `'line'` for line-wise selection
+--   - `'block'` for block-wise selection
+-- Note that If `apply_operator` is called while in a visual mode,
+-- the current visual selection will be used instead of any `motion`.
+--
+-- If no occurrences are marked after the operation, the occurrence will be disposed.
+---@param operator_name occurrence.BuiltinOperator | string
+---@param motion? string | occurrence.Range The range of motion (e.g. "aw", "$", etc), or a defined range. If `nil`, the full buffer range will be used.
+---@param motion_type? 'char' | 'line' | 'block' The type of motion, if `motion` is a `Range`. Defaults to 'char'.
+function Occurrence:apply_operator(operator_name, motion, motion_type)
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
+  local config = require("occurrence").resolve_config()
+  local operator_config = config:get_operator_config(operator_name)
+  if type(operator_config) == "table" then
+    -- In visual mode, use the current visual selection.
+    if vim.fn.mode():find("[vV]") ~= nil then
+      motion = nil
+    elseif type(motion) ~= "string" then
+      -- Create a visual selection for the operator.
+      motion = motion or Range.of_buffer()
+      Cursor.move(motion.start)
+      if motion_type == "line" then
+        feedkeys.change_mode("V", { silent = true })
+      elseif motion_type == "block" then
+        feedkeys.change_mode("", { silent = true })
+      else
+        feedkeys.change_mode("v", { silent = true })
+      end
+      Cursor.move(motion.stop)
+    end
+    require("occurrence.Operator").create_opfunc("v", self, operator_config, operator_name, vim.v.count, vim.v.register)
+    if type(motion) == "string" then
+      -- Apply opfunc to the motion.
+      feedkeys("g@" .. motion, { noremap = true })
+    else
+      -- Apply opfunc to the visual selection.
+      feedkeys("g@", { noremap = true })
+    end
+  else
+    log.error("Invalid operator:", operator_name)
   end
 end
 

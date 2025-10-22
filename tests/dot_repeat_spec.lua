@@ -408,6 +408,40 @@ describe("dot repeat functionality", function()
     assert.equals(3, #marks, "Three 'foo' marks should remain on third line")
   end)
 
+  it("repeats operator applied programmatically", function()
+    bufnr = util.buffer({ "foo bar foo baz", "foo test foo end" })
+
+    plugin.setup({
+      operators = {
+        d = {
+          method = "direct_api",
+          uses_register = true,
+          modifies_text = true,
+          replacement = "",
+        },
+      },
+    })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+
+    -- Mark all 'foo' occurrences
+    feedkeys("q")
+
+    -- Programmatically invoke the operator on marked occurrences on the current line
+    local occ = require("occurrence.Occurrence").get()
+    local range = require("occurrence.Range").of_line()
+    occ:apply_operator("d", range, "line")
+
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    assert.same({ " bar  baz", "foo test foo end" }, lines, "'foo' occurrences on the first line should be deleted")
+
+    -- Move to second line, second 'foo' and repeat using dot-repeat
+    feedkeys("j3w")
+    feedkeys(".")
+
+    lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    assert.same({ " bar  baz", " test  end" }, lines, "All 'foo' occurrences should be deleted")
+  end)
+
   it("caches cursor position before dot-repeat", function()
     bufnr = util.buffer({ "foo bar foo baz", "test foo test end" })
 

@@ -1,4 +1,5 @@
 local Cursor = require("occurrence.Cursor")
+local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 local Register = require("occurrence.Register")
 
@@ -313,7 +314,11 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
     -- For operator-pending/normal mode with motion, recalculate the range at the current position.
     if range and mode == "v" then
       cursor = cursor or CURSOR_CACHE[win] or Cursor.save()
-      range = range:move(cursor.location)
+      if type == "line" then
+        range = Range.of_line(cursor.location.line)
+      else
+        range = range:move(cursor.location)
+      end
     else
       -- Recalculate range at current cursor position (don't restore old cursor yet)
       range = Range.of_motion(type)
