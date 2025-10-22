@@ -182,6 +182,170 @@ describe("operators", function()
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({ " bar foo", "baz foo bar" }, final_lines)
     end)
+
+    it("handles multi-line register content", function()
+      bufnr = util.buffer("source1 source2 source3\ndest dest dest")
+
+      -- Step 1: Yank multiple occurrences of "source"
+      local source_occurrence = Occurrence.get(bufnr, "source\\d", "pattern")
+      for range in source_occurrence:matches() do
+        source_occurrence:mark(range)
+      end
+
+      local yank_config = assert(Config.new():get_operator_config("yank"))
+      Operator.apply(source_occurrence, yank_config, "y", nil, nil, '"')
+
+      -- Verify register has newline-separated content
+      local register_content = vim.fn.getreg('"')
+      assert.equals("source1\nsource2\nsource3", register_content)
+
+      -- Step 2: Put the multi-line register content at destination occurrences
+      local dest_occurrence = Occurrence.get(bufnr, "dest", "word")
+      for range in dest_occurrence:matches() do
+        dest_occurrence:mark(range)
+      end
+
+      -- Apply put operator - should replicate multi-line content at each occurrence
+      assert.has_no.errors(function()
+        local put_config = assert(Config.new():get_operator_config("put"))
+        Operator.apply(dest_occurrence, put_config, "p", nil, nil, '"')
+      end)
+
+      -- Check that multi-line content was inserted at each destination
+      -- Each "dest" gets replaced with all 3 lines
+      -- Since marks are processed in reverse: last dest, middle dest, first dest
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({
+        "source1",
+        "source2",
+        "source3 source1",
+        "source2",
+        "source3 source1",
+        "source2",
+        "source3",
+        "source1",
+        "source2",
+        "source3 source1",
+        "source2",
+        "source3 source1",
+        "source2",
+        "source3",
+      }, final_lines)
+    end)
+  end)
+
+  describe("distribute operator", function()
+    it("distributes lines from register across marked occurrences", function()
+      bufnr = util.buffer("source1 source2 source3\ndest dest dest")
+
+      -- Step 1: Yank multiple occurrences of "source"
+      local source_occurrence = Occurrence.get(bufnr, "source\\d", "pattern")
+      for range in source_occurrence:matches() do
+        source_occurrence:mark(range)
+      end
+
+      local yank_config = assert(Config.new():get_operator_config("yank"))
+      Operator.apply(source_occurrence, yank_config, "y", nil, nil, '"')
+
+      -- Verify register has newline-separated content
+      local register_content = vim.fn.getreg('"')
+      assert.equals("source1\nsource2\nsource3", register_content)
+
+      -- Step 2: Distribute the lines across destination occurrences
+      local dest_occurrence = Occurrence.get(bufnr, "dest", "word")
+      for range in dest_occurrence:matches() do
+        dest_occurrence:mark(range)
+      end
+
+      -- Apply distribute operator
+      assert.has_no.errors(function()
+        local distribute_config = assert(Config.new():get_operator_config("distribute"))
+        Operator.apply(dest_occurrence, distribute_config, "gp", nil, nil, '"')
+      end)
+
+      -- Check that each destination got one line (distributed)
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({
+        "source1 source2 source3",
+        "source1 source2 source3",
+      }, final_lines)
+    end)
+
+    it("cycles through lines when more destinations than lines", function()
+      bufnr = util.buffer("alpha beta\nPLACE PLACE PLACE PLACE PLACE")
+
+      -- Yank "alpha" and "beta" (2 values) using word pattern
+      local source_occurrence = Occurrence.get(bufnr, "\\(alpha\\|beta\\)", "pattern")
+      -- Mark only the first 2 matches
+      local count = 0
+      for range in source_occurrence:matches() do
+        if count < 2 then
+          source_occurrence:mark(range)
+          count = count + 1
+        end
+      end
+
+      local yank_config = assert(Config.new():get_operator_config("yank"))
+      Operator.apply(source_occurrence, yank_config, "y", nil, nil, '"')
+
+      -- Verify register has 2 lines
+      local register_content = vim.fn.getreg('"')
+      assert.equals("alpha\nbeta", register_content)
+
+      -- Distribute across 5 destinations (should cycle: alpha, beta, alpha, beta, alpha)
+      local dest_occurrence = Occurrence.get(bufnr, "PLACE", "word")
+      for range in dest_occurrence:matches() do
+        dest_occurrence:mark(range)
+      end
+
+      local distribute_config = assert(Config.new():get_operator_config("distribute"))
+      Operator.apply(dest_occurrence, distribute_config, "gp", nil, nil, '"')
+
+      -- Check that distribution cycled correctly
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({
+        "alpha beta",
+        "alpha beta alpha beta alpha",
+      }, final_lines)
+    end)
+
+    it("uses first N lines when more lines than destinations", function()
+      bufnr = util.buffer("foo bar baz qux quux\nPLACE PLACE")
+
+      -- Yank 5 values from first line
+      local source_occurrence = Occurrence.get(bufnr, "\\w\\+", "pattern")
+      -- Only mark the first 5 matches (which are all on line 1)
+      local count = 0
+      for range in source_occurrence:matches() do
+        if count < 5 then
+          source_occurrence:mark(range)
+          count = count + 1
+        end
+      end
+
+      local yank_config = assert(Config.new():get_operator_config("yank"))
+      Operator.apply(source_occurrence, yank_config, "y", nil, nil, '"')
+
+      -- Verify register has 5 lines
+      local register_content = vim.fn.getreg('"')
+      assert.equals("foo\nbar\nbaz\nqux\nquux", register_content)
+
+      -- Distribute to only 2 destinations (should use only first 2: foo, bar)
+      local dest_occurrence = Occurrence.get(bufnr, "PLACE", "word")
+      for range in dest_occurrence:matches() do
+        dest_occurrence:mark(range)
+      end
+
+      local distribute_config = assert(Config.new():get_operator_config("distribute"))
+      Operator.apply(dest_occurrence, distribute_config, "gp", nil, nil, '"')
+
+      -- Check that only first 2 lines were used
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({
+        "foo bar baz qux quux",
+        "foo bar",
+      }, final_lines)
+    end)
   end)
 
   describe("change operator", function()

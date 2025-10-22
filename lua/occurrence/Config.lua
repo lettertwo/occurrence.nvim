@@ -36,6 +36,7 @@ local DEFAULT_OPERATORS = {
   ["d"] = "delete",
   ["y"] = "yank",
   ["p"] = "put",
+  ["gp"] = "distribute",
   ["<"] = "indent_left",
   [">"] = "indent_right",
   ["="] = "indent_format",

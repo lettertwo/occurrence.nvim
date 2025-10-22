@@ -51,6 +51,7 @@ local log = require("occurrence.log")
 
 ---@class occurrence.ReplacementContext
 ---@field location occurrence.Location
+---@field total_count integer
 ---@field register? string
 ---@field register_type? string
 
@@ -190,6 +191,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
             location = edit,
             register = register,
             register_type = register_type,
+            total_count = #marks,
           }
           replacement = config.replacement(text, ctx, i)
         else
@@ -203,7 +205,12 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
         end
 
         if type(replacement) == "string" then
-          replacement = { replacement }
+          -- Split on newlines if present (e.g., from multi-line register content)
+          if replacement:find("\n") then
+            replacement = vim.split(replacement, "\n", { plain = true })
+          else
+            replacement = { replacement }
+          end
         end
 
         replacement = replacement or cached_replacement or {}

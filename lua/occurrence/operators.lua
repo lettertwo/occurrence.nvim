@@ -116,6 +116,35 @@ local put = {
   end,
 }
 
+---@type occurrence.OperatorConfig
+local distribute = {
+  desc = "Distribute lines from register across marked occurrences",
+  method = "direct_api",
+  uses_register = false,
+  modifies_text = true,
+  replacement = function(_, ctx, index)
+    local ok, reg = pcall(vim.fn.getreg, ctx.register or vim.v.register)
+    if not ok or not reg or reg == "" then
+      return ""
+    end
+
+    if type(reg) == "string" then
+      -- Split into lines for distribution
+      reg = vim.split(reg, "\n", { plain = true })
+    end
+
+    if #reg == 0 then
+      return ""
+    end
+
+    -- Distribute lines cyclically across occurrences.
+    -- Since occurrences are processed in reverse order (for text modifications),
+    -- we need to compute the forward index to maintain correct distribution order.
+    local line_index = ((ctx.total_count - index) % #reg) + 1
+    return reg[line_index]
+  end,
+}
+
 -- Supported operators
 ---@enum (key) occurrence.BuiltinOperator
 local builtin_operators = {
@@ -123,6 +152,7 @@ local builtin_operators = {
   delete = delete,
   yank = yank,
   put = put,
+  distribute = distribute,
   indent_left = indent_left,
   indent_right = indent_right,
   indent_format = indent_format,
