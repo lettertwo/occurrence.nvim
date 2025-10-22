@@ -204,3 +204,73 @@ jobs:
           path: lua
           level: warning
           nvim-version: ${{ matrix.nvim-version }}
+
+  # Documentation validation and generation
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate vimdoc with panvimdoc
+        uses: kdheepak/panvimdoc@main
+        with:
+          vimdoc: occurrence.nvim
+          pandoc: "README.md"
+          version: "NVIM >= v0.10.0"
+          toc: true
+          description: ""
+          titledatepattern: "%Y %B %d"
+          demojify: false
+          dedupsubheadings: true
+          treesitter: true
+          ignorerawblocks: true
+          docmapping: false
+          docmappingprojectname: true
+          shiftheadinglevelby: 0
+          incrementheadinglevelby: 0
+
+      - name: Check if docs have meaningful changes
+        id: check_docs
+        run: |
+          # Check if there are any changes
+          if git diff --quiet doc/; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No documentation changes"
+          else
+            # Check if only the timestamp line changed
+            # The timestamp is in the format: "Last change: YYYY Month DD"
+            if git diff doc/ | grep -E '^\+.*Last change:' > /dev/null && \
+               git diff doc/ | grep -E '^-.*Last change:' > /dev/null && \
+               [ $(git diff doc/ | grep -E '^[\+\-]' | grep -v -E '[\+\-].*Last change:' | wc -l) -eq 0 ]; then
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "Only timestamp changed, ignoring"
+            else
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              echo "Documentation has meaningful changes"
+            fi
+          fi
+
+      - name: Check if docs are up-to-date (PR only)
+        if: github.event_name == 'pull_request' && steps.check_docs.outputs.has_changes == 'true'
+        run: |
+          echo "✗ Documentation is out of sync with README.md"
+          echo ""
+          echo "Please run 'make doc' locally and commit the changes:"
+          echo "  make doc"
+          echo "  git add doc/"
+          echo "  git commit -m 'docs: update vimdoc'"
+          echo ""
+          git diff doc/
+          exit 1
+
+      - name: Commit and push if docs changed (main branch only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check_docs.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add doc/
+          git commit -m "docs: auto-update vimdoc [skip ci]"
+          git push
