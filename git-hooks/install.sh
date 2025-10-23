@@ -39,6 +39,15 @@ else
   exit 1
 fi
 
+# Install pre-push hook
+if [ -f git-hooks/pre-push ]; then
+  cp git-hooks/pre-push "$HOOKS_DIR/pre-push"
+  chmod +x "$HOOKS_DIR/pre-push"
+  echo "✓ Installed pre-push hook to $HOOKS_DIR"
+else
+  echo "Warning: git-hooks/pre-push not found"
+fi
+
 # Check if a global hooks path is configured
 GLOBAL_HOOKS_PATH=$(git config --global --get core.hooksPath || echo "")
 
@@ -57,9 +66,13 @@ fi
 echo ""
 echo "${GREEN}Git hooks installed successfully!${NC}"
 echo ""
-echo "The commit-msg hook will now validate your commit messages"
-echo "to ensure they follow Conventional Commits format."
+echo "Installed hooks:"
+echo "  • commit-msg: Validates Conventional Commits format"
+echo "  • pre-push: Prevents pushing fixup/squash/amend commits"
 echo ""
 echo "To configure the commit message template:"
 echo "  ${YELLOW}git config commit.template .gitmessage${NC}"
+echo ""
+echo "To bypass pre-push check (for WIP branches):"
+echo "  ${YELLOW}git push --no-verify${NC}"
 echo ""

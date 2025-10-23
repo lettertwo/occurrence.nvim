@@ -34,6 +34,11 @@ if echo "$COMMIT_SUBJECT" | grep -qE '^Revert '; then
   exit 0
 fi
 
+# Skip fixup/squash/amend commits (temporary commits for interactive rebase)
+if echo "$COMMIT_SUBJECT" | grep -qE '^(fixup|squash|amend)! '; then
+  exit 0
+fi
+
 # Conventional Commits pattern
 # Matches: type(scope): subject or type: subject
 # Optional ! for breaking changes
