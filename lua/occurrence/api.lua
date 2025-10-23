@@ -76,6 +76,8 @@ local pattern = {
     end
 
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    -- Clear search highlight
+    vim.cmd.nohlsearch()
     -- mark all occurrences of the newest pattern
     occurrence:add_pattern(search_pattern)
     if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then
