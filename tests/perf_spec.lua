@@ -191,7 +191,7 @@ describe("Performance Tests", function()
       assert.is_true(navigation_count > 0, "Should find at least some matches")
       assert.is_true(
         elapsed < 200,
-        "Navigating through " .. navigation_count .. " occurrences took too long: " .. elapsed .. "ms (~1ms each)"
+        "Navigating through " .. navigation_count .. " occurrences took too long: " .. elapsed
       )
     end)
 
@@ -220,7 +220,7 @@ describe("Performance Tests", function()
       assert.is_true(navigation_count > 0, "Should find at least some matches")
       assert.is_true(
         elapsed < 200,
-        "Navigating backward through " .. navigation_count .. " occurrences took too long: " .. elapsed .. "ms (~1ms each)"
+        "Navigating backward through " .. navigation_count .. " occurrences took too long: " .. elapsed
       )
     end)
 
@@ -258,7 +258,7 @@ describe("Performance Tests", function()
       assert.is_true(navigation_count > 0, "Should find at least some marked matches")
       assert.is_true(
         elapsed < 500,
-        "Navigating through " .. navigation_count .. " marked occurrences took too long: " .. elapsed .. "ms (~5ms each)"
+        "Navigating through " .. navigation_count .. " marked occurrences took too long: " .. elapsed
       )
     end)
 
@@ -298,7 +298,7 @@ describe("Performance Tests", function()
       assert.is_true(navigation_count > 0, "Should find at least some matches")
       assert.is_true(
         elapsed < 300,
-        "Alternating navigation through " .. navigation_count .. " occurrences took too long: " .. elapsed .. "ms (~1.5ms each)"
+        "Alternating navigation through " .. navigation_count .. " occurrences took too long: " .. elapsed
       )
     end)
   end)
@@ -335,31 +335,17 @@ describe("Performance Tests", function()
 
   describe("Stress Tests", function()
     it("handles rapid occurrence creation and disposal", function()
-      -- Use smaller buffer for this test - rapid switching is less common with huge files
-      local medium_content = {}
-      for i = 1, 500 do
-        local line = string.format("line %d with content and pattern_%d", i, i % 50)
-        table.insert(medium_content, line)
-      end
-
-      bufnr = util.buffer(medium_content)
+      bufnr = util.buffer(large_content)
       local start_time = vim.loop.hrtime()
 
-      -- Realistic: User might switch patterns/files ~50 times in an intense editing session
-      for i = 1, 50 do
+      for i = 1, 10 do
         local occurrence = Occurrence.get(bufnr, "content")
-        if i % 10 == 0 then
-          -- Occasionally mark some occurrences (realistic usage)
-          occurrence:mark()
-        end
+        occurrence:mark()
         occurrence:dispose()
       end
 
       local elapsed = (vim.loop.hrtime() - start_time) / 1e6
-      assert.is_true(
-        elapsed < 1000,
-        "Rapid creation/disposal (50 iterations) took too long: " .. elapsed .. "ms (~20ms each)"
-      )
+      assert.is_true(elapsed < 1000, "Rapid creation/disposal (10 iterations) took too long: " .. elapsed .. "ms")
     end)
 
     it("handles concurrent buffer operations", function()
