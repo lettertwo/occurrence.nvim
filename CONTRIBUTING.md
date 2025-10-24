@@ -17,7 +17,7 @@ Thank you for your interest in contributing to occurrence.nvim! This document pr
 2. Create a feature branch: `git checkout -b feature/your-feature-name`
 3. Make your changes following the guidelines below
 4. Write or update tests as needed
-5. Ensure all tests pass: `make test`
+5. Ensure all tests pass: `make test` (see [Testing](#testing) section)
 6. Update documentation if needed
 7. Submit a pull request
 
@@ -35,7 +35,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) f
 make install-hooks
 ```
 
-This installs a commit-msg hook that validates your commit messages locally before they're committed.
+This installs a [commit-msg](https://git-scm.com/docs/githooks#_commit_msg) hook that validates your commit messages locally before they're committed.
 
 **2. Set up the commit message template (optional but recommended):**
 
@@ -106,65 +106,36 @@ Optional. Reference issues and include breaking changes:
 - Reference issues: `Fixes #123`, `Closes #456`
 - Breaking changes: Start with `BREAKING CHANGE:` followed by description
 
-#### Examples
-
-```
-feat(operators): add support for 'p' (put) operator
-
-Add new 'put' operator that replaces marked occurrences with
-register content. Useful for bulk replacements.
-
-Closes #42
-```
-
-```
-fix(api): prevent extmark errors on buffer delete
-
-When a buffer is deleted, extmarks may throw errors if accessed.
-Add proper buffer validity checks before extmark operations.
-
-Fixes #78
-```
-
-```
-docs: add custom operator configuration examples
-
-Add examples showing how to create line-based operators (dd, yy, cc)
-and vim-mode-plus style keybindings.
-```
-
-```
-refactor(keymap)!: simplify configuration API
-
-BREAKING CHANGE: Remove 'actions' and 'preset_actions' config options.
-Replace with 'default_keymaps' boolean and 'on_preset_activate' callback.
-
-Migration guide:
-- Set default_keymaps = false to disable default keymaps
-- Use on_preset_activate callback for custom preset keymaps
-- Use <Plug> mappings for entry keymaps
-
-Closes #89
-```
-
 ### Code Style
 
-- Use 2 spaces for indentation
-- Format code with [stylua](https://github.com/JohnnyMorganz/StyLua): `stylua .`
 - Follow existing code patterns and conventions
-- Add LuaCATS type annotations for public APIs
-- Keep lines under 120 characters (see `stylua.toml`)
+- Format code with [stylua](https://github.com/JohnnyMorganz/StyLua)
+- Add [LuaCATS](https://luals.github.io/wiki/annotations/) type annotations for public APIs
 
 ### Testing
+
+Setup local [luarocks](https://github.com/luarocks/luarocks/wiki/Download) environment and run tests:
+
+```bash
+# Install dependencies
+luarocks --local install busted
+luarocks --local install nlua
+
+# Run all tests
+make test
+
+# Run performance tests only
+make test-perf
+```
 
 - Write tests for new features using [busted](https://lunarmodules.github.io/busted/)
 - Ensure existing tests pass: `make test`
 - Add performance tests for performance-critical features
-- Run tests in isolation: `busted tests/path/to/test_spec.lua`
+- Run tests in isolation: `make test tests/path/to/test_spec.lua`
 
 ### Documentation
 
-- Update README.md for user-facing changes
+- Update [README.md](README.md) for user-facing changes
 - Add/update LuaCATS annotations for API changes
 - Regenerate vim help: `make doc`
 - Document breaking changes clearly
@@ -172,27 +143,29 @@ Closes #89
 
 ## Project Structure
 
-```
-.
-├── lua/
-│   ├── occurrence.lua           # Main entry point
-│   └── occurrence/
-│       ├── Occurrence.lua       # Core occurrence class
-│       ├── BufferState.lua      # Per-buffer state
-│       ├── Config.lua           # Configuration handling
-│       ├── api.lua              # Action definitions
-│       ├── operators.lua        # Operator definitions
-│       └── ...                  # Supporting modules
-├── tests/
-│   ├── occurrence/              # Unit tests
-│   └── perf_spec.lua            # Performance tests
-├── doc/
-│   └── occurrence.nvim.txt      # Auto-generated vim help
-├── .github/workflows/           # CI/CD configuration
-├── README.md                    # User documentation
-├── CHANGELOG.md                 # Auto-generated changelog
-└── CONTRIBUTING.md              # This file
-```
+- `lua/occurrence.lua` - Main plugin entry point
+- `lua/occurrence/` - Core plugin modules
+  - `Occurrence.lua` - Central occurrence management
+  - `Config.lua` - Configuration handling
+  - `api.lua` - Built-in actions
+  - `operators.lua` - Built-in operators
+  - `Operator.lua` - Operator execution
+  - `Extmarks.lua` - Visual highlighting
+  - `Keymap.lua` - Keymap management
+  - `Range.lua`, `Location.lua`, `Cursor.lua` - Position utilities
+- `plugin/occurrence.lua` - Lazy loading plugin entry
+- `tests/` - Test suite including performance tests
+  - `occurrence/` - Unit tests for core modules
+  - `perf_spec.lua` - Performance benchmarks
+  - `dot_repeat_spec.lua` - Dot-repeat integration tests
+  - `integration_spec.lua` - Integration tests
+  - `plugin_spec.lua` - Plugin-level tests
+- `.github/workflows/` - CI/CD automation
+- `doc/` - Auto-generated vim help (via panvimdoc)
+- `git-hooks/` - Git hooks for commit validation
+- `CHANGELOG.md` - Auto-generated changelog
+- `CONTRIBUTING.md` - Contribution guidelines (this file)
+- `README.md` - Project overview and documentation
 
 ## Release Process
 
@@ -212,32 +185,18 @@ Releases are **fully automated** using [Release Please](https://github.com/googl
    - Tags the release (e.g., `v1.2.3`)
    - Triggers the release workflow (tests + publish)
 
-### Manual Release (if needed)
-
-If you need to create a release manually:
-
-1. Ensure all changes are merged to `main`
-2. Create and push a version tag:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-3. GitHub Actions will:
-   - Run all tests
-   - Create GitHub release
-
 ### Version Bumping Rules
 
 Release Please uses commit types to determine version bumps:
 
 - `feat:` → Minor version bump (0.1.0 → 0.2.0)
 - `fix:`, `perf:` → Patch version bump (0.1.0 → 0.1.1)
-- `feat!:`, `fix!:`, or `BREAKING CHANGE:` → Major version bump (0.1.0 → 1.0.0)
+- `feat!:`, `fix!:`, or `BREAKING CHANGE:` → Major version bump (1.0.0 → 2.0.0)
 - `docs:`, `style:`, `refactor:`, `test:`, `chore:` → No version bump (included in next release)
 
 ## Getting Help
 
-- Check existing documentation in README.md
+- Check existing documentation in [README.md](README.md) or `:h occurrence`
 - Search closed issues for similar questions
 - Open a new issue with your question
 - Join discussions in GitHub Discussions (if enabled)
