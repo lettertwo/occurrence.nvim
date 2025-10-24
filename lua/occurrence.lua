@@ -21,8 +21,10 @@ local occurrence = {}
 -- register <Plug> mappings for all commands using CapCase convention.
 for name, api_config in pairs(api) do
   -- Create `occurrence.<name>` API function
-  occurrence[name] = function(config)
-    require("occurrence.Occurrence").get():apply(api_config, occurrence.resolve_config(config))
+  occurrence[name] = function(opts)
+    -- TODO: explore passing args from commandline
+    local config, _ = occurrence.parse_opts(opts)
+    require("occurrence.Occurrence").get():apply(api_config, config)
   end
 
   -- Register `Occurrence <name>` subcommand
@@ -55,6 +57,20 @@ function occurrence.resolve_config(config)
     return _global_config
   end
   return Config.new()
+end
+
+-- Parse options table for API functions.
+-- Note that `opts` may be string args coming from the command line.
+---@param opts? occurrence.Options | occurrence.Config | string[]
+---@return occurrence.Config
+function occurrence.parse_opts(opts)
+  if opts == nil or type(opts) ~= table or vim.tbl_isempty(opts) then
+    return occurrence.resolve_config()
+  elseif vim.islist(opts) then
+    -- TODO: support string[] options
+    error("Not implemented: string[] options are not supported yet")
+  end
+  return occurrence.resolve_config(opts)
 end
 
 --- Reset the occurrence plugin
