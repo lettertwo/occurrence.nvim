@@ -8,18 +8,22 @@ local resolve_buffer = require("occurrence.resolve_buffer")
 local extmarks = {}
 
 -- Namespaces for extmarks
-local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
 local MATCH_NS = vim.api.nvim_create_namespace("OccurrenceMatch")
+local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
+local CURRENT_NS = vim.api.nvim_create_namespace("OccurrenceCurrent")
 
 -- Highlight groups
-local MARK_HLGROUP = "OccurrenceMark"
 local MATCH_HLGROUP = "OccurrenceMatch"
+local MARK_HLGROUP = "OccurrenceMark"
+local CURRENT_HLGROUP = "OccurrenceCurrent"
 
 -- Define default highlight groups on module load
--- OccurrenceMark: for marked occurrences (default: Underlined)
-vim.api.nvim_set_hl(0, MARK_HLGROUP, { default = true, link = "Underlined" })
--- OccurrenceMatch: for unmarked matches (default: none/empty)
-vim.api.nvim_set_hl(0, MATCH_HLGROUP, { default = true })
+-- OccurrenceMatch: for all occurrence matches (default: Search)
+vim.api.nvim_set_hl(0, MATCH_HLGROUP, { default = true, link = "Search" })
+-- OccurrenceMark: for marked occurrences (default: IncSearch)
+vim.api.nvim_set_hl(0, MARK_HLGROUP, { default = true, link = "IncSearch" })
+-- OccurrenceCurrent: for current occurrence under cursor (default: CurSearch)
+vim.api.nvim_set_hl(0, CURRENT_HLGROUP, { default = true, link = "CurSearch" })
 
 ---@alias occurrence.ExtmarkType 'mark' | 'match'
 
@@ -182,6 +186,7 @@ end
 ---@field buffer integer The buffer the extmarks are in.
 ---@field protected matches occurrence.ExtmarkMap Map of occurrence matches.
 ---@field protected marks occurrence.ExtmarkMap Map of marked occurrence matches.
+---@field protected current occurrence.ExtmarkMap Map for current occurrence under cursor.
 local Extmarks = {}
 
 ---@param buffer? integer
@@ -192,6 +197,7 @@ function extmarks.new(buffer)
   local self = setmetatable({
     matches = create_extmark_map(buffer, MATCH_NS, MATCH_HLGROUP),
     marks = create_extmark_map(buffer, MARK_NS, MARK_HLGROUP),
+    current = create_extmark_map(buffer, CURRENT_NS, CURRENT_HLGROUP),
   }, {
     __index = function(tbl, key)
       if rawget(tbl, key) ~= nil then
@@ -207,6 +213,7 @@ function extmarks.new(buffer)
   })
   disposable:add(self.matches)
   disposable:add(self.marks)
+  disposable:add(self.current)
   return self
 end
 
@@ -267,6 +274,7 @@ function Extmarks:clear()
   assert(not self:is_disposed(), "Cannot use a disposed Extmarks")
   self.matches:clear()
   self.marks:clear()
+  self.current:clear()
 end
 
 -- Get an iterator of mark extmarks.
@@ -281,6 +289,31 @@ end
 ---@return fun(): occurrence.Range?, occurrence.Range? next_extmark
 function Extmarks:iter_marks(opts)
   return self.marks:iter(opts)
+end
+
+-- Clear the current occurrence highlight.
+function Extmarks:clear_current()
+  assert(not self:is_disposed(), "Cannot use a disposed Extmarks")
+  self.current:clear()
+end
+
+-- Update the current occurrence highlight to the given cursor location.
+-- If no location is given, uses the current cursor position.
+---@param cursor? occurrence.Location
+function Extmarks:update_current(cursor)
+  assert(not self:is_disposed(), "Cannot use a disposed Extmarks")
+  cursor = cursor or Location.of_cursor()
+
+  self.current:clear()
+
+  if cursor then
+    for mark in self:iter_marks() do
+      if mark:contains(cursor) then
+        self.current:add(mark)
+        break
+      end
+    end
+  end
 end
 
 return extmarks

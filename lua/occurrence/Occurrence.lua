@@ -364,6 +364,7 @@ function Occurrence:mark(range)
       success = true
     end
   end
+  extmarks:update_current()
   return success
 end
 
@@ -379,6 +380,7 @@ function Occurrence:unmark(range)
       success = true
     end
   end
+  self.extmarks:update_current()
   return success
 end
 
@@ -675,6 +677,24 @@ local function get_or_create_occurrence(buffer, text, pattern_type)
         end
       end,
     })
+
+    -- Set up autocmd to update current occurrence highlight on cursor movement
+    local augroup = vim.api.nvim_create_augroup("OccurrenceCurrent_" .. buffer, { clear = true })
+    local autocmd_id = vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+      group = augroup,
+      buffer = buffer,
+      callback = function()
+        if not self:is_disposed() then
+          self.extmarks:update_current()
+        end
+      end,
+    })
+
+    disposable:add(function()
+      pcall(vim.api.nvim_del_autocmd, autocmd_id)
+      pcall(vim.api.nvim_del_augroup_by_id, augroup)
+    end)
+
     self:add(function()
       OCCURRENCE_CACHE[buffer] = nil
     end)

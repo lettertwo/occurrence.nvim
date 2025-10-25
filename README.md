@@ -242,6 +242,23 @@ require("occurrence").setup({
 })
 ```
 
+### Customizing Highlights
+
+occurrence.nvim uses three highlight groups for visual feedback:
+
+- **`OccurrenceMatch`**: Highlights all occurrence matches (default: links to `Search`)
+- **`OccurrenceMark`**: Highlights marked occurrences that will be operated on (default: links to `IncSearch`)
+- **`OccurrenceCurrent`**: Highlights the current occurrence under the cursor (default: links to `CurSearch`)
+
+You can customize these highlight groups in your configuration:
+
+```lua
+-- Example: Bold and underlined for emphasis
+vim.api.nvim_set_hl(0, "OccurrenceMatch", {})
+vim.api.nvim_set_hl(0, "OccurrenceMark", { bold = true, underline = true })
+vim.api.nvim_set_hl(0, "OccurrenceCurrent", { bold = true, underline = true, reverse = true })
+```
+
 ### Statusline Integration
 
 Display occurrence count in your statusline similar to Neovim's search count using the `status()` API:
