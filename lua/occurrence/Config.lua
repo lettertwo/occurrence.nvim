@@ -13,11 +13,11 @@ local config = {}
 ---@field default_keymaps? boolean
 ---@field default_operators? boolean
 ---@field operators? occurrence.OperatorKeymapConfig
----@field on_preset_activate? fun(map: occurrence.KeymapSetFn): nil
+---@field on_activate? fun(map: occurrence.KeymapSetFn): nil
 ---@field get_operator_config? fun(operator: string): occurrence.OperatorConfig | nil
 
 ---@type { [string]: occurrence.Api }
-local DEFAULT_PRESET_ACTIONS = {
+local DEFAULT_OCCURRENCE_MODE_ACTIONS = {
   ["<Esc>"] = "deactivate",
   ["<C-c>"] = "deactivate",
   ["<C-[>"] = "deactivate",
@@ -52,7 +52,7 @@ local DEFAULT_CONFIG = {
   operators = DEFAULT_OPERATORS,
   default_keymaps = true,
   default_operators = true,
-  on_preset_activate = nil,
+  on_activate = nil,
 }
 
 local function callable(fn)
@@ -85,7 +85,7 @@ end
 ---@field default_keymaps boolean
 ---@field default_operators boolean
 ---@field operators occurrence.OperatorKeymapConfig
----@field on_preset_activate? fun(map: occurrence.KeymapSetFn): nil
+---@field on_activate? fun(map: occurrence.KeymapSetFn): nil
 local Config = {}
 
 ---@param name string
@@ -97,7 +97,7 @@ end
 ---@param name occurrence.Api | string
 ---@return occurrence.ActionConfig | nil
 function Config:get_api_config(name)
-  local api_name = DEFAULT_PRESET_ACTIONS[name] or name
+  local api_name = DEFAULT_OCCURRENCE_MODE_ACTIONS[name] or name
   local api = require("occurrence.api")
   return api[api_name]
 end
@@ -141,22 +141,22 @@ function Config:get_operator_config(name)
 end
 
 ---@param occurrence occurrence.Occurrence
-function Config:activate_preset(occurrence)
+function Config:activate_occurrence_mode(occurrence)
   if self.default_keymaps then
     -- Disable the default operator-pending mapping.
     -- Note that this isn't strictly necessary, since the modify operator
-    -- command is a no-op when there is a preset keymap active,
+    -- command is a no-op when occurrence mode is active,
     -- but it gives some descriptive feedback to the user to update the binding.
     occurrence.keymap:set("o", "o", "<Nop>")
 
-    -- Set up buffer-local keymaps for normal mode preset actions
-    for preset_key, action_name in pairs(DEFAULT_PRESET_ACTIONS) do
-      local action_config = self:get_api_config(preset_key)
+    -- Set up buffer-local keymaps for occurrence mode actions
+    for action_key, action_name in pairs(DEFAULT_OCCURRENCE_MODE_ACTIONS) do
+      local action_config = self:get_api_config(action_key)
       if action_config then
         local plug = action_config.plug or ("<Plug>(Occurrence" .. to_capcase(action_name) .. ")")
         local desc = action_config.desc
         local mode = action_config.mode or { "n", "v" }
-        occurrence.keymap:set(mode, preset_key, plug, { desc = desc })
+        occurrence.keymap:set(mode, action_key, plug, { desc = desc })
       end
     end
   end
@@ -173,8 +173,8 @@ function Config:activate_preset(occurrence)
     end
   end
 
-  if callable(self.on_preset_activate) then
-    self.on_preset_activate(function(mode, lhs, rhs, opts)
+  if callable(self.on_activate) then
+    self.on_activate(function(mode, lhs, rhs, opts)
       occurrence.keymap:set(mode, lhs, rhs, opts)
     end)
   end
@@ -252,7 +252,7 @@ function config.validate(opts)
       operators = { "table", true },
       default_keymaps = { "boolean", true },
       default_operators = { "boolean", true },
-      on_preset_activate = { "callable", true },
+      on_activate = { "callable", true },
     }
 
     for key, validator in pairs(valid_keys) do

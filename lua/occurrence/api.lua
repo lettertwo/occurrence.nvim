@@ -6,12 +6,12 @@ local log = require("occurrence.log")
 
 ---@module 'occurrence.api'
 
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local word = {
   mode = "n",
   plug = "<Plug>(OccurrenceWord)",
   desc = "Find occurrences of word",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
     local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
@@ -30,12 +30,12 @@ local word = {
   end,
 }
 
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local selection = {
   mode = "v",
   plug = "<Plug>(OccurrenceSelection)",
   desc = "Find occurrences of selection",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     local range = Range.of_selection()
     assert(range, "no visual selection")
@@ -61,12 +61,12 @@ local selection = {
   end,
 }
 
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local pattern = {
   mode = "n",
   plug = "<Plug>(OccurrencePattern)",
   desc = "Find occurrences of search pattern",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     local search_pattern = vim.fn.getreg("/")
 
@@ -92,11 +92,11 @@ local pattern = {
 -- Find occurrences using the current selection if active,
 -- or the current search pattern if available,
 -- or the word under the cursor.
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local current = {
   plug = "<Plug>(OccurrenceCurrent)",
   desc = "Find occurrences",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence, ...)
     if vim.fn.mode():match("[vV]") then
       return selection.callback(occurrence, ...)
@@ -108,57 +108,57 @@ local current = {
   end,
 }
 
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local match_next = {
   mode = "n",
   plug = "<Plug>(OccurrenceMatchNext)",
   desc = "Next occurrence match",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     occurrence:match_cursor({ direction = "forward", wrap = true })
   end,
 }
 
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local match_previous = {
   mode = "n",
   plug = "<Plug>(OccurrenceMatchPrevious)",
   desc = "Previous occurrence match",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     occurrence:match_cursor({ direction = "backward", wrap = true })
   end,
 }
 
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local next = {
   mode = "n",
   plug = "<Plug>(OccurrenceNext)",
   desc = "Next marked occurrence",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
   end,
 }
 
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local previous = {
   mode = "n",
   plug = "<Plug>(OccurrencePrevious)",
   desc = "Previous marked occurrence",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
   end,
 }
 
 -- Add a mark and highlight for the current match of the given occurrence.
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local mark = {
   mode = "n",
   plug = "<Plug>(OccurrenceMark)",
   desc = "Mark occurrence",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     local range = occurrence:match_cursor()
     if range then
@@ -168,12 +168,12 @@ local mark = {
 }
 
 -- Remove a mark and highlight for the current match of the given occurrence.
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local unmark = {
   mode = "n",
   plug = "<Plug>(OccurrenceUnmark)",
   desc = "Unmark occurrence",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     local range = occurrence:match_cursor()
     if range then
@@ -183,11 +183,11 @@ local unmark = {
 }
 
 -- Add marks and highlights for all matches of the given occurrence.
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local mark_all = {
   mode = "n",
   desc = "Mark occurrences",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     for range in occurrence:matches() do
       occurrence:mark(range)
@@ -196,11 +196,11 @@ local mark_all = {
 }
 
 -- Clear all marks and highlights for the given occurrence.
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local unmark_all = {
   mode = "n",
   desc = "Unmark occurrences",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     for range in occurrence.extmarks:iter_marks() do
       occurrence:unmark(range)
@@ -209,11 +209,11 @@ local unmark_all = {
 }
 
 -- Add marks and highlights for matches of the given occurrence within the current selection.
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local mark_in_selection = {
   mode = "v",
   desc = "Mark occurences",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     local selection_range = Range:of_selection()
     if selection_range then
@@ -225,11 +225,11 @@ local mark_in_selection = {
 }
 
 -- Clear marks and highlights for matches of the given occurrence within the current selection.
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local unmark_in_selection = {
   mode = "v",
   desc = "Unmark occurrences",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     local selection_range = Range:of_selection()
     if selection_range then
@@ -240,12 +240,12 @@ local unmark_in_selection = {
   end,
 }
 
----@type occurrence.PresetConfig
+---@type occurrence.OccurrenceModeConfig
 local toggle = {
   mode = { "n", "v" },
   plug = "<Plug>(OccurrenceToggle)",
   desc = "Add/Toggle occurrence mark(s)",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence, ...)
     if vim.fn.mode():match("[vV]") then
       local pattern_count = occurrence.patterns and #occurrence.patterns or 0
@@ -285,7 +285,7 @@ local deactivate = {
   mode = "n",
   desc = "Clear occurrence",
   plug = "<Plug>(OccurrenceDeactivate)",
-  type = "preset",
+  type = "occurrence-mode",
   callback = function(occurrence)
     if occurrence.extmarks:has_any() then
       log.debug("Occurrence still has marks during deactivate")

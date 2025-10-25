@@ -38,10 +38,10 @@ local OCCURRENCE_CACHE = {}
 ---@field desc? string
 ---@field callback? occurrence.ActionCallback
 
--- An action that will run and then activate preset keymaps,
+-- An action that will run and then activate occurrence mode keymaps,
 -- if not already active.
----@class (exact) occurrence.PresetConfig
----@field type "preset"
+---@class (exact) occurrence.OccurrenceModeConfig
+---@field type "occurrence-mode"
 ---@field mode? "n" | "v" | ("n" | "v")[]
 ---@field plug? string
 ---@field desc? string
@@ -49,7 +49,7 @@ local OCCURRENCE_CACHE = {}
 
 -- A descriptor for an action to be applied to occurrences.
 ---@alias occurrence.ActionConfig
----   | occurrence.PresetConfig
+---   | occurrence.OccurrenceModeConfig
 ---   | occurrence.OperatorModifierConfig
 ---   | { callback: occurrence.ActionCallback }
 
@@ -516,11 +516,11 @@ end
 -- Apply the given `action` and `config` to this occurrence.
 -- If `action` is a string, it will be resolved to an API action config.
 -- If `action` is a table with a `callback` field, it will be treated as an action config:
---   - If `action.type == "preset"`, `config:activate_preset` will be called after the callback.
+--   - If `action.type == "occurrence-mode"`, `config:activate_occurrence_mode` will be called after the callback.
 --   - If `action.type == "operator-modifier"`, `config:modify_operator` will be called after the callback.
 -- Finally, if `action` is callable, it will be called directly.
 -- In all cases, the action callback will receive this `Occurrence` and the `config` as arguments,
--- and if it returns `false`, any followup behavior (as with "preset" and "operator-modifier" types)
+-- and if it returns `false`, any followup behavior (as with "occurrence-mode" and "operator-modifier" types)
 -- will be skipped, and this occurrence will be disposed.
 ---@param action occurrence.Api | occurrence.ActionConfig | occurrence.ActionCallback
 ---@param config occurrence.Config
@@ -537,24 +537,24 @@ function Occurrence:apply(action, config)
   end
 
   if action_config and (action_config.type or action_config.callback) then
-    if action_config.type == "preset" then
-      ---@cast action_config occurrence.PresetConfig
+    if action_config.type == "occurrence-mode" then
+      ---@cast action_config occurrence.OccurrenceModeConfig
       local ok, result = pcall(action_config.callback, self, config)
       if not ok or result == false then
-        log.debug("Preset action cancelled")
+        log.debug("Occurrence mode action cancelled")
         self:dispose()
       elseif not self:has_matches() then
         log.warn("No matches found for pattern(s):", table.concat(self.patterns, ", "), "skipping activation")
         self:dispose()
       elseif not self.keymap:is_active() then
-        log.debug("Activating preset keymaps for buffer", self.buffer)
-        config:activate_preset(self)
+        log.debug("Activating occurrence mode keymaps for buffer", self.buffer)
+        config:activate_occurrence_mode(self)
       end
       return
     elseif action_config.type == "operator-modifier" then
       ---@cast action_config occurrence.OperatorModifierConfig
       if self.keymap:is_active() then
-        log.debug("Operator modifier skipped; preset occurrence is active!")
+        log.debug("Operator modifier skipped; occurrence mode is active!")
         return
       end
 

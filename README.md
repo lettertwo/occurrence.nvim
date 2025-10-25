@@ -113,7 +113,7 @@ require("occurrence").setup({
   -- Receives a keymap function: `map(mode, lhs, rhs, opts)`
   -- This function can be used to set up custom keymaps that are only active in occurrence mode.
   -- Keymaps that are set through this function will automatically be removed when occurrence mode deactivates.
-  on_preset_activate = nil,
+  on_activate = nil,
 })
 ```
 
@@ -146,7 +146,7 @@ Disable default keymaps and set up custom ones:
 ```lua
 require("occurrence").setup({
   default_keymaps = false,  -- Disable default keymaps
-  on_preset_activate = function(map)
+  on_activate = function(map)
     -- NOTE: If you disable default keymaps
     -- you'll want a way to exit occurrence mode!
     map("n", "q", "<Plug>(OccurrenceDeactivate)")
@@ -165,12 +165,12 @@ vim.keymap.set("o", "<C-o>", function()
 end)
 ```
 
-#### Custom Keymaps with on_preset_activate
+#### Custom Keymaps
 
 ```lua
 require("occurrence").setup({
   default_keymaps = false,  -- Disable defaults
-  on_preset_activate = function(map)
+  on_activate = function(map)
     -- Custom navigation
     map("n", "<Tab>", "<Plug>(OccurrenceNext)")
     map("n", "<S-Tab>", "<Plug>(OccurrencePrevious)")
@@ -212,7 +212,7 @@ Add operators that work on marked occurrences on the current line:
 
 ```lua
 require("occurrence").setup({
-  on_preset_activate = function(map)
+  on_activate = function(map)
     -- dd - Delete marked occurrences on current line
     map("n", "dd", function()
       local occ = require('occurrence.Occurrence').get()

@@ -30,7 +30,7 @@ describe("integration tests", function()
     notify_stub:revert()
   end)
 
-  describe("activate_preset", function()
+  describe("activate_occurrence_mode", function()
     it("warns when no matches found", function()
       -- Create buffer with a unique word that won't have multiple occurrences
       bufnr = util.buffer("unique_word_that_appears_only_once")

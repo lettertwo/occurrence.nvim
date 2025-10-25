@@ -12,7 +12,7 @@ local log = require("occurrence.log")
 
 ---@alias occurrence.OperatorConfig occurrence.VisualFeedkeysOperatorConfig | occurrence.CommandOperatorConfig | occurrence.DirectApiOperatorConfig
 
--- An action that will be used as a preset keymap or as an operator-pending keymap.
+-- An action that will be used in occurrence mode or as an operator-pending keymap.
 ---@class (exact) occurrence.OperatorConfigBase
 ---@field desc? string
 ---@field uses_register boolean Whether the operator uses a register.

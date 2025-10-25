@@ -228,7 +228,7 @@ describe("dot repeat functionality", function()
     }, lines, "all instances of 'text' in the second paragraph should be replaced with 'abc'")
   end)
 
-  it("repeats operator on preset marks with motion, preserving all marked patterns", function()
+  it("repeats operator on occurrence mode marks with motion, preserving all marked patterns", function()
     -- Tests that after marking multiple words with `go`, then doing `cip` (change inner paragraph),
     -- dot-repeat preserves all the marked patterns and applies them to a new motion range
 

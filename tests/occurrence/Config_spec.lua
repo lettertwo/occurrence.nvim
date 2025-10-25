@@ -23,7 +23,7 @@ describe("Config", function()
           d = "delete",
         },
         default_keymaps = true,
-        on_preset_activate = setmetatable({}, {
+        on_activate = setmetatable({}, {
           __call = function() end,
         }),
       }
@@ -97,7 +97,7 @@ describe("Config", function()
     it("passes through an existing config", function()
       local opts = {
         default_operators = false,
-        on_preset_activate = function() end,
+        on_activate = function() end,
       }
 
       local conf1 = Config.new(opts)

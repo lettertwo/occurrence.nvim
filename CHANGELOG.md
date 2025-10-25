@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Core occurrence functionality
-- Multiple interaction modes (preset, operator-pending, modifier)
+- Multiple interaction modes (occurrence mode, operator-modifier)
 - Smart occurrence detection (word, selection, search patterns)
 - Visual highlighting using Neovim's extmarks system
 - Native vim operator integration
@@ -42,4 +42,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: https://github.com/lettertwo/occurrence.nvim/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/lettertwo/occurrence.nvim/releases/tag/v0.1.0
-

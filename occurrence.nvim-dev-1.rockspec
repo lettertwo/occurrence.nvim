@@ -6,20 +6,19 @@ package = "occurrence.nvim"
 version = modrev .. specrev
 
 description = {
-  summary = "Intelligent occurrence highlighting and operations for Neovim",
+  summary = "Mark occurrences of words/patterns in a buffer and perform operations on them",
   detailed = [[
-    occurrence.nvim is a modern Neovim plugin for intelligent occurrence
-    highlighting and operations. It allows you to mark occurrences of
-    words/patterns in a buffer and perform operations on them, similar to multiple
-    cursor functionality but with vim-native operators.
+    occurrence.nvim is a Neovim plugin to mark occurrences of words/patterns
+    in a buffer and perform operations on them.
+
+    Inspired by vim-mode-plus's occurrence feature.
 
     Features:
-    - Smart occurrence detection (word, selection, search patterns)
-    - Visual highlighting using Neovim's extmarks system
-    - Native vim operator integration (c, d, y, etc.)
-    - Multiple interaction modes (preset, operator-pending, modifier)
-    - Highly configurable keymaps and behavior
-    - Performance optimized for large files
+    - Smart Occurrence Detection: Find word under cursor, visual selections, or last search patterns
+    - Visual Feedback: Occurrences are highlighted with status showing current/total counts
+    - Operator Integration: Use native vim operators (c, d, y, etc.) on occurrences
+    - Multiple Interaction Modes: Select occurrences and then operate, or modify a pending operation to target occurrences
+    - Highly Configurable: Customize keymaps, operators, and behavior
   ]],
   homepage = repo_url,
   license = "MIT",

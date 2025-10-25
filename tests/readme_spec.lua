@@ -37,7 +37,7 @@ describe("README examples", function()
       })
       plugin.setup({
         default_keymaps = false,
-        on_preset_activate = function(map)
+        on_activate = function(map)
           map("n", "q", "<Plug>(OccurrenceDeactivate)")
         end,
       })
@@ -114,7 +114,7 @@ describe("README examples", function()
 
       plugin.setup({
         default_keymaps = false,
-        on_preset_activate = function(map)
+        on_activate = function(map)
           -- Custom navigation
           map("n", "<Tab>", "<Plug>(OccurrenceNext)")
           map("n", "<S-Tab>", "<Plug>(OccurrencePrevious)")
@@ -303,7 +303,7 @@ describe("README examples", function()
       })
 
       plugin.setup({
-        on_preset_activate = function(map)
+        on_activate = function(map)
           -- dd - Delete marked occurrences on current line
           map("n", "dd", function()
             local occ = require("occurrence.Occurrence").get()
@@ -360,7 +360,7 @@ describe("README examples", function()
       })
 
       plugin.setup({
-        on_preset_activate = function(map)
+        on_activate = function(map)
           -- D - Delete marked occurrences from cursor to end of line
           map("n", "D", function()
             local occ = require("occurrence.Occurrence").get()
@@ -429,7 +429,7 @@ describe("README examples", function()
       })
 
       plugin.setup({
-        on_preset_activate = function(map)
+        on_activate = function(map)
           -- cc - Change marked occurrences on current line
           map("n", "cc", function()
             local occ = require("occurrence.Occurrence").get()
@@ -490,7 +490,7 @@ describe("README examples", function()
       })
 
       plugin.setup({
-        on_preset_activate = function(map)
+        on_activate = function(map)
           -- C - Change marked occurrences from cursor to end of line
           map("n", "C", function()
             local occ = require("occurrence.Occurrence").get()
