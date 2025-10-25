@@ -1,21 +1,28 @@
-*occurrence.nvim.txt*      For NVIM >= 0.10.0     Last change: 2025 October 24
+*occurrence.txt*        For NVIM >= 0.10.0        Last change: 2025 October 24
 
 ==============================================================================
-Table of Contents                          *occurrence.nvim-table-of-contents*
+Table of Contents                               *occurrence-table-of-contents*
 
-1. occurrence.nvim                           |occurrence.nvim-occurrence.nvim|
-  - Features                        |occurrence.nvim-occurrence.nvim-features|
-  - Installation                |occurrence.nvim-occurrence.nvim-installation|
-  - Quick Start                  |occurrence.nvim-occurrence.nvim-quick-start|
-  - Configuration              |occurrence.nvim-occurrence.nvim-configuration|
-  - Example Workflows      |occurrence.nvim-occurrence.nvim-example-workflows|
-  - API Reference              |occurrence.nvim-occurrence.nvim-api-reference|
-  - Development                  |occurrence.nvim-occurrence.nvim-development|
-  - License                          |occurrence.nvim-occurrence.nvim-license|
-
-==============================================================================
-1. occurrence.nvim                           *occurrence.nvim-occurrence.nvim*
-
+1. Features                                              |occurrence-features|
+2. Installation                                      |occurrence-installation|
+  - Using lazy.nvim                  |occurrence-installation-using-lazy.nvim|
+  - Using packer.nvim              |occurrence-installation-using-packer.nvim|
+3. Quick Start                                        |occurrence-quick-start|
+  - Operator-pending mode       |occurrence-quick-start-operator-pending-mode|
+  - Occurrence mode                   |occurrence-quick-start-occurrence-mode|
+4. Configuration                                    |occurrence-configuration|
+  - Default Configuration     |occurrence-configuration-default-configuration|
+  - Custom Configuration Examples|occurrence-configuration-custom-configuration-examples|
+  - Statusline Integration   |occurrence-configuration-statusline-integration|
+5. Example Workflows                            |occurrence-example-workflows|
+  - Example: Selective Editing|occurrence-example-workflows-example:-selective-editing|
+  - Example: Working with Search Patterns|occurrence-example-workflows-example:-working-with-search-patterns|
+  - Example: Working with Multiple Patterns|occurrence-example-workflows-example:-working-with-multiple-patterns|
+  - Example: Yanking and Putting Occurrences|occurrence-example-workflows-example:-yanking-and-putting-occurrences|
+  - Example: Distributing Values|occurrence-example-workflows-example:-distributing-values|
+6. API Reference                                    |occurrence-api-reference|
+  - Lua API                                 |occurrence-api-reference-lua-api|
+  - Actions                                 |occurrence-api-reference-actions|
 A Neovim plugin to mark occurrences of words/patterns in a buffer and perform
 operations on them.
 
@@ -24,7 +31,8 @@ Inspired by vim-mode-plus
 occurrence feature.
 
 
-FEATURES                            *occurrence.nvim-occurrence.nvim-features*
+==============================================================================
+1. Features                                              *occurrence-features*
 
 - 🔍 **Smart Occurrence Detection**: Find word under cursor, visual selections, or last search patterns
 - 🎯 **Visual Feedback**: occurrences are highlighted. Status shows current/total counts
@@ -33,10 +41,11 @@ FEATURES                            *occurrence.nvim-occurrence.nvim-features*
 - 🔧 **Highly Configurable**: Customize keymaps, operators, and behavior
 
 
-INSTALLATION                    *occurrence.nvim-occurrence.nvim-installation*
+==============================================================================
+2. Installation                                      *occurrence-installation*
 
 
-USING LAZY.NVIM ~
+USING LAZY.NVIM                      *occurrence-installation-using-lazy.nvim*
 
 >lua
     {
@@ -48,7 +57,7 @@ USING LAZY.NVIM ~
 <
 
 
-USING PACKER.NVIM ~
+USING PACKER.NVIM                  *occurrence-installation-using-packer.nvim*
 
 >lua
     use {
@@ -60,13 +69,14 @@ USING PACKER.NVIM ~
 <
 
 
-QUICK START                      *occurrence.nvim-occurrence.nvim-quick-start*
+==============================================================================
+3. Quick Start                                        *occurrence-quick-start*
 
 With the default configuration, you can try these workflows to get a feel for
 `occurrence.nvim`.
 
 
-OPERATOR-PENDING MODE ~
+OPERATOR-PENDING MODE           *occurrence-quick-start-operator-pending-mode*
 
 You can modify most vim operators to work on occurrences of the word under
 cursor:
@@ -76,12 +86,12 @@ cursor:
 3. **Choose range**: Use vim motions like `$`, `ip`, etc. to apply to occurrences in that range
 
 
-OCCURRENCE MODE ~
+OCCURRENCE MODE                       *occurrence-quick-start-occurrence-mode*
 
 Alternatively, you can first mark occurrences and then operate on them.
 
 
-MARKING OCCURRENCES
+MARKING OCCURRENCES ~
 
 Marking occurrences can be done in several ways:
 
@@ -96,7 +106,7 @@ Once occurrences are marked, you can navigate, add and remove them:
 - **Toggle mark**: `go` to toggle mark on current occurrence
 
 
-OPERATING ON MARKED OCCURRENCES
+OPERATING ON MARKED OCCURRENCES ~
 
 With occurrences marked, you can perform operations on them in several ways:
 
@@ -112,10 +122,11 @@ Or, you can use visual mode:
 When you’re done, press `<Esc>` to exit occurrence mode and clear all marks.
 
 
-CONFIGURATION                  *occurrence.nvim-occurrence.nvim-configuration*
+==============================================================================
+4. Configuration                                    *occurrence-configuration*
 
 
-DEFAULT CONFIGURATION ~
+DEFAULT CONFIGURATION         *occurrence-configuration-default-configuration*
 
 >lua
     require("occurrence").setup({
@@ -170,10 +181,10 @@ Occurrence mode (after marking occurrences from normal/visual mode):
 - All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`)
 
 
-CUSTOM CONFIGURATION EXAMPLES ~
+CUSTOM CONFIGURATION EXAMPLES*occurrence-configuration-custom-configuration-examples*
 
 
-MINIMAL CONFIGURATION
+MINIMAL CONFIGURATION ~
 
 Disable default keymaps and set up custom ones:
 
@@ -200,7 +211,7 @@ Disable default keymaps and set up custom ones:
 <
 
 
-CUSTOM KEYMAPS WITH ON_PRESET_ACTIVATE
+CUSTOM KEYMAPS WITH ON_PRESET_ACTIVATE ~
 
 >lua
     require("occurrence").setup({
@@ -228,7 +239,7 @@ CUSTOM KEYMAPS WITH ON_PRESET_ACTIVATE
 <
 
 
-DISABLE SPECIFIC OPERATORS
+DISABLE SPECIFIC OPERATORS ~
 
 >lua
     require("occurrence").setup({
@@ -243,7 +254,7 @@ DISABLE SPECIFIC OPERATORS
 <
 
 
-CUSTOM LINE-BASED OPERATORS
+CUSTOM LINE-BASED OPERATORS ~
 
 Add operators that work on marked occurrences on the current line:
 
@@ -280,7 +291,7 @@ Add operators that work on marked occurrences on the current line:
 <
 
 
-STATUSLINE INTEGRATION ~
+STATUSLINE INTEGRATION       *occurrence-configuration-statusline-integration*
 
 Display occurrence count in your statusline similar to Neovim’s search count
 using the `status()` API:
@@ -333,12 +344,13 @@ Options:
 - `buffer` (integer): Buffer number (default: current buffer)
 
 
-EXAMPLE WORKFLOWS          *occurrence.nvim-occurrence.nvim-example-workflows*
+==============================================================================
+5. Example Workflows                            *occurrence-example-workflows*
 
 Some examples of real-world workflows using `occurrence.nvim`.
 
 
-EXAMPLE: SELECTIVE EDITING ~
+EXAMPLE: SELECTIVE EDITING*occurrence-example-workflows-example:-selective-editing*
 
 Change only some occurrences of a word:
 
@@ -359,7 +371,7 @@ Change only some occurrences of a word:
 <
 
 
-EXAMPLE: WORKING WITH SEARCH PATTERNS ~
+EXAMPLE: WORKING WITH SEARCH PATTERNS*occurrence-example-workflows-example:-working-with-search-patterns*
 
 Mark occurrences from last search pattern:
 
@@ -378,7 +390,7 @@ Mark occurrences from last search pattern:
 <
 
 
-EXAMPLE: WORKING WITH MULTIPLE PATTERNS ~
+EXAMPLE: WORKING WITH MULTIPLE PATTERNS*occurrence-example-workflows-example:-working-with-multiple-patterns*
 
 Mark different words and edit them together:
 
@@ -402,7 +414,7 @@ Mark different words and edit them together:
 <
 
 
-EXAMPLE: YANKING AND PUTTING OCCURRENCES ~
+EXAMPLE: YANKING AND PUTTING OCCURRENCES*occurrence-example-workflows-example:-yanking-and-putting-occurrences*
 
 Yank marked occurrences and paste at different locations:
 
@@ -424,7 +436,7 @@ Yank marked occurrences and paste at different locations:
 <
 
 
-EXAMPLE: DISTRIBUTING VALUES ~
+EXAMPLE: DISTRIBUTING VALUES*occurrence-example-workflows-example:-distributing-values*
 
 The `distribute` operator (`gp`) cycles through lines from a register when
 pasting, giving each occurrence a different value. This is useful for
@@ -456,24 +468,24 @@ refactoring or batch renaming with distinct values.
 - `gp` (distribute): Cycles through lines in the register, giving each occurrence a different line
 
 
-API REFERENCE                  *occurrence.nvim-occurrence.nvim-api-reference*
+==============================================================================
+6. API Reference                                    *occurrence-api-reference*
 
 
-LUA API ~
+LUA API                                     *occurrence-api-reference-lua-api*
 
 occurrence.nvim provides a Lua API for programmatic control:
 
 
-REQUIRE('OCCURRENCE').SETUP(OPTS)
+REQUIRE('OCCURRENCE').SETUP(OPTS) ~
 
-Configure the plugin. See |occurrence.nvim-configuration| for available
-options.
+Configure the plugin. See |occurrence-configuration| for available options.
 
 **Note:** calling `setup()` is **not required** unless you intend to customize
 settings!
 
 
-REQUIRE('OCCURRENCE').STATUS(OPTS)
+REQUIRE('OCCURRENCE').STATUS(OPTS) ~
 
 Get occurrence count information for statusline (or other) integrations.
 
@@ -502,7 +514,7 @@ Get occurrence count information for statusline (or other) integrations.
 <
 
 
-ACTIONS ~
+ACTIONS                                     *occurrence-api-reference-actions*
 
 All actions are available in three ways:
 
@@ -526,7 +538,7 @@ All actions are available in three ways:
 <
 
 
-ENTRY ACTIONS
+ENTRY ACTIONS ~
 
 Actions that activate occurrence mode:
 
@@ -543,7 +555,7 @@ Actions that activate occurrence mode:
                                             pattern, or word)
   ----------------------------------------------------------------------------------
 
-OCCURRENCE MODE ACTIONS
+OCCURRENCE MODE ACTIONS ~
 
 Actions available when occurrence mode is active:
 
@@ -582,19 +594,19 @@ Actions available when occurrence mode is active:
                                                           occurrence mode
   ------------------------------------------------------------------------------------------
 
-OPERATOR MODIFIER
+OPERATOR MODIFIER ~
 
 Actions to modify operator-pending mode to work on occurrences:
 
-  -----------------------------------------------------------------------------------------
+  ---------------------------------------------------------------------------------------
   Action            Mapping                            Description
-  ----------------- ---------------------------------- ------------------------------------
+  ----------------- ---------------------------------- ----------------------------------
   modify_operator   <Plug>(OccurrenceModifyOperator)   Modifier for operator-pending mode
-                                                       (e.g., coo, doo)
+                                                       (e.g., doip)
 
-  -----------------------------------------------------------------------------------------
+  ---------------------------------------------------------------------------------------
 
-OPERATORS
+OPERATORS ~
 
 Operators that work on marked occurrences (configured via `operators` table):
 
@@ -629,15 +641,6 @@ Operators that work on marked occurrences (configured via `operators` table):
 
   rot13           g?        ROT13 encoding
   ----------------------------------------------------------------------------
-
-DEVELOPMENT                      *occurrence.nvim-occurrence.nvim-development*
-
-See CONTRIBUTING <./CONTRIBUTING.md> for contribution guidelines.
-
-
-LICENSE                              *occurrence.nvim-occurrence.nvim-license*
-
-MIT <./LICENSE>
 
 Generated by panvimdoc <https://github.com/kdheepak/panvimdoc>
 

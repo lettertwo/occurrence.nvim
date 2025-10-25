@@ -1,4 +1,4 @@
-PROJECT_NAME := occurrence.nvim
+PROJECT_NAME := occurrence
 NVIM_VERSION := 0.10.0
 LUA_PATH := './lua_modules/share/lua/5.1/?.lua;./lua_modules/share/lua/5.1/?/init.lua;;'
 LUA_CPATH := './lua_modules/lib/lua/5.1/?.so;;'
@@ -11,11 +11,11 @@ LUA_CPATH := './lua_modules/lib/lua/5.1/?.so;;'
 	@mkdir -p $(@D)
 	@git clone git@github.com:kdheepak/panvimdoc.git $(@D)
 
-./doc/%.txt: ./vendor/panvimdoc/panvimdoc.sh README.md
+./doc/%.txt: ./vendor/panvimdoc/panvimdoc.sh README.md Makefile
 	@mkdir -p $(@D)
-	@$< --project-name "$*" --input-file "$(word 2,$^)" --vim-version "NVIM >= $(NVIM_VERSION)"
+	@$< --project-name "$*" --input-file "$(word 2,$^)" --shift-heading-level-by -1 --vim-version "NVIM >= $(NVIM_VERSION)"
 
-./doc/tags:
+./doc/tags: README.md Makefile
 	@mkdir -p $(@D)
 	@printf "%s\n" "Generating help tags in $(@D)"
 	@printf "%s\n" "nvim --headless -c 'helptags $(@D)' -c q"

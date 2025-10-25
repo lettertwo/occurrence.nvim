@@ -505,9 +505,9 @@ Actions available when occurrence mode is active:
 
 Actions to modify operator-pending mode to work on occurrences:
 
-| Action            | <Plug> Mapping                     | Description                                             |
-| ----------------- | ---------------------------------- | ------------------------------------------------------- |
-| `modify_operator` | `<Plug>(OccurrenceModifyOperator)` | Modifier for operator-pending mode (e.g., `coo`, `doo`) |
+| Action            | <Plug> Mapping                     | Description                                       |
+| ----------------- | ---------------------------------- | ------------------------------------------------- |
+| `modify_operator` | `<Plug>(OccurrenceModifyOperator)` | Modifier for operator-pending mode (e.g., `doip`) |
 
 #### Operators
 
@@ -528,16 +528,28 @@ Operators that work on marked occurrences (configured via `operators` table):
 | `swap_case`     | `g~`        | Swap case                                                         |
 | `rot13`         | `g?`        | ROT13 encoding                                                    |
 
+<!-- panvimdoc-ignore-start -->
+
 ## Development
 
 See [CONTRIBUTING](./CONTRIBUTING.md) for contribution guidelines.
 
+<!-- panvimdoc-ignore-end -->
+
+<!-- panvimdoc-ignore-start -->
+
 ## License
 
 [MIT](./LICENSE)
+
+<!-- panvimdoc-ignore-end -->
+
+<!-- panvimdoc-ignore-start -->
 
 [vim-mode-plus]: https://github.com/t9md/atom-vim-mode-plus?tab=readme-ov-file#some-features
 [panvimdoc]: https://github.com/kdheepak/panvimdoc
 [LuaCATS]: https://luals.github.io/wiki/annotations/
 [LuaRocks]: https://luarocks.org/modules/lettertwo/occurrence.nvim
 [busted]: https://github.com/lunarmodules/busted
+
+<!-- panvimdoc-ignore-end -->
