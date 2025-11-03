@@ -309,4 +309,73 @@ describe("api", function()
       assert.equals(4, marked_count, "Should find and mark both 'bar' occurrences")
     end)
   end)
+
+  describe("API annotations", function()
+    it("type annotations exist for all exported API functions", function()
+      local api = require("occurrence.api")
+
+      -- Read the source file to check for annotations
+      local source_path = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h:h") .. "/lua/occurrence.lua"
+      local file = io.open(source_path, "r")
+      assert(file, "Could not open lua/occurrence.lua")
+      local source = file:read("*a")
+      file:close()
+
+      -- Extract all @field annotations from @class occurrence
+      local annotated_fields = {}
+      local in_class = false
+      for line in source:gmatch("[^\n]+") do
+        if line:match("^%-%-%-%s*@class%s+occurrence%s*$") then
+          in_class = true
+        elseif in_class then
+          -- Stop when we hit another annotation or code
+          if line:match("^%-%-%-%s*@type%s+occurrence") or line:match("^local occurrence") then
+            break
+          end
+          -- Extract field name from ---@field name ...
+          local field = line:match("^%-%-%-%s*@field%s+(%S+)")
+          if field then
+            annotated_fields[field] = true
+          end
+        end
+      end
+
+      -- Check that all exported functions have @field annotations
+      local missing = {}
+      for name in pairs(api) do
+        if not annotated_fields[name] then
+          table.insert(missing, name)
+        end
+      end
+      table.sort(missing)
+
+      assert.same(
+        {},
+        missing,
+        string.format(
+          "Missing @field annotations in @class occurrence for: %s\n" .. "Add these annotations to lua/occurrence.lua",
+          table.concat(missing, ", ")
+        )
+      )
+
+      -- Check that there are no extra @field annotations
+      local extra = {}
+      for name in pairs(annotated_fields) do
+        if not api[name] then
+          table.insert(extra, name)
+        end
+      end
+      table.sort(extra)
+
+      assert.same(
+        {},
+        extra,
+        string.format(
+          "Extra @field annotations in @class occurrence that don't correspond to exported functions: %s\n"
+            .. "Remove these annotations from lua/occurrence.lua or implement the functions",
+          table.concat(extra, ", ")
+        )
+      )
+    end)
+  end)
 end)
