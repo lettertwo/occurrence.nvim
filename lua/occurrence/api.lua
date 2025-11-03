@@ -6,6 +6,8 @@ local log = require("occurrence.log")
 
 ---@module 'occurrence.api'
 
+-- Find occurrences of the word under the cursor, mark all matches,
+-- and activate occurrence mode
 ---@type occurrence.OccurrenceModeConfig
 local word = {
   mode = "n",
@@ -30,6 +32,8 @@ local word = {
   end,
 }
 
+-- Find occurrences of the current visual selection, mark all
+-- matches, and activate occurrence mode
 ---@type occurrence.OccurrenceModeConfig
 local selection = {
   mode = "v",
@@ -61,6 +65,8 @@ local selection = {
   end,
 }
 
+-- Find occurrences of the last search pattern, mark all matches,
+-- and activate occurrence mode
 ---@type occurrence.OccurrenceModeConfig
 local pattern = {
   mode = "n",
@@ -89,9 +95,10 @@ local pattern = {
   end,
 }
 
--- Find occurrences using the current selection if active,
--- or the current search pattern if available,
--- or the word under the cursor.
+-- Smart entry action that adapts to the current context. In
+-- visual mode: acts like `selection`. Otherwise, if `:h hlsearch`
+-- is active: acts like `pattern`. Otherwise: acts like `word`.
+-- Marks all matches and activates occurrence mode
 ---@type occurrence.OccurrenceModeConfig
 local current = {
   plug = "<Plug>(OccurrenceCurrent)",
@@ -108,6 +115,7 @@ local current = {
   end,
 }
 
+-- Move to the next occurrence match, whether marked or unmarked
 ---@type occurrence.OccurrenceModeConfig
 local match_next = {
   mode = "n",
@@ -119,6 +127,7 @@ local match_next = {
   end,
 }
 
+-- Move to the previous occurrence match, whether marked or unmarked
 ---@type occurrence.OccurrenceModeConfig
 local match_previous = {
   mode = "n",
@@ -130,6 +139,7 @@ local match_previous = {
   end,
 }
 
+-- Move to the next marked occurrence
 ---@type occurrence.OccurrenceModeConfig
 local next = {
   mode = "n",
@@ -141,6 +151,7 @@ local next = {
   end,
 }
 
+-- Move to the previous marked occurrence
 ---@type occurrence.OccurrenceModeConfig
 local previous = {
   mode = "n",
@@ -152,7 +163,7 @@ local previous = {
   end,
 }
 
--- Add a mark and highlight for the current match of the given occurrence.
+-- Mark the occurrence match nearest to the cursor
 ---@type occurrence.OccurrenceModeConfig
 local mark = {
   mode = "n",
@@ -167,7 +178,7 @@ local mark = {
   end,
 }
 
--- Remove a mark and highlight for the current match of the given occurrence.
+-- Unmark the occurrence match nearest to the cursor
 ---@type occurrence.OccurrenceModeConfig
 local unmark = {
   mode = "n",
@@ -182,7 +193,7 @@ local unmark = {
   end,
 }
 
--- Add marks and highlights for all matches of the given occurrence.
+-- Mark all occurrence matches in the buffer
 ---@type occurrence.OccurrenceModeConfig
 local mark_all = {
   mode = "n",
@@ -195,7 +206,7 @@ local mark_all = {
   end,
 }
 
--- Clear all marks and highlights for the given occurrence.
+-- Unmark all occurrence matches in the buffer
 ---@type occurrence.OccurrenceModeConfig
 local unmark_all = {
   mode = "n",
@@ -208,7 +219,7 @@ local unmark_all = {
   end,
 }
 
--- Add marks and highlights for matches of the given occurrence within the current selection.
+-- Mark all occurrence matches in the current visual selection
 ---@type occurrence.OccurrenceModeConfig
 local mark_in_selection = {
   mode = "v",
@@ -224,7 +235,7 @@ local mark_in_selection = {
   end,
 }
 
--- Clear marks and highlights for matches of the given occurrence within the current selection.
+-- Unmark all occurrence matches in the current visual selection
 ---@type occurrence.OccurrenceModeConfig
 local unmark_in_selection = {
   mode = "v",
@@ -240,6 +251,14 @@ local unmark_in_selection = {
   end,
 }
 
+-- Smart toggle action that activates occurrence mode or toggles
+-- marks. In normal mode: If no patterns exist, acts like `word`
+-- to start occurrence mode. Otherwise, toggles the mark on the
+-- match under the cursor, or adds a new word pattern if not on a
+-- match. In visual mode: If no patterns exist, acts like
+-- `selection` to start occurrence mode. Otherwise, toggles marks
+-- on all matches within the selection, or adds a new selection
+-- pattern if no matches.
 ---@type occurrence.OccurrenceModeConfig
 local toggle = {
   mode = { "n", "v" },
@@ -281,6 +300,8 @@ local toggle = {
   end,
 }
 
+-- Clear all marks and patterns, and deactivate occurrence mode
+---@type occurrence.OccurrenceModeConfig
 local deactivate = {
   mode = "n",
   desc = "Clear occurrence",
@@ -295,6 +316,9 @@ local deactivate = {
   end,
 }
 
+-- Modify a pending operator to act on occurrences of the word
+-- under the cursor. Used in operator-pending mode (e.g., `coo`
+-- changes word occurrences, `doo` deletes them)
 ---@type occurrence.OperatorModifierConfig
 local modify_operator = {
   mode = "o",

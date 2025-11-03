@@ -14,10 +14,56 @@ end
 ---@type occurrence.Config?
 local _global_config = nil
 
--- TODO: Annotate generated API
--- Ideally, we'd also have tests to verify the annotations are accurate.
-
----@module 'occurrence'
+---@class occurrence
+-- Find occurrences of the word under the cursor, mark all matches,
+-- and activate occurrence mode
+---@field word fun(opts?: occurrence.Options): nil
+-- Find occurrences of the current visual selection, mark all
+-- matches, and activate occurrence mode
+---@field selection fun(opts?: occurrence.Options): nil
+-- Find occurrences of the last search pattern, mark all matches,
+-- and activate occurrence mode
+---@field pattern fun(opts?: occurrence.Options): nil
+-- Smart entry action that adapts to the current context. In
+-- visual mode: acts like `selection`. Otherwise, if `:h hlsearch`
+-- is active: acts like `pattern`. Otherwise: acts like `word`.
+-- Marks all matches and activates occurrence mode
+---@field current fun(opts?: occurrence.Options): nil
+-- Move to the next marked occurrence
+---@field next fun(opts?: occurrence.Options): nil
+-- Move to the previous marked occurrence
+---@field previous fun(opts?: occurrence.Options): nil
+-- Move to the next occurrence match, whether marked or unmarked
+---@field match_next fun(opts?: occurrence.Options): nil
+-- Move to the previous occurrence match, whether marked or unmarked
+---@field match_previous fun(opts?: occurrence.Options): nil
+-- Mark the occurrence match nearest to the cursor
+---@field mark fun(opts?: occurrence.Options): nil
+-- Unmark the occurrence match nearest to the cursor
+---@field unmark fun(opts?: occurrence.Options): nil
+-- Smart toggle action that activates occurrence mode or toggles
+-- marks. In normal mode: If no patterns exist, acts like `word`
+-- to start occurrence mode. Otherwise, toggles the mark on the
+-- match under the cursor, or adds a new word pattern if not on a
+-- match. In visual mode: If no patterns exist, acts like
+-- `selection` to start occurrence mode. Otherwise, toggles marks
+-- on all matches within the selection, or adds a new selection
+-- pattern if no matches.
+---@field toggle fun(opts?: occurrence.Options): nil
+-- Mark all occurrence matches in the buffer
+---@field mark_all fun(opts?: occurrence.Options): nil
+-- Unmark all occurrence matches in the buffer
+---@field unmark_all fun(opts?: occurrence.Options): nil
+-- Mark all occurrence matches in the current visual selection
+---@field mark_in_selection fun(opts?: occurrence.Options): nil
+-- Unmark all occurrence matches in the current visual selection
+---@field unmark_in_selection fun(opts?: occurrence.Options): nil
+-- Clear all marks and patterns, and deactivate occurrence mode
+---@field deactivate fun(opts?: occurrence.Options): nil
+-- Modify a pending operator to act on occurrences of the word
+-- under the cursor. Only useful in operator-pending mode
+-- (e.g., `c`, `d`, etc.)
+---@field modify_operator fun(opts?: occurrence.Options): nil
 local occurrence = {}
 
 -- Generate public API functions and commands for all api functions and
