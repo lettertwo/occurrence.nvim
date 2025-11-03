@@ -14,6 +14,9 @@ end
 ---@type occurrence.Config?
 local _global_config = nil
 
+-- TODO: Annotate generated API
+-- Ideally, we'd also have tests to verify the annotations are accurate.
+
 ---@module 'occurrence'
 local occurrence = {}
 
@@ -73,7 +76,9 @@ function occurrence.parse_opts(opts)
   return occurrence.resolve_config(opts)
 end
 
---- Reset the occurrence plugin
+-- Reset the occurrence plugin by removing keymaps
+-- and cancelling active occurrences.
+-- Automatically called by `setup({})`.
 function occurrence.reset()
   _global_config = nil
   for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
@@ -90,8 +95,22 @@ function occurrence.reset()
   end
 end
 
+-- Sets up `occurrence.nvim` using the given `opts`.
+--
+-- It is only necessary to call `setup()` if you intend
+-- to customize the default configuration.
+--
+-- Any `opts` will be merged with the default config.
+--
+-- `setup()` may be called multiple times to reset the plugin
+-- with a new configuration. Note that calling setup with no `opts`
+-- is only effective the first time; Subsequent calls
+-- do nothing unless called with new `opts`.
 ---@param opts? occurrence.Options
 function occurrence.setup(opts)
+  if _global_config and opts == nil then
+    return
+  end
   opts = opts or {}
   local config = require("occurrence.Config").new(opts)
   if _global_config ~= config then
@@ -109,6 +128,14 @@ function occurrence.setup(opts)
       vim.keymap.set("o", "o", api.modify_operator.plug, {
         desc = api.modify_operator.desc,
       })
+
+      -- TODO: support inner and around occurrence operator modifiers
+      -- vim.keymap.set("o", "io", api.modify_operator_inner.plug, {
+      --   desc = api.modify_operator_inner.desc,
+      -- })
+      -- vim.keymap.set("o", "ao", api.modify_operator_around.plug, {
+      --   desc = api.modify_operator_around.desc,
+      -- })
     end
   end
 end
@@ -119,7 +146,7 @@ end
 -- If `marked` is `true`, only marked occurrences will be counted.
 -- If `buffer` is provided, it will be used instead of the current buffer.
 ---@param opts? { marked?: boolean, buffer?: integer }
----@return occurrence.Status | nil `nil` if there is no activate occurrence for the buffer.
+---@return occurrence.Status | nil `nil` if there is no active occurrence for the buffer.
 function occurrence.status(opts)
   opts = opts or {}
   local buffer = opts.buffer or vim.api.nvim_get_current_buf()

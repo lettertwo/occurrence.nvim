@@ -2,10 +2,10 @@ occurrence-api-reference	occurrence.txt	/*occurrence-api-reference*
 occurrence-api-reference-actions	occurrence.txt	/*occurrence-api-reference-actions*
 occurrence-api-reference-lua-api	occurrence.txt	/*occurrence-api-reference-lua-api*
 occurrence-configuration	occurrence.txt	/*occurrence-configuration*
+occurrence-configuration-customizing-highlights	occurrence.txt	/*occurrence-configuration-customizing-highlights*
 occurrence-configuration-default-configuration	occurrence.txt	/*occurrence-configuration-default-configuration*
 occurrence-configuration-statusline-integration	occurrence.txt	/*occurrence-configuration-statusline-integration*
 occurrence-example-workflows	occurrence.txt	/*occurrence-example-workflows*
-occurrence-features	occurrence.txt	/*occurrence-features*
 occurrence-installation	occurrence.txt	/*occurrence-installation*
 occurrence-installation-using-lazy.nvim	occurrence.txt	/*occurrence-installation-using-lazy.nvim*
 occurrence-installation-using-packer.nvim	occurrence.txt	/*occurrence-installation-using-packer.nvim*

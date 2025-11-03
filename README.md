@@ -4,6 +4,8 @@ A Neovim plugin to mark occurrences of words/patterns in a buffer and perform op
 
 Inspired by [vim-mode-plus]'s occurrence feature.
 
+<!-- panvimdoc-ignore-start -->
+
 ## Features
 
 - 🔍 **Smart Occurrence Detection**: Find word under cursor, visual selections, or last search patterns
@@ -12,6 +14,8 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 - 🎮 **Multiple Interaction Modes**: Select occurrences and then operate, or modify a pending operation to target occurrences
 - 🔧 **Highly Configurable**: Customize keymaps, operators, and behavior
 
+<!-- panvimdoc-ignore-end -->
+
 ## Installation
 
 ### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
@@ -19,9 +23,8 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 ```lua
 {
   "occurrence.nvim",
-  config = function()
-    require("occurrence").setup()
-  end,
+  event = "BufReadPost", -- If you want to lazy load
+  opts = {} -- It is not neccessary to define any options or call `setup()`
 }
 ```
 
