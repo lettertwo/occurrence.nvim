@@ -1,61 +1,79 @@
 # occurrence.nvim
 
-A Neovim plugin to mark occurrences of words/patterns in a buffer and perform operations on them.
-
-Inspired by [vim-mode-plus]'s occurrence feature.
+A Neovim plugin for marking and operating on multiple occurrences. Mark words, selections, or search patterns, then use native Vim operators to batch edit them. Inspired by [vim-mode-plus]'s occurrence feature.
 
 <!-- panvimdoc-ignore-start -->
 
-## Features
+## Key Features
 
-- 🔍 **Smart Occurrence Detection**: Find word under cursor, visual selections, or last search patterns
-- 🎯 **Visual Feedback**: occurrences are highlighted. Status shows current/total counts
-- ⚡ **Operator Integration**: Use native vim operators (`c`, `d`, `y`, etc.) on occurrences
-- 🎮 **Multiple Interaction Modes**: Select occurrences and then operate, or modify a pending operation to target occurrences
-- 🔧 **Highly Configurable**: Customize keymaps, operators, and behavior
+### 🔍 Smart Occurrence Detection
+
+- Word under cursor with boundary matching
+- Visual selections (character, line, or block)
+- Last search pattern from `/` or `?`
+- Automatic pattern escaping and vim regex support
+
+### ⚡ Native Operator Integration
+
+- Use standard Vim operators: `c`, `d`, `y`, `p`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`
+- Two interaction modes: mark-then-operate or operator-pending modifier
+- Works with motions and text objects (`ip`, `$`, `G`, etc.)
+- Dot-repeat support for all operations
+
+### 🎯 Visual Feedback
+
+- Real-time highlighting of all matches and marked occurrences
+- Current occurrence highlighting during navigation
+- Statusline integration showing current/total counts
+- Customizable highlight groups
+
+### 🛠️ Highly Configurable
+
+- Enable/disable default keymaps or define custom ones
+- Choose which operators to enable or disable, or add custom ones
+- Customize highlight appearance
+- Lua API for advanced usage and integration
 
 <!-- panvimdoc-ignore-end -->
 
 ## Installation
 
+### Requirements
+
+- Neovim >= 0.10.0
+
 ### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
 {
-  "occurrence.nvim",
+  "lettertwo/occurrence.nvim",
   event = "BufReadPost", -- If you want to lazy load
-  opts = {} -- It is not neccessary to define any options or call `setup()`
+  -- opts = {} -- setup is optional; the defaults will work out of the box.
 }
 ```
 
-### Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+### Using :h vim.pack
 
 ```lua
-use {
-  "occurrence.nvim",
-  config = function()
-    require("occurrence").setup()
-  end,
-}
+vim.pack.add("lettertwo/occurrence.nvim")
 ```
 
 ## Quick Start
 
 With the default configuration, you can try these workflows to get a feel for `occurrence.nvim`.
 
-### Operator-pending mode
+1. Install the plugin using your preferred package manager
+2. No configuration required - default keymaps work out of the box
 
-You can modify most vim operators to work on occurrences of the word under cursor:
+### Marking occurrences
 
-1. **Choose operator**: Start an operation like `c`, `d`, `y`
-2. **Modify operator**: Press `o` to enter occurrence operator-modifier mode
-3. **Choose range**: Use vim motions like `$`, `ip`, etc. to apply to occurrences in that range
+You can enter 'occurrence mode' to mark occurrences and then operate on them:
 
-### Occurrence mode
-
-Alternatively, you can first mark occurrences and then operate on them.
-
-#### Marking occurrences
+1. Place cursor on a word and press `go` to mark all occurrences
+2. Use `n`/`N` to navigate between marked occurrences
+3. Press `c` followed by a motion (e.g., `ip`) to change marked occurrences in that range
+4. Type your replacement text
+5. Press `<Esc>` to exit occurrence mode
 
 Marking occurrences can be done in several ways:
 
@@ -69,7 +87,7 @@ Once occurrences are marked, you can navigate, add and remove them:
 - **Mark individual**: `ga` to mark current occurrence, `gx` to unmark
 - **Toggle mark**: `go` to toggle mark on current occurrence
 
-#### Operating on marked occurrences
+### Operating on marked occurrences
 
 With occurrences marked, you can perform operations on them in several ways:
 
@@ -84,9 +102,21 @@ Or, you can use visual mode:
 
 When you're done, press `<Esc>` to exit occurrence mode and clear all marks.
 
+### Operator-pending mode
+
+**Alternative workflow:** Use operator-pending mode with `c`, `d`, or `y` followed by `o` and a motion (e.g., `doip` deletes word occurrences in the paragraph).
+
+You can modify most vim operators to work on occurrences of the word under cursor:
+
+1. **Choose operator**: Start an operation like `c`, `d`, `y`
+2. **Modify operator**: Press `o` to enter occurrence operator-modifier mode
+3. **Choose range**: Use vim motions like `$`, `ip`, etc. to apply to occurrences in that range
+
 ## Configuration
 
 ### Default Configuration
+
+The plugin works with zero configuration but can be customized through `require("occurrence").setup({...})`. Configuration options include:
 
 ```lua
 require("occurrence").setup({
@@ -249,9 +279,9 @@ require("occurrence").setup({
 
 occurrence.nvim uses three highlight groups for visual feedback:
 
-- **`OccurrenceMatch`**: Highlights all occurrence matches (default: links to `Search`)
-- **`OccurrenceMark`**: Highlights marked occurrences that will be operated on (default: links to `IncSearch`)
-- **`OccurrenceCurrent`**: Highlights the current occurrence under the cursor (default: links to `CurSearch`)
+- **`OccurrenceMatch`**: All occurrence matches (default: links to `Search`)
+- **`OccurrenceMark`**: Marked occurrences (default: links to `IncSearch`)
+- **`OccurrenceCurrent`**: Current occurrence (default: links to `CurSearch`)
 
 You can customize these highlight groups in your configuration:
 
@@ -283,37 +313,14 @@ require('lualine').setup({
 })
 ```
 
-```lua
--- Example: statusline function with icons
-function _G.occurrence_statusline()
-  local count = require('occurrence').status({ marked = true })
-  if not count then
-    return ""
-  end
+The `status()` function returns `nil` if no active occurrence, otherwise returns:
 
-  local icon = count.exact_match == 1 and "" or "󰍉"
-  return string.format("%s %d/%d", icon, count.current, count.total)
-end
+- `current`: Current match index
+- `total`: Total number of matches
+- `exact_match`: 1 if cursor is on a match, 0 otherwise
+- `marked_only`: Whether counting only marked occurrences
 
--- Add to your statusline
-vim.opt.statusline = "%f %{%v:lua.occurrence_statusline()%}"
-```
-
-**API: `require('occurrence').status(opts)`**
-
-Returns `nil` if no active occurrence, otherwise returns:
-
-- `current` (integer): Current match index (1-based)
-- `total` (integer): Total number of matches
-- `exact_match` (integer): 1 if cursor is on a match, 0 otherwise
-- `marked_only` (boolean): Whether counting only marked occurrences
-
-Options:
-
-- `marked` (boolean): Count only marked occurrences (default: false)
-- `buffer` (integer): Buffer number (default: current buffer)
-
-## Example Workflows
+## Usage Examples
 
 Some examples of real-world workflows using `occurrence.nvim`.
 
@@ -458,15 +465,6 @@ Get occurrence count information for statusline (or other) integrations.
   - `total` (integer): Total number of matches
   - `exact_match` (integer): 1 if cursor is exactly on a match, 0 otherwise
   - `marked_only` (boolean): Whether counting only marked occurrences
-
-**Example:**
-
-```lua
-local count = require('occurrence').status()
-if count then
-  print(string.format("Match %d of %d", count.current, count.total))
-end
-```
 
 ### Actions
 

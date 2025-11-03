@@ -1,32 +1,33 @@
-*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 November 03
+*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 November 04
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
 
 1. Installation                                      |occurrence-installation|
+  - Requirements                        |occurrence-installation-requirements|
   - Using lazy.nvim                  |occurrence-installation-using-lazy.nvim|
-  - Using packer.nvim              |occurrence-installation-using-packer.nvim|
+  - Using :h vim.pack              |occurrence-installation-using-:h-vim.pack|
 2. Quick Start                                        |occurrence-quick-start|
+  - Marking occurrences           |occurrence-quick-start-marking-occurrences|
+  - Operating on marked occurrences|occurrence-quick-start-operating-on-marked-occurrences|
   - Operator-pending mode       |occurrence-quick-start-operator-pending-mode|
-  - Occurrence mode                   |occurrence-quick-start-occurrence-mode|
 3. Configuration                                    |occurrence-configuration|
   - Default Configuration     |occurrence-configuration-default-configuration|
   - Custom Configuration Examples|occurrence-configuration-custom-configuration-examples|
   - Customizing Highlights   |occurrence-configuration-customizing-highlights|
   - Statusline Integration   |occurrence-configuration-statusline-integration|
-4. Example Workflows                            |occurrence-example-workflows|
-  - Example: Selective Editing|occurrence-example-workflows-example:-selective-editing|
-  - Example: Working with Search Patterns|occurrence-example-workflows-example:-working-with-search-patterns|
-  - Example: Working with Multiple Patterns|occurrence-example-workflows-example:-working-with-multiple-patterns|
-  - Example: Yanking and Putting Occurrences|occurrence-example-workflows-example:-yanking-and-putting-occurrences|
-  - Example: Distributing Values|occurrence-example-workflows-example:-distributing-values|
+4. Usage Examples                                  |occurrence-usage-examples|
+  - Example: Selective Editing|occurrence-usage-examples-example:-selective-editing|
+  - Example: Working with Search Patterns|occurrence-usage-examples-example:-working-with-search-patterns|
+  - Example: Working with Multiple Patterns|occurrence-usage-examples-example:-working-with-multiple-patterns|
+  - Example: Yanking and Putting Occurrences|occurrence-usage-examples-example:-yanking-and-putting-occurrences|
+  - Example: Distributing Values|occurrence-usage-examples-example:-distributing-values|
 5. API Reference                                    |occurrence-api-reference|
   - Lua API                                 |occurrence-api-reference-lua-api|
   - Actions                                 |occurrence-api-reference-actions|
-A Neovim plugin to mark occurrences of words/patterns in a buffer and perform
-operations on them.
-
-Inspired by vim-mode-plus
+A Neovim plugin for marking and operating on multiple occurrences. Mark words,
+selections, or search patterns, then use native Vim operators to batch edit
+them. Inspired by vim-mode-plus
 <https://github.com/t9md/atom-vim-mode-plus?tab=readme-ov-file#some-features>’s
 occurrence feature.
 
@@ -35,26 +36,26 @@ occurrence feature.
 1. Installation                                      *occurrence-installation*
 
 
+REQUIREMENTS                            *occurrence-installation-requirements*
+
+- Neovim >= 0.10.0
+
+
 USING LAZY.NVIM                      *occurrence-installation-using-lazy.nvim*
 
 >lua
     {
-      "occurrence.nvim",
+      "lettertwo/occurrence.nvim",
       event = "BufReadPost", -- If you want to lazy load
-      opts = {} -- It is not neccessary to define any options or call `setup()`
+      -- opts = {} -- setup is optional; the defaults will work out of the box.
     }
 <
 
 
-USING PACKER.NVIM                  *occurrence-installation-using-packer.nvim*
+USING :H VIM.PACK                  *occurrence-installation-using-:h-vim.pack*
 
 >lua
-    use {
-      "occurrence.nvim",
-      config = function()
-        require("occurrence").setup()
-      end,
-    }
+    vim.pack.add("lettertwo/occurrence.nvim")
 <
 
 
@@ -64,23 +65,19 @@ USING PACKER.NVIM                  *occurrence-installation-using-packer.nvim*
 With the default configuration, you can try these workflows to get a feel for
 `occurrence.nvim`.
 
-
-OPERATOR-PENDING MODE           *occurrence-quick-start-operator-pending-mode*
-
-You can modify most vim operators to work on occurrences of the word under
-cursor:
-
-1. **Choose operator**: Start an operation like `c`, `d`, `y`
-2. **Modify operator**: Press `o` to enter occurrence operator-modifier mode
-3. **Choose range**: Use vim motions like `$`, `ip`, etc. to apply to occurrences in that range
+1. Install the plugin using your preferred package manager
+2. No configuration required - default keymaps work out of the box
 
 
-OCCURRENCE MODE                       *occurrence-quick-start-occurrence-mode*
+MARKING OCCURRENCES               *occurrence-quick-start-marking-occurrences*
 
-Alternatively, you can first mark occurrences and then operate on them.
+You can enter 'occurrence mode' to mark occurrences and then operate on them:
 
-
-MARKING OCCURRENCES ~
+1. Place cursor on a word and press `go` to mark all occurrences
+2. Use `n`/`N` to navigate between marked occurrences
+3. Press `c` followed by a motion (e.g., `ip`) to change marked occurrences in that range
+4. Type your replacement text
+5. Press `<Esc>` to exit occurrence mode
 
 Marking occurrences can be done in several ways:
 
@@ -95,7 +92,7 @@ Once occurrences are marked, you can navigate, add and remove them:
 - **Toggle mark**: `go` to toggle mark on current occurrence
 
 
-OPERATING ON MARKED OCCURRENCES ~
+OPERATING ON MARKED OCCURRENCES*occurrence-quick-start-operating-on-marked-occurrences*
 
 With occurrences marked, you can perform operations on them in several ways:
 
@@ -111,11 +108,28 @@ Or, you can use visual mode:
 When you’re done, press `<Esc>` to exit occurrence mode and clear all marks.
 
 
+OPERATOR-PENDING MODE           *occurrence-quick-start-operator-pending-mode*
+
+**Alternative workflow:** Use operator-pending mode with `c`, `d`, or `y`
+followed by `o` and a motion (e.g., `doip` deletes word occurrences in the
+paragraph).
+
+You can modify most vim operators to work on occurrences of the word under
+cursor:
+
+1. **Choose operator**: Start an operation like `c`, `d`, `y`
+2. **Modify operator**: Press `o` to enter occurrence operator-modifier mode
+3. **Choose range**: Use vim motions like `$`, `ip`, etc. to apply to occurrences in that range
+
+
 ==============================================================================
 3. Configuration                                    *occurrence-configuration*
 
 
 DEFAULT CONFIGURATION         *occurrence-configuration-default-configuration*
+
+The plugin works with zero configuration but can be customized through
+`require("occurrence").setup({...})`. Configuration options include:
 
 >lua
     require("occurrence").setup({
@@ -284,9 +298,9 @@ CUSTOMIZING HIGHLIGHTS       *occurrence-configuration-customizing-highlights*
 
 occurrence.nvim uses three highlight groups for visual feedback:
 
-- **OccurrenceMatch**: Highlights all occurrence matches (default: links to `Search`)
-- **OccurrenceMark**: Highlights marked occurrences that will be operated on (default: links to `IncSearch`)
-- **OccurrenceCurrent**: Highlights the current occurrence under the cursor (default: links to `CurSearch`)
+- **OccurrenceMatch**: All occurrence matches (default: links to `Search`)
+- **OccurrenceMark**: Marked occurrences (default: links to `IncSearch`)
+- **OccurrenceCurrent**: Current occurrence (default: links to `CurSearch`)
 
 You can customize these highlight groups in your configuration:
 
@@ -320,44 +334,22 @@ using the `status()` API:
     })
 <
 
->lua
-    -- Example: statusline function with icons
-    function _G.occurrence_statusline()
-      local count = require('occurrence').status({ marked = true })
-      if not count then
-        return ""
-      end
-    
-      local icon = count.exact_match == 1 and "" or "󰍉"
-      return string.format("%s %d/%d", icon, count.current, count.total)
-    end
-    
-    -- Add to your statusline
-    vim.opt.statusline = "%f %{%v:lua.occurrence_statusline()%}"
-<
+The `status()` function returns `nil` if no active occurrence, otherwise
+returns:
 
-**API: require('occurrence').status(opts)**
-
-Returns `nil` if no active occurrence, otherwise returns:
-
-- `current` (integer): Current match index (1-based)
-- `total` (integer): Total number of matches
-- `exact_match` (integer): 1 if cursor is on a match, 0 otherwise
-- `marked_only` (boolean): Whether counting only marked occurrences
-
-Options:
-
-- `marked` (boolean): Count only marked occurrences (default: false)
-- `buffer` (integer): Buffer number (default: current buffer)
+- `current`: Current match index
+- `total`: Total number of matches
+- `exact_match`: 1 if cursor is on a match, 0 otherwise
+- `marked_only`: Whether counting only marked occurrences
 
 
 ==============================================================================
-4. Example Workflows                            *occurrence-example-workflows*
+4. Usage Examples                                  *occurrence-usage-examples*
 
 Some examples of real-world workflows using `occurrence.nvim`.
 
 
-EXAMPLE: SELECTIVE EDITING*occurrence-example-workflows-example:-selective-editing*
+EXAMPLE: SELECTIVE EDITING*occurrence-usage-examples-example:-selective-editing*
 
 Change only some occurrences of a word:
 
@@ -378,7 +370,7 @@ Change only some occurrences of a word:
 <
 
 
-EXAMPLE: WORKING WITH SEARCH PATTERNS*occurrence-example-workflows-example:-working-with-search-patterns*
+EXAMPLE: WORKING WITH SEARCH PATTERNS*occurrence-usage-examples-example:-working-with-search-patterns*
 
 Mark occurrences from last search pattern:
 
@@ -397,7 +389,7 @@ Mark occurrences from last search pattern:
 <
 
 
-EXAMPLE: WORKING WITH MULTIPLE PATTERNS*occurrence-example-workflows-example:-working-with-multiple-patterns*
+EXAMPLE: WORKING WITH MULTIPLE PATTERNS*occurrence-usage-examples-example:-working-with-multiple-patterns*
 
 Mark different words and edit them together:
 
@@ -421,7 +413,7 @@ Mark different words and edit them together:
 <
 
 
-EXAMPLE: YANKING AND PUTTING OCCURRENCES*occurrence-example-workflows-example:-yanking-and-putting-occurrences*
+EXAMPLE: YANKING AND PUTTING OCCURRENCES*occurrence-usage-examples-example:-yanking-and-putting-occurrences*
 
 Yank marked occurrences and paste at different locations:
 
@@ -443,7 +435,7 @@ Yank marked occurrences and paste at different locations:
 <
 
 
-EXAMPLE: DISTRIBUTING VALUES*occurrence-example-workflows-example:-distributing-values*
+EXAMPLE: DISTRIBUTING VALUES*occurrence-usage-examples-example:-distributing-values*
 
 The `distribute` operator (`gp`) cycles through lines from a register when
 pasting, giving each occurrence a different value. This is useful for
@@ -510,15 +502,6 @@ Get occurrence count information for statusline (or other) integrations.
     - `total` (integer): Total number of matches
     - `exact_match` (integer): 1 if cursor is exactly on a match, 0 otherwise
     - `marked_only` (boolean): Whether counting only marked occurrences
-
-**Example:**
-
->lua
-    local count = require('occurrence').status()
-    if count then
-      print(string.format("Match %d of %d", count.current, count.total))
-    end
-<
 
 
 ACTIONS                                     *occurrence-api-reference-actions*

@@ -5,12 +5,13 @@ occurrence-configuration	occurrence.txt	/*occurrence-configuration*
 occurrence-configuration-customizing-highlights	occurrence.txt	/*occurrence-configuration-customizing-highlights*
 occurrence-configuration-default-configuration	occurrence.txt	/*occurrence-configuration-default-configuration*
 occurrence-configuration-statusline-integration	occurrence.txt	/*occurrence-configuration-statusline-integration*
-occurrence-example-workflows	occurrence.txt	/*occurrence-example-workflows*
 occurrence-installation	occurrence.txt	/*occurrence-installation*
+occurrence-installation-requirements	occurrence.txt	/*occurrence-installation-requirements*
+occurrence-installation-using-:h-vim.pack	occurrence.txt	/*occurrence-installation-using-:h-vim.pack*
 occurrence-installation-using-lazy.nvim	occurrence.txt	/*occurrence-installation-using-lazy.nvim*
-occurrence-installation-using-packer.nvim	occurrence.txt	/*occurrence-installation-using-packer.nvim*
 occurrence-quick-start	occurrence.txt	/*occurrence-quick-start*
-occurrence-quick-start-occurrence-mode	occurrence.txt	/*occurrence-quick-start-occurrence-mode*
+occurrence-quick-start-marking-occurrences	occurrence.txt	/*occurrence-quick-start-marking-occurrences*
 occurrence-quick-start-operator-pending-mode	occurrence.txt	/*occurrence-quick-start-operator-pending-mode*
 occurrence-table-of-contents	occurrence.txt	/*occurrence-table-of-contents*
+occurrence-usage-examples	occurrence.txt	/*occurrence-usage-examples*
 occurrence.txt	occurrence.txt	/*occurrence.txt*
