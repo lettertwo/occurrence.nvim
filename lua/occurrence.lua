@@ -141,15 +141,4 @@ vim.api.nvim_create_user_command("Occurrence", command.execute, {
   preview = command.preview,
 })
 
--- Register autocmd to setup occurrence automatically.
-vim.api.nvim_create_autocmd({ "BufReadPost" }, {
-  group = vim.api.nvim_create_augroup("OccurrenceAutoSetup", { clear = true }),
-  once = true,
-  callback = function()
-    if _global_config == nil then
-      occurrence.setup()
-    end
-  end,
-})
-
 return occurrence

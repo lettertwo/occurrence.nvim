@@ -7,4 +7,13 @@ local occurrence = setmetatable({}, {
   end,
 })
 
+-- Register autocmd to setup occurrence automatically.
+vim.api.nvim_create_autocmd({ "BufReadPost" }, {
+  group = vim.api.nvim_create_augroup("OccurrenceAutoSetup", { clear = true }),
+  once = true,
+  callback = function()
+    occurrence.setup()
+  end,
+})
+
 return occurrence
