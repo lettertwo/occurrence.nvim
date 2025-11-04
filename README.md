@@ -6,30 +6,30 @@ A Neovim plugin for marking and operating on multiple occurrences. Mark words, s
 
 Inspired by [vim-mode-plus]'s occurrence feature.
 
-# Key Features
+## Key Features
 
-## 🔍 Smart Occurrence Detection
+### 🔍 Smart Occurrence Detection
 
 - Word under cursor with boundary matching
 - Visual selections (character, line, or block)
 - Last search pattern from `/` or `?`
 - Automatic pattern escaping and vim regex support
 
-## ⚡ Native Operator Integration
+### ⚡ Native Operator Integration
 
 - Use standard Vim operators: `c`, `d`, `y`, `p`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`
 - Two interaction modes: mark-then-operate or operator-pending modifier
 - Works with motions and text objects (`ip`, `$`, `G`, etc.)
 - Dot-repeat support for all operations
 
-## 🎯 Visual Feedback
+### 🎯 Visual Feedback
 
 - Real-time highlighting of all matches and marked occurrences
 - Current occurrence highlighting during navigation
 - Statusline integration showing current/total counts
 - Customizable highlight groups
 
-## 🛠️ Highly Configurable
+### 🛠️ Highly Configurable
 
 - Enable/disable default keymaps or define custom ones
 - Choose which operators to enable or disable, or add custom ones
