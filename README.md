@@ -301,7 +301,7 @@ require('lualine').setup({
 })
 ```
 
-The `status()` function returns `nil` if no active occurrence, otherwise returns:
+The `status()` function returns `nil` if there is no active occurrence, otherwise returns:
 
 - `current`: Current match index
 - `total`: Total number of matches
@@ -310,7 +310,7 @@ The `status()` function returns `nil` if no active occurrence, otherwise returns
 
 # Usage Examples
 
-Some examples of real-world workflows using `occurrence.nvim`.
+Some examples of possible workflows using `occurrence.nvim`.
 
 ### Example: Selective Editing
 
@@ -429,13 +429,14 @@ jVgp                         " Move to line2 and Distribute - cycles through yan
 
 occurrence.nvim provides a Lua API for programmatic control:
 
-### `require('occurrence').setup(opts)`
+setup
+: `require('occurrence').setup(opts)`
 
 Configure the plugin. See [Configuration](#configuration) for available options.
-
 **Note:** calling `setup()` is **not required** unless you intend to customize settings!
 
-### `require('occurrence').status(opts)`
+status
+: `require('occurrence').status(opts)`
 
 Get occurrence count information for statusline (or other) integrations.
 
@@ -448,7 +449,7 @@ Get occurrence count information for statusline (or other) integrations.
 **Returns:**
 
 - `nil` if no active occurrence
-- Table with fields:
+- or a table with fields:
   - `current` (integer): Current match index (1-based)
   - `total` (integer): Total number of matches
   - `exact_match` (integer): 1 if cursor is exactly on a match, 0 otherwise
@@ -480,43 +481,132 @@ All actions are available in three ways:
 
 Actions that activate occurrence mode:
 
-| Action      | <Plug> Mapping                | Description                                           |
-| ----------- | ----------------------------- | ----------------------------------------------------- |
-| `word`      | `<Plug>(OccurrenceWord)`      | Find occurrences of word under cursor                 |
-| `selection` | `<Plug>(OccurrenceSelection)` | Find occurrences of visual selection                  |
-| `pattern`   | `<Plug>(OccurrencePattern)`   | Find occurrences of last search pattern               |
-| `current`   | `<Plug>(OccurrenceCurrent)`   | Find occurrences (smart: selection, pattern, or word) |
+word
+: `require('occurrence').word()`
+`:Occurrence word`
+`<Plug>(OccurrenceWord)`
+
+Find occurrences of word under cursor, mark all matches, and activate occurrence mode
+
+selection
+: `require('occurrence').selection()`
+`:Occurrence selection`
+`<Plug>(OccurrenceSelection)`
+
+Find occurrences of the current visual selection, mark all matches, and activate occurrence mode
+
+pattern
+: `require('occurrence').pattern()`
+`:Occurrence pattern`
+`<Plug>(OccurrencePattern)`
+
+Find occurrences of the last search pattern, mark all matches, and activate occurrence mode
+
+current
+: `require('occurrence').current()`
+`:Occurrence current`
+`<Plug>(OccurrenceCurrent)`
+
+Smart entry action that adapts to the current context. In visual mode: acts like `selection`. Otherwise, if `:h hlsearch` is active: acts like `pattern`. Otherwise: acts like `word`. Marks all matches and activates occurrence mode
 
 ### Occurrence Mode Actions
 
 Actions available when occurrence mode is active:
 
-| Action                | <Plug> Mapping                    | Description                                          |
-| --------------------- | --------------------------------- | ---------------------------------------------------- |
-| `next`                | `<Plug>(OccurrenceNext)`          | Navigate to next marked occurrence                   |
-| `previous`            | `<Plug>(OccurrencePrevious)`      | Navigate to previous marked occurrence               |
-| `match_next`          | `<Plug>(OccurrenceMatchNext)`     | Navigate to next occurrence (all matches)            |
-| `match_previous`      | `<Plug>(OccurrenceMatchPrevious)` | Navigate to previous occurrence (all matches)        |
-| `mark`                | `<Plug>(OccurrenceMark)`          | Mark current occurrence                              |
-| `unmark`              | `<Plug>(OccurrenceUnmark)`        | Unmark current occurrence                            |
-| `toggle`              | `<Plug>(OccurrenceToggle)`        | Toggle mark on occurrence or mark new word/selection |
-| `mark_all`            | -                                 | Mark all occurrences                                 |
-| `unmark_all`          | -                                 | Unmark all occurrences                               |
-| `mark_in_selection`   | -                                 | Mark occurrences within visual selection             |
-| `unmark_in_selection` | -                                 | Unmark occurrences within visual selection           |
-| `deactivate`          | `<Plug>(OccurrenceDeactivate)`    | Clear all marks and exit occurrence mode             |
+next
+: `require('occurrence').next()`
+`:Occurrence next`
+`<Plug>(OccurrenceNext)`
+
+Move to the next marked occurrence
+
+previous
+: `require('occurrence').previous()`
+`:Occurrence previous`
+`<Plug>(OccurrencePrevious)`
+
+Move to the previous marked occurrence
+
+match_next
+: `require('occurrence').match_next()`
+`:Occurrence match_next`
+`<Plug>(OccurrenceMatchNext)`
+
+Move to the next occurrence match, whether marked or unmarked
+
+match_previous
+: `require('occurrence').match_previous()`
+`:Occurrence match_previous`
+`<Plug>(OccurrenceMatchPrevious)`
+
+Move to the previous occurrence match, whether marked or unmarked
+
+mark
+: `require('occurrence').mark()`
+`:Occurrence mark`
+`<Plug>(OccurrenceMark)`
+
+Mark the occurrence match nearest to the cursor
+
+unmark
+: `require('occurrence').unmark()`
+`:Occurrence unmark`
+`<Plug>(OccurrenceUnmark)`
+
+Unmark the occurrence match nearest to the cursor
+
+toggle
+: `require('occurrence').toggle()`
+`:Occurrence toggle`
+`<Plug>(OccurrenceToggle)`
+
+Smart toggle action that activates occurrence mode or toggles marks. In normal mode: If no patterns exist, acts like `word` to start occurrence mode. Otherwise, toggles the mark on the match under the cursor, or adds a new word pattern if not on a match. In visual mode: If no patterns exist, acts like `selection` to start occurrence mode. Otherwise, toggles marks on all matches within the selection, or adds a new selection pattern if no matches.
+
+mark_all
+: `require('occurrence').mark_all()`
+`:Occurrence mark_all`
+
+Mark all occurrence matches in the buffer
+
+unmark_all
+: `require('occurrence').unmark_all()`
+`:Occurrence unmark_all`
+
+Unmark all occurrence matches in the buffer
+
+mark_in_selection
+: `require('occurrence').mark_in_selection()`
+`:Occurrence mark_in_selection`
+
+Mark all occurrence matches in the current visual selection
+
+unmark_in_selection
+: `require('occurrence').unmark_in_selection()`
+`:Occurrence unmark_in_selection`
+
+Unmark all occurrence matches in the current visual selection
+
+deactivate
+: `require('occurrence').deactivate()`
+`:Occurrence deactivate`
+`<Plug>(OccurrenceDeactivate)`
+
+Clear all marks and patterns, and deactivate occurrence mode
 
 ### Operator Modifier
 
 Actions to modify operator-pending mode to work on occurrences:
 
-| Action            | <Plug> Mapping                     | Description                                       |
-| ----------------- | ---------------------------------- | ------------------------------------------------- |
-| `modify_operator` | `<Plug>(OccurrenceModifyOperator)` | Modifier for operator-pending mode (e.g., `doip`) |
+modify_operator
+: `require('occurrence').modify_operator()`
+`:Occurrence modify_operator`
+`<Plug>(OccurrenceModifyOperator)`
+
+Modify a pending operator to act on occurrences of the word under the cursor. Only useful in operator-pending mode (e.g., `c`, `d`, etc.)
 
 ## Builtin Operators
 
-The following operators can be modified via `modify_operator` or used in occurrence mode (configured via `operators` table):
+The following operators are supported via `modify_operator` or with marked occurrences (configured via `operators` table):
 
 | Operator        | Key  | Description                                                       |
 | --------------- | ---- | ----------------------------------------------------------------- |
