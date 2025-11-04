@@ -1,33 +1,35 @@
 # occurrence.nvim
 
-A Neovim plugin for marking and operating on multiple occurrences. Mark words, selections, or search patterns, then use native Vim operators to batch edit them. Inspired by [vim-mode-plus]'s occurrence feature.
+A Neovim plugin for marking and operating on multiple occurrences. Mark words, selections, or search patterns, then use native Vim operators to batch edit them.
 
 <!-- panvimdoc-ignore-start -->
 
-## Key Features
+Inspired by [vim-mode-plus]'s occurrence feature.
 
-### 🔍 Smart Occurrence Detection
+# Key Features
+
+## 🔍 Smart Occurrence Detection
 
 - Word under cursor with boundary matching
 - Visual selections (character, line, or block)
 - Last search pattern from `/` or `?`
 - Automatic pattern escaping and vim regex support
 
-### ⚡ Native Operator Integration
+## ⚡ Native Operator Integration
 
 - Use standard Vim operators: `c`, `d`, `y`, `p`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`
 - Two interaction modes: mark-then-operate or operator-pending modifier
 - Works with motions and text objects (`ip`, `$`, `G`, etc.)
 - Dot-repeat support for all operations
 
-### 🎯 Visual Feedback
+## 🎯 Visual Feedback
 
 - Real-time highlighting of all matches and marked occurrences
 - Current occurrence highlighting during navigation
 - Statusline integration showing current/total counts
 - Customizable highlight groups
 
-### 🛠️ Highly Configurable
+## 🛠️ Highly Configurable
 
 - Enable/disable default keymaps or define custom ones
 - Choose which operators to enable or disable, or add custom ones
@@ -36,7 +38,7 @@ A Neovim plugin for marking and operating on multiple occurrences. Mark words, s
 
 <!-- panvimdoc-ignore-end -->
 
-## Installation
+# Installation
 
 ### Requirements
 
@@ -58,14 +60,14 @@ A Neovim plugin for marking and operating on multiple occurrences. Mark words, s
 vim.pack.add("lettertwo/occurrence.nvim")
 ```
 
-## Quick Start
+# Quick Start
 
 With the default configuration, you can try these workflows to get a feel for `occurrence.nvim`.
 
 1. Install the plugin using your preferred package manager
 2. No configuration required - default keymaps work out of the box
 
-### Marking occurrences
+## Marking occurrences
 
 You can enter 'occurrence mode' to mark occurrences and then operate on them:
 
@@ -87,7 +89,7 @@ Once occurrences are marked, you can navigate, add and remove them:
 - **Mark individual**: `ga` to mark current occurrence, `gx` to unmark
 - **Toggle mark**: `go` to toggle mark on current occurrence
 
-### Operating on marked occurrences
+## Operating on occurrences
 
 With occurrences marked, you can perform operations on them in several ways:
 
@@ -102,7 +104,7 @@ Or, you can use visual mode:
 
 When you're done, press `<Esc>` to exit occurrence mode and clear all marks.
 
-### Operator-pending mode
+## Operator-pending mode
 
 **Alternative workflow:** Use operator-pending mode with `c`, `d`, or `y` followed by `o` and a motion (e.g., `doip` deletes word occurrences in the paragraph).
 
@@ -112,9 +114,7 @@ You can modify most vim operators to work on occurrences of the word under curso
 2. **Modify operator**: Press `o` to enter occurrence operator-modifier mode
 3. **Choose range**: Use vim motions like `$`, `ip`, etc. to apply to occurrences in that range
 
-## Configuration
-
-### Default Configuration
+# Configuration
 
 The plugin works with zero configuration but can be customized through `require("occurrence").setup({...})`. Configuration options include:
 
@@ -150,7 +150,9 @@ require("occurrence").setup({
 })
 ```
 
-**Default Keymaps** (when `default_keymaps = true`):
+### Default Keymaps
+
+These keymaps are set automatically when `default_keymaps = true`.
 
 Normal/Visual mode:
 
@@ -170,35 +172,9 @@ Occurrence mode (after marking occurrences from normal/visual mode):
 - `<Esc>`, `<C-c>`, `<C-[>` - Exit occurrence mode
 - All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`)
 
-### Custom Configuration Examples
+## Keymaps
 
-#### Minimal Configuration
-
-Disable default keymaps and set up custom ones:
-
-```lua
-require("occurrence").setup({
-  default_keymaps = false,  -- Disable default keymaps
-  on_activate = function(map)
-    -- NOTE: If you disable default keymaps
-    -- you'll want a way to exit occurrence mode!
-    map("n", "q", "<Plug>(OccurrenceDeactivate)")
-  end,
-})
-
--- Set up custom keymaps using <Plug> mappings
-vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceCurrent)")
-
--- Or using the `:Occurrence` command:
-vim.keymap.set("v", "<C-o>", ":Occurrence selection<CR>")
-
--- Or using Lua API:
-vim.keymap.set("o", "<C-o>", function()
-  require('occurrence').modify_operator()
-end)
-```
-
-#### Custom Keymaps
+You can disable default keymaps and set up custom ones:
 
 ```lua
 require("occurrence").setup({
@@ -217,15 +193,27 @@ require("occurrence").setup({
     end)
 
     -- Exit
+    -- NOTE: If you disable default keymaps
+    -- you'll want a way to exit occurrence mode!
     map("n", "q", "<Plug>(OccurrenceDeactivate)")
   end,
 })
 
--- Entry keymap
-vim.keymap.set({ "n", "v" }, "<leader>o", "<Plug>(OccurrenceCurrent)")
+-- Set up custom keymaps using <Plug> mappings
+vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceCurrent)")
+
+-- Or using the `:Occurrence` command:
+vim.keymap.set("v", "<C-o>", ":Occurrence selection<CR>")
+
+-- Or using Lua API:
+vim.keymap.set("o", "<C-o>", function()
+  require('occurrence').modify_operator()
+end)
 ```
 
-#### Disable Specific Operators
+## Operators
+
+### Disabling Specific Operators
 
 ```lua
 require("occurrence").setup({
@@ -239,7 +227,7 @@ require("occurrence").setup({
 })
 ```
 
-#### Custom Line-Based Operators
+### Custom Line-Based Operators
 
 Add operators that work on marked occurrences on the current line:
 
@@ -275,7 +263,7 @@ require("occurrence").setup({
 })
 ```
 
-### Customizing Highlights
+## Highlights
 
 occurrence.nvim uses three highlight groups for visual feedback:
 
@@ -292,7 +280,7 @@ vim.api.nvim_set_hl(0, "OccurrenceMark", { bold = true, underline = true })
 vim.api.nvim_set_hl(0, "OccurrenceCurrent", { bold = true, underline = true, reverse = true })
 ```
 
-### Statusline Integration
+## Statusline Integration
 
 Display occurrence count in your statusline similar to Neovim's search count using the `status()` API:
 
@@ -320,7 +308,7 @@ The `status()` function returns `nil` if no active occurrence, otherwise returns
 - `exact_match`: 1 if cursor is on a match, 0 otherwise
 - `marked_only`: Whether counting only marked occurrences
 
-## Usage Examples
+# Usage Examples
 
 Some examples of real-world workflows using `occurrence.nvim`.
 
@@ -435,19 +423,19 @@ jVgp                         " Move to line2 and Distribute - cycles through yan
 - `p` (put): Replicates the same text at each occurrence
 - `gp` (distribute): Cycles through lines in the register, giving each occurrence a different line
 
-## API Reference
+# API Reference
 
-### Lua API
+## Lua API
 
 occurrence.nvim provides a Lua API for programmatic control:
 
-#### `require('occurrence').setup(opts)`
+### `require('occurrence').setup(opts)`
 
 Configure the plugin. See [Configuration](#configuration) for available options.
 
 **Note:** calling `setup()` is **not required** unless you intend to customize settings!
 
-#### `require('occurrence').status(opts)`
+### `require('occurrence').status(opts)`
 
 Get occurrence count information for statusline (or other) integrations.
 
@@ -466,30 +454,29 @@ Get occurrence count information for statusline (or other) integrations.
   - `exact_match` (integer): 1 if cursor is exactly on a match, 0 otherwise
   - `marked_only` (boolean): Whether counting only marked occurrences
 
-### Actions
+## Actions
 
 All actions are available in three ways:
 
-- **Lua API**: `require('occurrence').<action>()`
-- **Vim commands**: `:Occurrence <action>`
-- **<Plug> mappings**: `<Plug>(Occurrence<Action>)`
+- **Lua API**:
 
-**Example usage:**
+  ```lua
+  require('occurrence').current()
+  ```
 
-```lua
-local occurrence = require('occurrence')
+- **Vim commands**:
 
--- Entry actions (activate occurrence mode)
-occurrence.word()      -- Mark word under cursor
-occurrence.current()   -- Smart: selection, pattern, or word
+  ```vim
+  :Occurrence current
+  ```
 
--- Navigation (when occurrence mode is active)
-occurrence.next()      -- Next marked occurrence
-occurrence.mark()      -- Mark current occurrence
-occurrence.deactivate() -- Exit occurrence mode
-```
+- **<Plug> mappings**:
 
-#### Entry Actions
+  ```vim
+  <Plug>(OccurrenceCurrent)
+  ```
+
+### Entry Actions
 
 Actions that activate occurrence mode:
 
@@ -500,7 +487,7 @@ Actions that activate occurrence mode:
 | `pattern`   | `<Plug>(OccurrencePattern)`   | Find occurrences of last search pattern               |
 | `current`   | `<Plug>(OccurrenceCurrent)`   | Find occurrences (smart: selection, pattern, or word) |
 
-#### Occurrence Mode Actions
+### Occurrence Mode Actions
 
 Actions available when occurrence mode is active:
 
@@ -519,7 +506,7 @@ Actions available when occurrence mode is active:
 | `unmark_in_selection` | -                                 | Unmark occurrences within visual selection           |
 | `deactivate`          | `<Plug>(OccurrenceDeactivate)`    | Clear all marks and exit occurrence mode             |
 
-#### Operator Modifier
+### Operator Modifier
 
 Actions to modify operator-pending mode to work on occurrences:
 
@@ -527,47 +514,35 @@ Actions to modify operator-pending mode to work on occurrences:
 | ----------------- | ---------------------------------- | ------------------------------------------------- |
 | `modify_operator` | `<Plug>(OccurrenceModifyOperator)` | Modifier for operator-pending mode (e.g., `doip`) |
 
-#### Operators
+## Builtin Operators
 
-Operators that work on marked occurrences (configured via `operators` table):
+The following operators can be modified via `modify_operator` or used in occurrence mode (configured via `operators` table):
 
-| Operator        | Default Key | Description                                                       |
-| --------------- | ----------- | ----------------------------------------------------------------- |
-| `change`        | `c`         | Change marked occurrences (prompts for replacement)               |
-| `delete`        | `d`         | Delete marked occurrences                                         |
-| `yank`          | `y`         | Yank marked occurrences to register                               |
-| `put`           | `p`         | Put register content at marked occurrences (replicates same text) |
-| `distribute`    | `gp`        | Distribute lines from register cyclically across occurrences      |
-| `indent_left`   | `<`         | Indent left                                                       |
-| `indent_right`  | `>`         | Indent right                                                      |
-| `indent_format` | `=`         | Indent/format                                                     |
-| `uppercase`     | `gU`        | Convert to uppercase                                              |
-| `lowercase`     | `gu`        | Convert to lowercase                                              |
-| `swap_case`     | `g~`        | Swap case                                                         |
-| `rot13`         | `g?`        | ROT13 encoding                                                    |
+| Operator        | Key  | Description                                                       |
+| --------------- | ---- | ----------------------------------------------------------------- |
+| `change`        | `c`  | Change marked occurrences (prompts for replacement)               |
+| `delete`        | `d`  | Delete marked occurrences                                         |
+| `yank`          | `y`  | Yank marked occurrences to register                               |
+| `put`           | `p`  | Put register content at marked occurrences (replicates same text) |
+| `distribute`    | `gp` | Distribute lines from register cyclically across occurrences      |
+| `indent_left`   | `<`  | Indent left                                                       |
+| `indent_right`  | `>`  | Indent right                                                      |
+| `indent_format` | `=`  | Indent/format                                                     |
+| `uppercase`     | `gU` | Convert to uppercase                                              |
+| `lowercase`     | `gu` | Convert to lowercase                                              |
+| `swap_case`     | `g~` | Swap case                                                         |
+| `rot13`         | `g?` | ROT13 encoding                                                    |
 
 <!-- panvimdoc-ignore-start -->
 
-## Development
+# Development
 
 See [CONTRIBUTING](./CONTRIBUTING.md) for contribution guidelines.
 
-<!-- panvimdoc-ignore-end -->
-
-<!-- panvimdoc-ignore-start -->
-
-## License
+# License
 
 [MIT](./LICENSE)
 
-<!-- panvimdoc-ignore-end -->
-
-<!-- panvimdoc-ignore-start -->
-
 [vim-mode-plus]: https://github.com/t9md/atom-vim-mode-plus?tab=readme-ov-file#some-features
-[panvimdoc]: https://github.com/kdheepak/panvimdoc
-[LuaCATS]: https://luals.github.io/wiki/annotations/
-[LuaRocks]: https://luarocks.org/modules/lettertwo/occurrence.nvim
-[busted]: https://github.com/lunarmodules/busted
 
 <!-- panvimdoc-ignore-end -->

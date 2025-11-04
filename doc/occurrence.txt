@@ -3,45 +3,41 @@
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
 
-1. Installation                                      |occurrence-installation|
-  - Requirements                        |occurrence-installation-requirements|
-  - Using lazy.nvim                  |occurrence-installation-using-lazy.nvim|
-  - Using :h vim.pack              |occurrence-installation-using-:h-vim.pack|
-2. Quick Start                                        |occurrence-quick-start|
+1. occurrence.nvim                                |occurrence-occurrence.nvim|
+2. Installation                                      |occurrence-installation|
+3. Quick Start                                        |occurrence-quick-start|
   - Marking occurrences           |occurrence-quick-start-marking-occurrences|
-  - Operating on marked occurrences|occurrence-quick-start-operating-on-marked-occurrences|
+  - Operating on occurrences |occurrence-quick-start-operating-on-occurrences|
   - Operator-pending mode       |occurrence-quick-start-operator-pending-mode|
-3. Configuration                                    |occurrence-configuration|
-  - Default Configuration     |occurrence-configuration-default-configuration|
-  - Custom Configuration Examples|occurrence-configuration-custom-configuration-examples|
-  - Customizing Highlights   |occurrence-configuration-customizing-highlights|
+4. Configuration                                    |occurrence-configuration|
+  - Keymaps                                 |occurrence-configuration-keymaps|
+  - Operators                             |occurrence-configuration-operators|
+  - Highlights                           |occurrence-configuration-highlights|
   - Statusline Integration   |occurrence-configuration-statusline-integration|
-4. Usage Examples                                  |occurrence-usage-examples|
-  - Example: Selective Editing|occurrence-usage-examples-example:-selective-editing|
-  - Example: Working with Search Patterns|occurrence-usage-examples-example:-working-with-search-patterns|
-  - Example: Working with Multiple Patterns|occurrence-usage-examples-example:-working-with-multiple-patterns|
-  - Example: Yanking and Putting Occurrences|occurrence-usage-examples-example:-yanking-and-putting-occurrences|
-  - Example: Distributing Values|occurrence-usage-examples-example:-distributing-values|
-5. API Reference                                    |occurrence-api-reference|
+5. Usage Examples                                  |occurrence-usage-examples|
+6. API Reference                                    |occurrence-api-reference|
   - Lua API                                 |occurrence-api-reference-lua-api|
   - Actions                                 |occurrence-api-reference-actions|
+  - Builtin Operators             |occurrence-api-reference-builtin-operators|
+
+==============================================================================
+1. occurrence.nvim                                *occurrence-occurrence.nvim*
+
 A Neovim plugin for marking and operating on multiple occurrences. Mark words,
 selections, or search patterns, then use native Vim operators to batch edit
-them. Inspired by vim-mode-plus
-<https://github.com/t9md/atom-vim-mode-plus?tab=readme-ov-file#some-features>’s
-occurrence feature.
+them.
 
 
 ==============================================================================
-1. Installation                                      *occurrence-installation*
+2. Installation                                      *occurrence-installation*
 
 
-REQUIREMENTS                            *occurrence-installation-requirements*
+REQUIREMENTS ~
 
 - Neovim >= 0.10.0
 
 
-USING LAZY.NVIM                      *occurrence-installation-using-lazy.nvim*
+USING LAZY.NVIM ~
 
 >lua
     {
@@ -52,7 +48,7 @@ USING LAZY.NVIM                      *occurrence-installation-using-lazy.nvim*
 <
 
 
-USING :H VIM.PACK                  *occurrence-installation-using-:h-vim.pack*
+USING :H VIM.PACK ~
 
 >lua
     vim.pack.add("lettertwo/occurrence.nvim")
@@ -60,7 +56,7 @@ USING :H VIM.PACK                  *occurrence-installation-using-:h-vim.pack*
 
 
 ==============================================================================
-2. Quick Start                                        *occurrence-quick-start*
+3. Quick Start                                        *occurrence-quick-start*
 
 With the default configuration, you can try these workflows to get a feel for
 `occurrence.nvim`.
@@ -92,7 +88,7 @@ Once occurrences are marked, you can navigate, add and remove them:
 - **Toggle mark**: `go` to toggle mark on current occurrence
 
 
-OPERATING ON MARKED OCCURRENCES*occurrence-quick-start-operating-on-marked-occurrences*
+OPERATING ON OCCURRENCES     *occurrence-quick-start-operating-on-occurrences*
 
 With occurrences marked, you can perform operations on them in several ways:
 
@@ -123,10 +119,7 @@ cursor:
 
 
 ==============================================================================
-3. Configuration                                    *occurrence-configuration*
-
-
-DEFAULT CONFIGURATION         *occurrence-configuration-default-configuration*
+4. Configuration                                    *occurrence-configuration*
 
 The plugin works with zero configuration but can be customized through
 `require("occurrence").setup({...})`. Configuration options include:
@@ -163,7 +156,10 @@ The plugin works with zero configuration but can be customized through
     })
 <
 
-**Default Keymaps** (when `default_keymaps = true`):
+
+DEFAULT KEYMAPS ~
+
+These keymaps are set automatically when `default_keymaps = true`.
 
 Normal/Visual mode:
 
@@ -184,17 +180,27 @@ Occurrence mode (after marking occurrences from normal/visual mode):
 - All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`)
 
 
-CUSTOM CONFIGURATION EXAMPLES*occurrence-configuration-custom-configuration-examples*
+KEYMAPS                                     *occurrence-configuration-keymaps*
 
-
-MINIMAL CONFIGURATION ~
-
-Disable default keymaps and set up custom ones:
+You can disable default keymaps and set up custom ones:
 
 >lua
     require("occurrence").setup({
-      default_keymaps = false,  -- Disable default keymaps
+      default_keymaps = false,  -- Disable defaults
       on_activate = function(map)
+        -- Custom navigation
+        map("n", "<Tab>", "<Plug>(OccurrenceNext)")
+        map("n", "<S-Tab>", "<Plug>(OccurrencePrevious)")
+    
+        -- Batch operations
+        map("n", "<leader>a", function()
+          require('occurrence').mark_all()
+        end)
+        map("n", "<leader>x", function()
+          require('occurrence').unmark_all()
+        end)
+    
+        -- Exit
         -- NOTE: If you disable default keymaps
         -- you'll want a way to exit occurrence mode!
         map("n", "q", "<Plug>(OccurrenceDeactivate)")
@@ -214,35 +220,10 @@ Disable default keymaps and set up custom ones:
 <
 
 
-CUSTOM KEYMAPS ~
-
->lua
-    require("occurrence").setup({
-      default_keymaps = false,  -- Disable defaults
-      on_activate = function(map)
-        -- Custom navigation
-        map("n", "<Tab>", "<Plug>(OccurrenceNext)")
-        map("n", "<S-Tab>", "<Plug>(OccurrencePrevious)")
-    
-        -- Batch operations
-        map("n", "<leader>a", function()
-          require('occurrence').mark_all()
-        end)
-        map("n", "<leader>x", function()
-          require('occurrence').unmark_all()
-        end)
-    
-        -- Exit
-        map("n", "q", "<Plug>(OccurrenceDeactivate)")
-      end,
-    })
-    
-    -- Entry keymap
-    vim.keymap.set({ "n", "v" }, "<leader>o", "<Plug>(OccurrenceCurrent)")
-<
+OPERATORS                                 *occurrence-configuration-operators*
 
 
-DISABLE SPECIFIC OPERATORS ~
+DISABLING SPECIFIC OPERATORS ~
 
 >lua
     require("occurrence").setup({
@@ -294,7 +275,7 @@ Add operators that work on marked occurrences on the current line:
 <
 
 
-CUSTOMIZING HIGHLIGHTS       *occurrence-configuration-customizing-highlights*
+HIGHLIGHTS                               *occurrence-configuration-highlights*
 
 occurrence.nvim uses three highlight groups for visual feedback:
 
@@ -344,12 +325,12 @@ returns:
 
 
 ==============================================================================
-4. Usage Examples                                  *occurrence-usage-examples*
+5. Usage Examples                                  *occurrence-usage-examples*
 
 Some examples of real-world workflows using `occurrence.nvim`.
 
 
-EXAMPLE: SELECTIVE EDITING*occurrence-usage-examples-example:-selective-editing*
+EXAMPLE: SELECTIVE EDITING ~
 
 Change only some occurrences of a word:
 
@@ -370,7 +351,7 @@ Change only some occurrences of a word:
 <
 
 
-EXAMPLE: WORKING WITH SEARCH PATTERNS*occurrence-usage-examples-example:-working-with-search-patterns*
+EXAMPLE: WORKING WITH SEARCH PATTERNS ~
 
 Mark occurrences from last search pattern:
 
@@ -389,7 +370,7 @@ Mark occurrences from last search pattern:
 <
 
 
-EXAMPLE: WORKING WITH MULTIPLE PATTERNS*occurrence-usage-examples-example:-working-with-multiple-patterns*
+EXAMPLE: WORKING WITH MULTIPLE PATTERNS ~
 
 Mark different words and edit them together:
 
@@ -413,7 +394,7 @@ Mark different words and edit them together:
 <
 
 
-EXAMPLE: YANKING AND PUTTING OCCURRENCES*occurrence-usage-examples-example:-yanking-and-putting-occurrences*
+EXAMPLE: YANKING AND PUTTING OCCURRENCES ~
 
 Yank marked occurrences and paste at different locations:
 
@@ -435,7 +416,7 @@ Yank marked occurrences and paste at different locations:
 <
 
 
-EXAMPLE: DISTRIBUTING VALUES*occurrence-usage-examples-example:-distributing-values*
+EXAMPLE: DISTRIBUTING VALUES ~
 
 The `distribute` operator (`gp`) cycles through lines from a register when
 pasting, giving each occurrence a different value. This is useful for
@@ -468,7 +449,7 @@ refactoring or batch renaming with distinct values.
 
 
 ==============================================================================
-5. API Reference                                    *occurrence-api-reference*
+6. API Reference                                    *occurrence-api-reference*
 
 
 LUA API                                     *occurrence-api-reference-lua-api*
@@ -508,24 +489,18 @@ ACTIONS                                     *occurrence-api-reference-actions*
 
 All actions are available in three ways:
 
-- **Lua API**: `require('occurrence').<action>()`
-- **Vim commands**: `:Occurrence <action>`
-- ** mappings**: `<Plug>(Occurrence<Action>)`
-
-**Example usage:**
-
->lua
-    local occurrence = require('occurrence')
-    
-    -- Entry actions (activate occurrence mode)
-    occurrence.word()      -- Mark word under cursor
-    occurrence.current()   -- Smart: selection, pattern, or word
-    
-    -- Navigation (when occurrence mode is active)
-    occurrence.next()      -- Next marked occurrence
-    occurrence.mark()      -- Mark current occurrence
-    occurrence.deactivate() -- Exit occurrence mode
-<
+- **Lua API**:
+    >lua
+        require('occurrence').current()
+    <
+- **Vim commands**:
+    >vim
+        :Occurrence current
+    <
+- ** mappings**:
+    >vim
+        <Plug>(OccurrenceCurrent)
+    <
 
 
 ENTRY ACTIONS ~
@@ -596,40 +571,39 @@ Actions to modify operator-pending mode to work on occurrences:
 
   ---------------------------------------------------------------------------------------
 
-OPERATORS ~
+BUILTIN OPERATORS                 *occurrence-api-reference-builtin-operators*
 
-Operators that work on marked occurrences (configured via `operators` table):
+The following operators can be modified via `modify_operator` or used in
+occurrence mode (configured via `operators` table):
 
   ----------------------------------------------------------------------------
-  Operator        Default   Description
-                  Key       
-  --------------- --------- --------------------------------------------------
-  change          c         Change marked occurrences (prompts for
-                            replacement)
+  Operator        Key   Description
+  --------------- ----- ------------------------------------------------------
+  change          c     Change marked occurrences (prompts for replacement)
 
-  delete          d         Delete marked occurrences
+  delete          d     Delete marked occurrences
 
-  yank            y         Yank marked occurrences to register
+  yank            y     Yank marked occurrences to register
 
-  put             p         Put register content at marked occurrences
-                            (replicates same text)
+  put             p     Put register content at marked occurrences (replicates
+                        same text)
 
-  distribute      gp        Distribute lines from register cyclically across
-                            occurrences
+  distribute      gp    Distribute lines from register cyclically across
+                        occurrences
 
-  indent_left     <         Indent left
+  indent_left     <     Indent left
 
-  indent_right    >         Indent right
+  indent_right    >     Indent right
 
-  indent_format   =         Indent/format
+  indent_format   =     Indent/format
 
-  uppercase       gU        Convert to uppercase
+  uppercase       gU    Convert to uppercase
 
-  lowercase       gu        Convert to lowercase
+  lowercase       gu    Convert to lowercase
 
-  swap_case       g~        Swap case
+  swap_case       g~    Swap case
 
-  rot13           g?        ROT13 encoding
+  rot13           g?    ROT13 encoding
   ----------------------------------------------------------------------------
 
 Generated by panvimdoc <https://github.com/kdheepak/panvimdoc>

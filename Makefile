@@ -13,7 +13,7 @@ LUA_CPATH := './lua_modules/lib/lua/5.1/?.so;;'
 
 ./doc/%.txt: ./vendor/panvimdoc/panvimdoc.sh README.md Makefile
 	@mkdir -p $(@D)
-	@$< --project-name "$*" --input-file "$(word 2,$^)" --shift-heading-level-by -1 --vim-version "NVIM >= $(NVIM_VERSION)"
+	@$< --project-name "$*" --input-file "$(word 2,$^)" --vim-version "NVIM >= $(NVIM_VERSION)"
 
 ./doc/tags: README.md Makefile
 	@mkdir -p $(@D)
