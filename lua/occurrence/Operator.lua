@@ -1,5 +1,4 @@
 local Cursor = require("occurrence.Cursor")
-local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 local Register = require("occurrence.Register")
 
@@ -124,6 +123,7 @@ local _set_opfunc = vim.fn[vim.api.nvim_exec2(
 ---@param count? integer The count of occurrences in the range to operate on. If `nil` or `0`, all occurrences in the range will be touched.
 ---@param register? string The register (e.g. '"*d', '"ay', etc). If `nil`, the default register will be used.
 ---@param register_type? string The type of the register (e.g. "v", "V", etc). If `nil`, it will be inferred from the text yanked to the register.
+---@return false | nil Returns `false` if the operation was cancelled, `nil` otherwise.
 local function apply_operator(occurrence, config, operator_name, range, count, register, register_type)
   operator_name = operator_name or vim.v.operator
 
@@ -202,7 +202,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
         if i == 1 and replacement == false then
           log.debug("Operation cancelled by user")
           original_cursor:restore()
-          return
+          return false
         end
 
         if type(replacement) == "string" then
@@ -262,7 +262,7 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
 
   if edited == 0 then
     log.debug("No occurrences to apply operator", operator_name)
-    return
+    return false
   end
 
   -- Save register contents
@@ -308,7 +308,16 @@ local function create_opfunc(mode, occurrence, config, operator_name, count, reg
     -- From :h single-repeat:
     --   > Note that when repeating a command that used a Visual selection,
     --   > the same SIZE of area is used.
-    type = type or initial_type
+    if not type then
+      type = initial_type
+      log.debug(
+        string.format("opfunc called for operator '%s' in mode '%s' with initial type '%s'", operator_name, mode, type)
+      )
+    else
+      log.debug(
+        string.format("opfunc called for operator '%s' in mode '%s' with original type '%s'", operator_name, mode, type)
+      )
+    end
 
     -- For visual mode, preserve the size of the original range by moving it to the new position.
     -- For operator-pending/normal mode with motion, recalculate the range at the current position.

@@ -207,20 +207,27 @@ function Config:modify_operator(occurrence, operator_key)
   vim.schedule(function()
     log.debug("Activating operator-pending keymaps for buffer", occurrence.buffer)
 
-    vim.api.nvim_create_autocmd("ModeChanged", {
-      once = true,
+    local autocmd_id = nil
+    autocmd_id = vim.api.nvim_create_autocmd("ModeChanged", {
       pattern = "*:n",
-      callback = function()
+      callback = function(e)
+        log.debug("ModeChanged event:", e.match)
         vim.schedule(function()
-          log.debug("Operator-pending mode exited, clearing occurrence for buffer", occurrence.buffer)
-          occurrence:dispose()
+          -- if we are still in normal mode, then we assume
+          -- it is safe to dispose of the occurrence.
+          if vim.api.nvim_get_mode().mode == "n" then
+            log.debug("Operator-pending mode exited, clearing occurrence for buffer", occurrence.buffer)
+            occurrence:dispose()
+            if autocmd_id ~= nil then
+              vim.api.nvim_del_autocmd(autocmd_id)
+            end
+          end
         end)
       end,
     })
     require("occurrence.Operator").create_opfunc("o", occurrence, operator_config, operator_key, count, register)
     -- re-enter operator-pending mode
     feedkeys.change_mode("o", { silent = true })
-    vim.cmd("redraw") -- ensure the screen is redrawn
   end)
 end
 

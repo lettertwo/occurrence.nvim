@@ -38,7 +38,7 @@ function Register:save()
     local content = table.concat(self.text, "\n")
     vim.fn.setreg(self.register, content, self.type == "line" and "l" or self.type == "block" and "b" or "c")
     self.text = {} -- Clear the text after saving
-    log.debug("Saved to register", self.register, ":", content)
+    log.debug("Saved text to register", self.register)
   else
     log.debug("No text to save to register", self.register)
   end
