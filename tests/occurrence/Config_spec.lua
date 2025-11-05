@@ -18,6 +18,10 @@ describe("Config", function()
   describe("config.new validation", function()
     it("validates valid options", function()
       local valid_opts = {
+        keymaps = {
+          ["<Tab>"] = "next",
+          ["n"] = false,
+        },
         operators = {
           c = "change",
           d = "delete",
@@ -32,6 +36,35 @@ describe("Config", function()
         Config.new(valid_opts)
       end)
       assert.spy(vim.notify).was_not_called_with(match._, vim.log.levels.WARN, match._)
+    end)
+
+    it("validates keymaps with custom KeymapConfig", function()
+      local valid_opts = {
+        keymaps = {
+          ["<leader>x"] = {
+            mode = "n",
+            callback = function() end,
+            desc = "Custom action",
+          },
+        },
+      }
+
+      assert.has_no.errors(function()
+        Config.new(valid_opts)
+      end)
+      assert.spy(vim.notify).was_not_called_with(match._, vim.log.levels.WARN, match._)
+    end)
+
+    it("rejects invalid keymap values", function()
+      ---@diagnostic disable-next-line: assign-type-mismatch
+      local invalid_opts = {
+        keymaps = {
+          ["n"] = 123, -- Invalid type
+        },
+      }
+
+      Config.new(invalid_opts)
+      assert.spy(vim.notify).was_called_with(match.has_match("keymap value"), vim.log.levels.WARN, match._)
     end)
 
     it("handles invalid options gracefully with warning", function()
@@ -92,6 +125,45 @@ describe("Config", function()
       assert.equals(false, conf.default_keymaps)
       assert.equals(false, conf.default_operators)
       assert.not_same(defaults.operators, conf.operators)
+    end)
+
+    it("clears default keymaps when default_keymaps = false", function()
+      local opts = {
+        default_keymaps = false,
+      }
+
+      local defaults = Config.default()
+      local conf = Config.new(opts)
+
+      assert.equals(false, conf.default_keymaps)
+      -- keymaps should be empty when default_keymaps = false
+      assert.same({}, conf.keymaps)
+      -- But defaults should have keymaps
+      assert.not_same({}, defaults.keymaps)
+    end)
+
+    it("allows custom keymaps when default_keymaps = false", function()
+      local custom_callback = function() end
+      local opts = {
+        default_keymaps = false,
+        keymaps = {
+          ["<Tab>"] = "next",
+          ["<leader>x"] = {
+            callback = custom_callback,
+          },
+        },
+      }
+
+      local conf = Config.new(opts)
+
+      assert.equals(false, conf.default_keymaps)
+      -- Should have only the custom keymaps
+      assert.equals(2, vim.tbl_count(conf.keymaps))
+      assert.equals("next", conf.keymaps["<Tab>"])
+      assert.equals(custom_callback, conf.keymaps["<leader>x"].callback)
+      -- Default keymaps should not be present
+      assert.is_nil(conf.keymaps["n"])
+      assert.is_nil(conf.keymaps["ga"])
     end)
 
     it("passes through an existing config", function()
@@ -171,39 +243,90 @@ describe("Config", function()
     end)
   end)
 
-  describe("Config:get_api_config", function()
+  describe("Config:get_keymap_config", function()
     it("returns nil for unsupported API", function()
       local conf = Config.new()
-      assert.is_nil(conf:get_api_config("nonexistent_api"))
+      assert.is_nil(conf:get_keymap_config("nonexistent_api"))
     end)
 
-    it("returns API config by key", function()
+    it("returns keymap config by key", function()
       local conf = Config.new()
-      local api = assert(conf:get_api_config("ga"), "Expected API config for 'ga'")
+      local api = assert(conf:get_keymap_config("ga"), "Expected API config for 'ga'")
       assert.same(require("occurrence.api").mark, api)
     end)
 
-    it("returns API config by name", function()
+    it("returns keymap config by name", function()
       local conf = Config.new()
-      local api = assert(conf:get_api_config("mark"), "Expected API config for 'mark'")
+      local api = assert(conf:get_keymap_config("mark"), "Expected API config for 'mark'")
       assert.same(require("occurrence.api").mark, api)
+    end)
+
+    it("returns nil for explicitly disabled keymaps", function()
+      local opts = {
+        keymaps = {
+          ["n"] = false,
+        },
+      }
+      local conf = Config.new(opts)
+      assert.is_nil(conf:get_keymap_config("n"))
+      local default_config = Config.new()
+      assert.not_nil(default_config:get_keymap_config("n"))
+    end)
+
+    it("returns the correct keymap config for aliased keymaps", function()
+      local opts = {
+        keymaps = {
+          ["<Tab>"] = "next",
+        },
+      }
+      local conf = Config.new(opts)
+      local api = assert(conf:get_keymap_config("<Tab>"), "Expected API config for '<Tab>'")
+      assert.same(require("occurrence.api").next, api)
+    end)
+
+    it("returns custom KeymapConfig with callback", function()
+      local custom_callback = function() end
+      local custom_action = {
+        callback = custom_callback,
+        desc = "Custom action",
+      }
+      local opts = {
+        keymaps = {
+          ["<leader>x"] = custom_action,
+        },
+      }
+      local conf = Config.new(opts)
+      local api = assert(conf:get_keymap_config("<leader>x"), "Expected action config for '<leader>x'")
+      assert.equals(custom_action, api)
+      assert.equals(custom_callback, api.callback)
+    end)
+
+    it("returns nil for explicitly disabled keymaps", function()
+      local opts = {
+        keymaps = {
+          ["disabled"] = false,
+        },
+      }
+      local conf = Config.new(opts)
+      assert.is_nil(conf:get_keymap_config("disabled"))
+      assert.is_false(conf:keymap_is_supported("disabled"))
     end)
   end)
 
-  describe("Config:api_is_supported", function()
-    it("returns false for unsupported API", function()
+  describe("Config:keymap_is_supported", function()
+    it("returns false for unsupported keymaps", function()
       local conf = Config.new()
-      assert.is_false(conf:api_is_supported("nonexistent_api"))
+      assert.is_false(conf:keymap_is_supported("nonexistent_api"))
     end)
 
     it("returns true for supported API names and their default keys", function()
       local conf = Config.new()
-      assert.is_true(conf:api_is_supported("mark"))
-      assert.is_true(conf:api_is_supported("unmark"))
-      assert.is_true(conf:api_is_supported("deactivate"))
-      assert.is_true(conf:api_is_supported("ga"))
-      assert.is_true(conf:api_is_supported("gx"))
-      assert.is_true(conf:api_is_supported("<Esc>"))
+      assert.is_true(conf:keymap_is_supported("mark"))
+      assert.is_true(conf:keymap_is_supported("unmark"))
+      assert.is_true(conf:keymap_is_supported("deactivate"))
+      assert.is_true(conf:keymap_is_supported("ga"))
+      assert.is_true(conf:keymap_is_supported("gx"))
+      assert.is_true(conf:keymap_is_supported("<Esc>"))
     end)
   end)
 end)

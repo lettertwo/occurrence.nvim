@@ -513,58 +513,6 @@ current
 
 Smart entry action that adapts to the current context. In visual mode: acts like `selection`. Otherwise, if `:h hlsearch` is active: acts like `pattern`. Otherwise: acts like `word`. Marks all matches and activates occurrence mode
 
-### Occurrence Mode Actions
-
-Actions available when occurrence mode is active:
-
-next
-
-: `require('occurrence').next()`  
-`:Occurrence next`  
-`<Plug>(OccurrenceNext)`
-
-Move to the next marked occurrence
-
-previous
-
-: `require('occurrence').previous()`  
-`:Occurrence previous`  
-`<Plug>(OccurrencePrevious)`
-
-Move to the previous marked occurrence
-
-match_next
-
-: `require('occurrence').match_next()`  
-`:Occurrence match_next`  
-`<Plug>(OccurrenceMatchNext)`
-
-Move to the next occurrence match, whether marked or unmarked
-
-match_previous
-
-: `require('occurrence').match_previous()`  
-`:Occurrence match_previous`  
-`<Plug>(OccurrenceMatchPrevious)`
-
-Move to the previous occurrence match, whether marked or unmarked
-
-mark
-
-: `require('occurrence').mark()`  
-`:Occurrence mark`  
-`<Plug>(OccurrenceMark)`
-
-Mark the occurrence match nearest to the cursor
-
-unmark
-
-: `require('occurrence').unmark()`  
-`:Occurrence unmark`  
-`<Plug>(OccurrenceUnmark)`
-
-Unmark the occurrence match nearest to the cursor
-
 toggle
 
 : `require('occurrence').toggle()`  
@@ -572,6 +520,70 @@ toggle
 `<Plug>(OccurrenceToggle)`
 
 Smart toggle action that activates occurrence mode or toggles marks. In normal mode: If no patterns exist, acts like `word` to start occurrence mode. Otherwise, toggles the mark on the match under the cursor, or adds a new word pattern if not on a match. In visual mode: If no patterns exist, acts like `selection` to start occurrence mode. Otherwise, toggles marks on all matches within the selection, or adds a new selection pattern if no matches.
+
+deactivate
+
+: `require('occurrence').deactivate()`  
+`:Occurrence deactivate`  
+`<Plug>(OccurrenceDeactivate)`
+
+Clear all marks and patterns, and deactivate occurrence mode
+
+modify_operator
+
+: `require('occurrence').modify_operator()`  
+`:Occurrence modify_operator`  
+`<Plug>(OccurrenceModifyOperator)`
+
+Modify a pending operator to act on occurrences of the word under the cursor. Only useful in operator-pending mode (e.g., `c`, `d`, etc.)
+
+Note that this action does not activate occurrence mode. It simply modifies the pending operator to act on occurrences within the specified range.
+
+### Occurrence Mode Actions
+
+Actions available when occurrence mode is active:
+
+next
+
+: `require('occurrence').next()`  
+`:Occurrence next`
+
+Move to the next marked occurrence
+
+previous
+
+: `require('occurrence').previous()`  
+`:Occurrence previous`
+
+Move to the previous marked occurrence
+
+match_next
+
+: `require('occurrence').match_next()`  
+`:Occurrence match_next`
+
+Move to the next occurrence match, whether marked or unmarked
+
+match_previous
+
+: `require('occurrence').match_previous()`  
+`:Occurrence match_previous`
+
+Move to the previous occurrence match, whether marked or unmarked
+
+mark
+
+: `require('occurrence').mark()`  
+`:Occurrence mark`
+
+Mark the occurrence match nearest to the cursor
+
+unmark
+
+: `require('occurrence').unmark()`  
+`:Occurrence unmark`
+
+Unmark the occurrence match nearest to the cursor
 
 mark_all
 
@@ -600,26 +612,6 @@ unmark_in_selection
 `:Occurrence unmark_in_selection`
 
 Unmark all occurrence matches in the current visual selection
-
-deactivate
-
-: `require('occurrence').deactivate()`  
-`:Occurrence deactivate`  
-`<Plug>(OccurrenceDeactivate)`
-
-Clear all marks and patterns, and deactivate occurrence mode
-
-### Operator Modifier
-
-Actions to modify operator-pending mode to work on occurrences:
-
-modify_operator
-
-: `require('occurrence').modify_operator()`  
-`:Occurrence modify_operator`  
-`<Plug>(OccurrenceModifyOperator)`
-
-Modify a pending operator to act on occurrences of the word under the cursor. Only useful in operator-pending mode (e.g., `c`, `d`, etc.)
 
 ## Builtin Operators
 

@@ -8,19 +8,25 @@ local config = {}
 ---@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.BuiltinOperator | string | false
 ---@alias occurrence.OperatorKeymapConfig { [string]: occurrence.OperatorKeymapEntry }
 
----@alias occurrence.KeymapEntry occurrence.Api | string
----@alias occurrence.KeymapConfig { [string]: occurrence.KeymapEntry }
+-- User-facing keymap config (for keymaps option in setup)
+---@class occurrence.KeymapConfig
+---@field callback occurrence.ActionCallback
+---@field mode? "n" | "v" | ("n" | "v")[]
+---@field desc? string
+
+---@alias occurrence.OccurrenceModeKeymapEntry occurrence.KeymapConfig | occurrence.Api | string | false
+---@alias occurrence.OccurrenceModeKeymapConfig { [string]: occurrence.OccurrenceModeKeymapEntry }
 
 ---@class occurrence.Options
 ---@field default_keymaps? boolean
 ---@field default_operators? boolean
----@field keymaps? occurrence.KeymapConfig
+---@field keymaps? occurrence.OccurrenceModeKeymapConfig
 ---@field operators? occurrence.OperatorKeymapConfig
 ---@field on_activate? fun(map: occurrence.KeymapSetFn): nil
 ---@field get_operator_config? fun(operator: string): occurrence.OperatorConfig | nil
 
 ---@type { [string]: occurrence.Api }
-local DEFAULT_OCCURRENCE_MODE_ACTIONS = {
+local DEFAULT_OCCURRENCE_KEYMAPS = {
   ["<Esc>"] = "deactivate",
   ["<C-c>"] = "deactivate",
   ["<C-[>"] = "deactivate",
@@ -52,7 +58,7 @@ local DEFAULT_OPERATORS = {
 }
 
 local DEFAULT_CONFIG = {
-  keymaps = DEFAULT_OCCURRENCE_MODE_ACTIONS,
+  keymaps = DEFAULT_OCCURRENCE_KEYMAPS,
   operators = DEFAULT_OPERATORS,
   default_keymaps = true,
   default_operators = true,
@@ -72,33 +78,63 @@ local function validate_operator_config(value)
   end
 end
 
+---@param value occurrence.KeymapConfig
+local function validate_keymap_config(value)
+  vim.validate("config", value, "table")
+  vim.validate("callback", value.callback, "callable")
+  if value.mode then
+    vim.validate("mode", value.mode, { "string", "table" }, true)
+  end
+  vim.validate("desc", value.desc, "string", true)
+end
+
 ---@class occurrence.Config
 ---@field validate fun(self: occurrence.Config, opts: occurrence.Options): string? error_message
 ---@field default_keymaps boolean
 ---@field default_operators boolean
----@field keymaps occurrence.KeymapConfig
+---@field keymaps occurrence.OccurrenceModeKeymapConfig
 ---@field operators occurrence.OperatorKeymapConfig
 ---@field on_activate? fun(map: occurrence.KeymapSetFn): nil
 local Config = {}
 
 ---@param name string
----@return boolean
-function Config:operator_is_supported(name)
-  return not not self:get_operator_config(name)
-end
+---@return occurrence.ApiConfig | occurrence.KeymapConfig | nil
+function Config:get_keymap_config(name)
+  local keymap_config = nil
+  keymap_config = self.keymaps[name]
 
----@param name occurrence.Api | string
----@return occurrence.ActionConfig | nil
-function Config:get_api_config(name)
-  local api_name = DEFAULT_OCCURRENCE_MODE_ACTIONS[name] or name
-  local api = require("occurrence.api")
-  return api[api_name]
+  -- Explicitly disabled keymap
+  if keymap_config == false then
+    return nil
+  end
+
+  if type(keymap_config) == "string" then
+    name = keymap_config
+    keymap_config = nil
+  end
+
+  if keymap_config == nil then
+    local api = require("occurrence.api")
+    keymap_config = api[name]
+    ---@cast keymap_config -occurrence.Api
+  end
+
+  -- Validate user-provided keymap config, but not built-in api configs
+  if keymap_config ~= nil and self.keymaps[name] ~= nil and type(self.keymaps[name]) == "table" then
+    local ok, err = pcall(validate_keymap_config, keymap_config)
+    if not ok then
+      log.warn_once(string.format("Invalid keymap config for '%s': %s", name, err))
+      return nil
+    end
+  end
+
+  return keymap_config
 end
 
 ---@param name string
 ---@return boolean
-function Config:api_is_supported(name)
-  return not not self:get_api_config(name)
+function Config:keymap_is_supported(name)
+  return not not self:get_keymap_config(name)
 end
 
 ---@param name string
@@ -133,6 +169,12 @@ function Config:get_operator_config(name)
   return operator_config
 end
 
+---@param name string
+---@return boolean
+function Config:operator_is_supported(name)
+  return not not self:get_operator_config(name)
+end
+
 ---Check if the given options is already a config.
 ---@param opts any
 ---@return boolean
@@ -158,6 +200,7 @@ function config.validate(opts)
 
     ---@type { [string]: { [1]: string, [2]: boolean? } }
     local valid_keys = {
+      keymaps = { "table", true },
       operators = { "table", true },
       default_keymaps = { "boolean", true },
       default_operators = { "boolean", true },
@@ -167,6 +210,16 @@ function config.validate(opts)
     for key, validator in pairs(valid_keys) do
       ---@diagnostic disable-next-line: param-type-mismatch
       vim.validate(key, opts[key], unpack(validator))
+    end
+
+    if opts.keymaps then
+      for keymap_key, keymap_value in pairs(opts.keymaps) do
+        vim.validate("keymap key", keymap_key, "string")
+        vim.validate("keymap value", keymap_value, { "table", "string", "boolean" })
+        if type(keymap_value) == "table" then
+          validate_keymap_config(keymap_value)
+        end
+      end
     end
 
     if opts.operators then
@@ -221,6 +274,10 @@ function config.new(opts, ...)
   end
 
   local self = vim.tbl_deep_extend("force", {}, DEFAULT_CONFIG, opts or {})
+
+  if not self.default_keymaps then
+    self.keymaps = (opts and opts.keymaps) or {}
+  end
 
   if not self.default_operators then
     self.operators = (opts and opts.operators) or {}

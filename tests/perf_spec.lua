@@ -473,19 +473,17 @@ describe("Performance Tests", function()
       local memory_delta = measure_memory(function()
         local buffers = {}
 
-        -- Create multiple buffers and occurrences (from old "Memory Management Performance" test)
         for i = 1, 50 do
           local buf = util.buffer({ "test content line " .. i, "another line with pattern" })
-          table.insert(buffers, buf)
           local occurrence = Occurrence.get(buf, "pattern")
           occurrence:mark()
+          table.insert(buffers, buf)
         end
 
         -- Clean up all buffers
         for _, buf in ipairs(buffers) do
-          if vim.api.nvim_buf_is_valid(buf) then
-            vim.api.nvim_buf_delete(buf, { force = true })
-          end
+          Occurrence.del(buf)
+          vim.api.nvim_buf_delete(buf, {})
         end
       end)
 

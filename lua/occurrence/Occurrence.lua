@@ -13,14 +13,6 @@ local function callable(fn)
   return type(fn) == "function" or (type(fn) == "table" and getmetatable(fn) and getmetatable(fn).__call)
 end
 
--- Helper to convert snake_case to CapCase for <Plug> names
-local function to_capcase(snake_str)
-  local result = snake_str:gsub("_(%w)", function(c)
-    return c:upper()
-  end)
-  return result:sub(1, 1):upper() .. result:sub(2)
-end
-
 ---@alias occurrence.PatternType 'pattern' | 'selection' | 'word'
 
 -- A map of Buffer ids to their Occurrence instances.
@@ -55,11 +47,10 @@ local OCCURRENCE_CACHE = {}
 ---@field desc? string
 ---@field callback? occurrence.ActionCallback
 
--- A descriptor for an action to be applied to occurrences.
----@alias occurrence.ActionConfig
+-- Internal descriptor for actions
+---@alias occurrence.ApiConfig
 ---   | occurrence.OccurrenceModeConfig
 ---   | occurrence.OperatorModifierConfig
----   | { callback: occurrence.ActionCallback }
 
 ---@class occurrence.SearchFlags
 ---@field cursor? boolean Whether to accept a match at the cursor position.
@@ -580,15 +571,26 @@ function Occurrence:activate_occurrence_mode(config)
     -- command is a no-op when occurrence mode is active,
     -- but it gives some descriptive feedback to the user to update the binding.
     self.keymap:set("o", "o", "<Nop>")
+  end
 
-    -- Set up buffer-local keymaps for occurrence mode actions
-    for action_key, action_name in pairs(config.keymaps) do
-      local action_config = config:get_api_config(action_key)
-      if action_config then
-        local plug = action_config.plug or ("<Plug>(Occurrence" .. to_capcase(action_name) .. ")")
-        local desc = action_config.desc
-        local mode = action_config.mode or { "n", "v" }
-        self.keymap:set(mode, action_key, plug, { desc = desc })
+  -- Set up buffer-local keymaps for occurrence mode actions
+  for action_key, action_name in pairs(config.keymaps) do
+    local action_config = config:get_keymap_config(action_key)
+    if action_config then
+      local desc = action_config.desc
+      local mode = action_config.mode or { "n", "v" }
+
+      if action_config.plug then
+        -- Use <Plug> mapping if defined
+        self.keymap:set(mode, action_key, action_config.plug, { desc = desc })
+      elseif action_config.callback then
+        -- Fall back to direct callback
+        self.keymap:set(mode, action_key, function()
+          action_config.callback(self, config)
+        end, { desc = desc })
+      else
+        -- No plug or callback defined
+        log.warn_once(string.format("Action config for '%s' has no plug or callback defined", action_key))
       end
     end
   end
@@ -622,7 +624,7 @@ end
 -- and if it returns `false`, any followup behavior (as with "occurrence-mode" and "operator-modifier" types)
 -- will be skipped, and this occurrence will be disposed.
 ---@param config occurrence.Config
----@param action occurrence.Api | occurrence.ActionConfig | occurrence.ActionCallback
+---@param action occurrence.Api | occurrence.ApiConfig | occurrence.KeymapConfig | occurrence.ActionCallback
 function Occurrence:apply(config, action)
   local callback = nil
   local action_config = nil
@@ -822,6 +824,7 @@ end
 vim.api.nvim_create_autocmd({ "BufDelete" }, {
   group = vim.api.nvim_create_augroup("OccurrenceCleanup", { clear = true }),
   callback = function(args)
+    log.debug("Buffer deleted, cleaning up occurrence for buffer", args.buf)
     delete_occurrence(args.buf)
   end,
 })

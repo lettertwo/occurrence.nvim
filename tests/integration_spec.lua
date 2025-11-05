@@ -687,6 +687,217 @@ describe("integration tests", function()
     end)
   end)
 
+  describe("keymaps config", function()
+    it("uses custom keymaps when default_keymaps = false", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      local custom_keymap_called = false
+      plugin.setup({
+        default_keymaps = false,
+        keymaps = {
+          ["<Tab>"] = "next",
+          ["x"] = {
+            callback = function(occ, config)
+              custom_keymap_called = true
+              occ:dispose()
+            end,
+            desc = "Custom exit action",
+          },
+        },
+      })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+
+      -- Activate occurrence on 'foo'
+      feedkeys("q")
+
+      -- Verify marks are created
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      -- Check that custom keymap <Tab> is mapped
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local tab_key = nil
+      for _, map in ipairs(mappings) do
+        if map.lhs == "<Tab>" then
+          tab_key = map.lhs
+          break
+        end
+      end
+      assert.equals("<Tab>", tab_key, "<Tab> should be mapped to next")
+
+      -- Check that default keymaps are NOT mapped (e.g., 'n')
+      local n_key_found = false
+      for _, map in ipairs(mappings) do
+        if map.lhs == "n" and map.desc == builtins.next.desc then
+          n_key_found = true
+          break
+        end
+      end
+      assert.is_false(n_key_found, "'n' should not be mapped when default_keymaps = false")
+
+      -- Test custom callback keymap
+      feedkeys("x")
+      assert.is_true(custom_keymap_called, "Custom callback should have been called")
+
+      -- Verify marks are cleared
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.same({}, marks, "Marks should be cleared after custom exit action")
+    end)
+
+    it("allows disabling specific default keymaps", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({
+        keymaps = {
+          ["n"] = false, -- Disable default 'n' keymap
+        },
+      })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+
+      -- Activate occurrence on 'foo'
+      feedkeys("q")
+
+      -- Check that 'n' is NOT mapped
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local n_key_found = false
+      for _, map in ipairs(mappings) do
+        if map.lhs == "n" and map.desc == builtins.next.desc then
+          n_key_found = true
+          break
+        end
+      end
+      assert.is_false(n_key_found, "'n' should not be mapped when explicitly disabled")
+
+      -- Check that other default keymaps are still mapped (e.g., 'N')
+      local n_prev_found = false
+      for _, map in ipairs(mappings) do
+        if map.lhs == "N" and map.desc == builtins.previous.desc then
+          n_prev_found = true
+          break
+        end
+      end
+      assert.is_true(n_prev_found, "'N' should still be mapped")
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
+
+    it("supports aliasing keymaps to different actions", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({
+        keymaps = {
+          ["<C-n>"] = "next", -- Alias <C-n> to next action
+        },
+      })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+
+      -- Activate occurrence on 'foo'
+      feedkeys("q")
+
+      -- Check that <C-n> is mapped to next
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local ctrl_n_found = false
+      for _, map in ipairs(mappings) do
+        if map.lhs == "<C-N>" or map.lhs == "<C-n>" then
+          ctrl_n_found = true
+          assert.equals(builtins.next.desc, map.desc)
+          break
+        end
+      end
+      assert.is_true(ctrl_n_found, "<C-n> should be mapped to next action")
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
+
+    it("supports custom KeymapConfig with callback", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({
+        keymaps = {
+          ["z"] = {
+            callback = function(occurrence)
+              occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
+            end,
+            desc = "Custom next binding",
+          },
+        },
+      })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+
+      -- Activate occurrence on 'foo'
+      feedkeys("q")
+
+      -- Check that 'z' is mapped with custom desc
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+      local z_key_found = false
+      for _, map in ipairs(mappings) do
+        if map.lhs == "z" and map.desc == "Custom next binding" then
+          z_key_found = true
+          break
+        end
+      end
+      assert.is_true(z_key_found, "'z' should be mapped with custom description")
+
+      -- Test that it actually navigates
+      assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0), "Should start at first 'foo'")
+      feedkeys("z") -- Use custom mapped key
+      assert.same({ 1, 12 }, vim.api.nvim_win_get_cursor(0), "Should move to second 'foo'")
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
+
+    it("on_activate callback works alongside keymaps config", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      local on_activate_called = false
+      local custom_keymap_set = false
+
+      plugin.setup({
+        keymaps = {
+          ["<Tab>"] = "next",
+        },
+        on_activate = function(map)
+          on_activate_called = true
+          map("n", "z", function()
+            custom_keymap_set = true
+          end, { desc = "Custom on_activate keymap" })
+        end,
+      })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+
+      -- Activate occurrence on 'foo'
+      feedkeys("q")
+
+      assert.is_true(on_activate_called, "on_activate callback should have been called")
+
+      -- Check that both keymaps config and on_activate keymaps are set
+      local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
+
+      local tab_found = false
+      local z_found = false
+      for _, map in ipairs(mappings) do
+        if map.lhs == "<Tab>" then
+          tab_found = true
+        elseif map.lhs == "z" and map.desc == "Custom on_activate keymap" then
+          z_found = true
+        end
+      end
+
+      assert.is_true(tab_found, "<Tab> from keymaps config should be mapped")
+      assert.is_true(z_found, "'z' from on_activate should be mapped")
+
+      -- Test custom on_activate keymap
+      feedkeys("z")
+      assert.is_true(custom_keymap_set, "Custom on_activate keymap should work")
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
+  end)
+
   describe("operators", function()
     it("applies direct_api operator to all marked occurrences", function()
       bufnr = util.buffer("foo bar baz foo")
