@@ -73,7 +73,7 @@ for name, api_config in pairs(api) do
   occurrence[name] = function(opts)
     -- TODO: explore passing args from commandline
     local config, _ = occurrence.parse_opts(opts)
-    require("occurrence.Occurrence").get():apply(api_config, config)
+    require("occurrence.Occurrence").get():apply(config, api_config)
   end
 
   -- Register `Occurrence <name>` subcommand

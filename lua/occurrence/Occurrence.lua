@@ -13,6 +13,14 @@ local function callable(fn)
   return type(fn) == "function" or (type(fn) == "table" and getmetatable(fn) and getmetatable(fn).__call)
 end
 
+-- Helper to convert snake_case to CapCase for <Plug> names
+local function to_capcase(snake_str)
+  local result = snake_str:gsub("_(%w)", function(c)
+    return c:upper()
+  end)
+  return result:sub(1, 1):upper() .. result:sub(2)
+end
+
 ---@alias occurrence.PatternType 'pattern' | 'selection' | 'word'
 
 -- A map of Buffer ids to their Occurrence instances.
@@ -515,6 +523,95 @@ function Occurrence:clear()
   self.patterns = {}
 end
 
+---@param config occurrence.Config
+---@param operator_key? string If nil, modifies the pending operator.
+function Occurrence:modify_operator(config, operator_key)
+  local count, register = vim.v.count, vim.v.register
+  operator_key = operator_key or vim.v.operator
+
+  local operator_config = config:get_operator_config(operator_key)
+
+  if not operator_config then
+    log.warn(string.format("Operator '%s' is not supported", operator_key))
+    -- If we have failed to modify the pending operator
+    -- to use the occurrence, we should dispose of it.
+    self:dispose()
+    return
+  end
+
+  -- cancel the pending op.
+  feedkeys.change_mode("n", { force = true, noflush = true, silent = true })
+
+  -- Schedule sending `g@` to trigger custom opfunc on the next frame.
+  -- This is async to allow the first mode change event to cycle.
+  -- If we did this synchronously, there would be no opportunity for
+  -- other plugins (e.g. which-key) to react to the modified operator mode change.
+  -- see `:h CTRL-\_CTRL-N` and `:h g@`
+  vim.schedule(function()
+    log.debug("Activating operator-pending keymaps for buffer", self.buffer)
+
+    local autocmd_id = nil
+    autocmd_id = vim.api.nvim_create_autocmd("ModeChanged", {
+      pattern = "*:n",
+      callback = function(e)
+        log.debug("ModeChanged event:", e.match)
+        vim.schedule(function()
+          -- if we are still in normal mode, then we assume
+          -- it is safe to dispose of the occurrence.
+          if vim.api.nvim_get_mode().mode == "n" then
+            log.debug("Operator-pending mode exited, clearing occurrence for buffer", self.buffer)
+            self:dispose()
+            pcall(vim.api.nvim_del_autocmd, autocmd_id)
+          end
+        end)
+      end,
+    })
+    require("occurrence.Operator").create_opfunc("o", self, operator_config, operator_key, count, register)
+    -- re-enter operator-pending mode
+    feedkeys.change_mode("o", { silent = true })
+  end)
+end
+
+---@param config occurrence.Config
+function Occurrence:activate_occurrence_mode(config)
+  if config.default_keymaps then
+    -- Disable the default operator-pending mapping.
+    -- Note that this isn't strictly necessary, since the modify operator
+    -- command is a no-op when occurrence mode is active,
+    -- but it gives some descriptive feedback to the user to update the binding.
+    self.keymap:set("o", "o", "<Nop>")
+
+    -- Set up buffer-local keymaps for occurrence mode actions
+    for action_key, action_name in pairs(config.keymaps) do
+      local action_config = config:get_api_config(action_key)
+      if action_config then
+        local plug = action_config.plug or ("<Plug>(Occurrence" .. to_capcase(action_name) .. ")")
+        local desc = action_config.desc
+        local mode = action_config.mode or { "n", "v" }
+        self.keymap:set(mode, action_key, plug, { desc = desc })
+      end
+    end
+  end
+
+  -- Set up buffer-local keymaps for operators
+  for operator_key in pairs(config.operators) do
+    local operator_config = config:get_operator_config(operator_key)
+    local operator = operator_config and require("occurrence.Operator").new(operator_key, operator_config)
+    if operator_config and operator then
+      local desc = operator_config.desc or ("'" .. operator_key .. "' on marked occurrences")
+      self.keymap:set({ "n", "v" }, operator_key, operator, { desc = desc, expr = true })
+    else
+      log.warn_once(string.format("Operator '%s' is not supported", operator_key))
+    end
+  end
+
+  if callable(config.on_activate) then
+    config.on_activate(function(mode, lhs, rhs, opts)
+      self.keymap:set(mode, lhs, rhs, opts)
+    end)
+  end
+end
+
 -- Apply the given `action` and `config` to this occurrence.
 -- If `action` is a string, it will be resolved to an API action config.
 -- If `action` is a table with a `callback` field, it will be treated as an action config:
@@ -524,9 +621,9 @@ end
 -- In all cases, the action callback will receive this `Occurrence` and the `config` as arguments,
 -- and if it returns `false`, any followup behavior (as with "occurrence-mode" and "operator-modifier" types)
 -- will be skipped, and this occurrence will be disposed.
----@param action occurrence.Api | occurrence.ActionConfig | occurrence.ActionCallback
 ---@param config occurrence.Config
-function Occurrence:apply(action, config)
+---@param action occurrence.Api | occurrence.ActionConfig | occurrence.ActionCallback
+function Occurrence:apply(config, action)
   local callback = nil
   local action_config = nil
 
@@ -550,7 +647,7 @@ function Occurrence:apply(action, config)
         self:dispose()
       elseif not self.keymap:is_active() then
         log.debug("Activating occurrence mode keymaps for buffer", self.buffer)
-        config:activate_occurrence_mode(self)
+        self:activate_occurrence_mode(config)
       end
       return
     elseif action_config.type == "operator-modifier" then
@@ -567,7 +664,7 @@ function Occurrence:apply(action, config)
         return
       end
 
-      config:modify_operator(self)
+      self:modify_operator(config)
       return
     else
       callback = action_config.callback
