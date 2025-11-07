@@ -120,13 +120,56 @@ The plugin works with zero configuration but can be customized through `require(
 
 ```lua
 require("occurrence").setup({
-  -- Enable default keymaps (go, n, N, gn, gN, ga, gx, etc.)
+  -- Whether to include default keymaps.
+  --
+  -- If `false`, global keymaps, such as the default `go` to activate
+  -- occurrence mode, or the default `o` to modify a pending operator,
+  -- are not set, so activation keymaps must be set manually,
+  -- e.g., `vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceCurrent)")``
+  -- or `vim.keymap.set("o", "<C-o>", "<Plug>(OccurrenceModifyOperator)")`.
+  --
+  -- Additionally, when `false`, only keymaps explicitly defined in `keymaps`
+  -- will be automatically set when activating occurrence mode. Keymaps for
+  -- occurrence mode can also be set manually using the `on_activate` callback.
+  --
+  -- Default `operators` will still be set unless `default_operators` is also `false`.
+  --
+  -- Defaults to `true`.
   default_keymaps = true,
 
-  -- Enable default operator support (c, d, y, p, gp, <, >, =, gu, gU, g~, g?)
+  -- Whether to include default operator support.
+  -- (c, d, y, p, gp, <, >, =, gu, gU, g~, g?)
+  --
+  -- If `false`, only operators explicitly defined in `operators`
+  -- will be supported.
+  --
+  -- Defaults to `true`.
   default_operators = true,
 
-  -- Operator configurations
+  -- A table defining keymaps that will be active in occurrence mode.
+  -- Each key is a string representing the keymap, and each value is either:
+  --   - a string representing the name of a built-in API action,
+  --   - a table defining a custom keymap configuration,
+  --   - or `false` to disable the keymap.
+  keymaps = {
+    ["n"] = "next",                     -- Next marked occurrence
+    ["N"] = "previous",                 -- Previous marked occurrence
+    ["gn"] = "match_next",              -- Next occurrence (all matches)
+    ["gN"] = "match_previous",          -- Previous occurrence (all matches)
+    ["go"] = "toggle",                  -- Toggle or mark an occurrence
+    ["ga"] = "mark",                    -- Mark current occurrence
+    ["gx"] = "unmark",                  -- Unmark current occurrence
+    ["<Esc>"] = "deactivate",           -- Exit occurrence mode
+    ["<C-c>"] = "deactivate",           -- Exit occurrence mode
+    ["<C-[>"] = "deactivate",           -- Exit occurrence mode
+  },
+
+  -- A table defining operators that can be modified to operate on occurrences.
+  -- These operators will also be active as keymaps in occurrence mode.
+  -- Each key is a string representing the operator key, and each value is either:
+  --   - a string representing the name of a built-in operator,
+  --   - a table defining a custom operator configuration,
+  --   - or `false` to disable the operator.
   operators = {
     ["c"] = "change",             -- Change marked occurrences
     ["d"] = "delete",             -- Delete marked occurrences
@@ -142,10 +185,15 @@ require("occurrence").setup({
     ["g?"] = "rot13",             -- ROT13 encoding
   },
 
-  -- Optional: callback when occurrence mode activates
-  -- Receives a keymap function: `map(mode, lhs, rhs, opts)`
-  -- This function can be used to set up custom keymaps that are only active in occurrence mode.
-  -- Keymaps that are set through this function will automatically be removed when occurrence mode deactivates.
+  -- A callback that is invoked when occurrence mode is activated.
+  -- The callback receives a `map` function that can be used
+  -- to set additional keymaps for occurrence mode.
+  --
+  -- Any keymaps set using this `map` function will automatically be
+  -- buffer-local and will be removed when occurrence mode is deactivated.
+  --
+  -- Receives a function with the same signature as `:h vim.keymap.set`:
+  --`map(mode, lhs, rhs, opts)`
   on_activate = nil,
 })
 ```

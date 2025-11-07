@@ -8,22 +8,74 @@ local config = {}
 ---@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.BuiltinOperator | string | false
 ---@alias occurrence.OperatorKeymapConfig { [string]: occurrence.OperatorKeymapEntry }
 
--- User-facing keymap config (for keymaps option in setup)
+-- A configuration for an occurrence mode keymap.
+-- A keymap defined this way will be buffer-local and
+-- active only when occurrence mode is active.
 ---@class occurrence.KeymapConfig
+-- The callback function to invoke when the keymap is triggered.
 ---@field callback occurrence.ActionCallback
+-- The mode(s) in which the keymap is active.
+-- Note that, regardless of these modes, the keymap will
+-- only be active when occurrence mode is active.
 ---@field mode? "n" | "v" | ("n" | "v")[]
+-- An optional description for the keymap.
+-- Similar to the `desc` field in `:h vim.keymap.set` options.
 ---@field desc? string
 
 ---@alias occurrence.OccurrenceModeKeymapEntry occurrence.KeymapConfig | occurrence.Api | string | false
 ---@alias occurrence.OccurrenceModeKeymapConfig { [string]: occurrence.OccurrenceModeKeymapEntry }
 
+-- Options for configuring occurrence.nvim.
+-- Pass these to `require("occurrence").setup({ ... })`
+-- to customize the plugin's behavior.
 ---@class occurrence.Options
+-- Whether to include default keymaps.
+--
+-- If `false`, global keymaps, such as the default `go` to activate
+-- occurrence mode, or the default `o` to modify a pending operator,
+-- are not set, so activation keymaps must be set manually,
+-- e.g., `vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceCurrent)")``
+-- or `vim.keymap.set("o", "<C-o>", "<Plug>(OccurrenceModifyOperator)")`.
+--
+-- Additionally, when `false`, only keymaps explicitly defined in `keymaps`
+-- will be automatically set when activating occurrence mode. Keymaps for
+-- occurrence mode can also be set manually using the `on_activate` callback.
+--
+-- Default `operators` will still be set unless `default_operators` is also `false`.
+--
+-- Defaults to `true`.
 ---@field default_keymaps? boolean
+-- Whether to include default operator support.
+-- (c, d, y, p, gp, <, >, =, gu, gU, g~, g?)
+--
+-- If `false`, only operators explicitly defined in `operators`
+-- will be supported.
+--
+-- Defaults to `true`.
 ---@field default_operators? boolean
+-- A table defining keymaps that will be active in occurrence mode.
+-- Each key is a string representing the keymap, and each value is either:
+--   - a string representing the name of a built-in API action,
+--   - a table defining a custom keymap configuration,
+--   - or `false` to disable the keymap.
 ---@field keymaps? occurrence.OccurrenceModeKeymapConfig
+-- A table defining operators that can be modified to operate on occurrences.
+-- These operators will also be active as keymaps in occurrence mode.
+-- Each key is a string representing the operator key, and each value is either:
+--   - a string representing the name of a built-in operator,
+--   - a table defining a custom operator configuration,
+--   - or `false` to disable the operator.
 ---@field operators? occurrence.OperatorKeymapConfig
+-- A callback that is invoked when occurrence mode is activated.
+-- The callback receives a `map` function that can be used
+-- to set additional keymaps for occurrence mode.
+--
+-- Any keymaps set using this `map` function will automatically be
+-- buffer-local and will be removed when occurrence mode is deactivated.
+--
+-- Receives a function with the same signature as `:h vim.keymap.set`:
+--`map(mode, lhs, rhs, opts)`
 ---@field on_activate? fun(map: occurrence.KeymapSetFn): nil
----@field get_operator_config? fun(operator: string): occurrence.OperatorConfig | nil
 
 ---@type { [string]: occurrence.Api }
 local DEFAULT_OCCURRENCE_KEYMAPS = {
