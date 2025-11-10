@@ -48,13 +48,13 @@ local OCCURRENCE_CACHE = {}
 ---@field type "operator-modifier"
 ---@field mode "o"
 ---@field expr true
----@field plug? string
+---@field plug string
 
 -- A configuration for a global keymap that will run and then
 -- activate occurrence mode keymaps, if not already active.
 ---@class (exact) occurrence.OccurrenceModeConfig: occurrence.KeymapConfig
 ---@field type "occurrence-mode"
----@field plug? string
+---@field plug string
 
 -- Internal descriptor for actions
 ---@alias occurrence.ApiConfig

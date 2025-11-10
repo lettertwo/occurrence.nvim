@@ -595,35 +595,40 @@ Actions available when occurrence mode is active:
 next
 
 : `require('occurrence').next()`  
-`:Occurrence next`
+`:Occurrence next`  
+`<Plug>(OccurrenceNext)`
 
 Move to the next marked occurrence
 
 previous
 
 : `require('occurrence').previous()`  
-`:Occurrence previous`
+`:Occurrence previous`  
+`<Plug>(OccurrencePrevious)`
 
 Move to the previous marked occurrence
 
 match_next
 
 : `require('occurrence').match_next()`  
-`:Occurrence match_next`
+`:Occurrence match_next`  
+`<Plug>(OccurrenceMatchNext)`
 
 Move to the next occurrence match, whether marked or unmarked
 
 match_previous
 
 : `require('occurrence').match_previous()`  
-`:Occurrence match_previous`
+`:Occurrence match_previous`  
+`<Plug>(OccurrenceMatchPrevious)`
 
 Move to the previous occurrence match, whether marked or unmarked
 
 mark
 
 : `require('occurrence').mark()`  
-`:Occurrence mark`
+`:Occurrence mark`  
+`<Plug>(OccurrenceMark)`
 
 Mark the occurrence match nearest to the cursor
 
@@ -637,28 +642,32 @@ Unmark the occurrence match nearest to the cursor
 mark_all
 
 : `require('occurrence').mark_all()`  
-`:Occurrence mark_all`
+`:Occurrence mark_all`  
+`<Plug>(OccurrenceMarkAll)`
 
 Mark all occurrence matches in the buffer
 
 unmark_all
 
 : `require('occurrence').unmark_all()`  
-`:Occurrence unmark_all`
+`:Occurrence unmark_all`  
+`<Plug>(OccurrenceUnmarkAll)`
 
 Unmark all occurrence matches in the buffer
 
 mark_in_selection
 
 : `require('occurrence').mark_in_selection()`  
-`:Occurrence mark_in_selection`
+`:Occurrence mark_in_selection`  
+`<Plug>(OccurrenceMarkInSelection)`
 
 Mark all occurrence matches in the current visual selection
 
 unmark_in_selection
 
 : `require('occurrence').unmark_in_selection()`  
-`:Occurrence unmark_in_selection`
+`:Occurrence unmark_in_selection`  
+`<Plug>(OccurrenceUnmarkInSelection)`
 
 Unmark all occurrence matches in the current visual selection
 

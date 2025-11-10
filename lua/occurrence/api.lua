@@ -11,9 +11,9 @@ local log = require("occurrence.log")
 ---@type occurrence.OccurrenceModeConfig
 local word = {
   mode = "n",
+  type = "occurrence-mode",
   plug = "<Plug>(OccurrenceWord)",
   desc = "Find occurrences of word",
-  type = "occurrence-mode",
   callback = function(occurrence)
     local pattern_count = occurrence.patterns and #occurrence.patterns or 0
     local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
@@ -37,9 +37,9 @@ local word = {
 ---@type occurrence.OccurrenceModeConfig
 local selection = {
   mode = "v",
+  type = "occurrence-mode",
   plug = "<Plug>(OccurrenceSelection)",
   desc = "Find occurrences of selection",
-  type = "occurrence-mode",
   callback = function(occurrence)
     local range = Range.of_selection()
     assert(range, "no visual selection")
@@ -70,9 +70,9 @@ local selection = {
 ---@type occurrence.OccurrenceModeConfig
 local pattern = {
   mode = "n",
+  type = "occurrence-mode",
   plug = "<Plug>(OccurrencePattern)",
   desc = "Find occurrences of search pattern",
-  type = "occurrence-mode",
   callback = function(occurrence)
     local search_pattern = vim.fn.getreg("/")
 
@@ -101,9 +101,10 @@ local pattern = {
 -- Marks all matches and activates occurrence mode
 ---@type occurrence.OccurrenceModeConfig
 local current = {
+  mode = { "n", "v" },
+  type = "occurrence-mode",
   plug = "<Plug>(OccurrenceCurrent)",
   desc = "Find occurrences",
-  type = "occurrence-mode",
   callback = function(occurrence, ...)
     if vim.fn.mode():match("[vV]") then
       return selection.callback(occurrence, ...)
@@ -126,9 +127,9 @@ local current = {
 ---@type occurrence.OccurrenceModeConfig
 local toggle = {
   mode = { "n", "v" },
+  type = "occurrence-mode",
   plug = "<Plug>(OccurrenceToggle)",
   desc = "Add/Toggle occurrence mark(s)",
-  type = "occurrence-mode",
   callback = function(occurrence, ...)
     if vim.fn.mode():match("[vV]") then
       local pattern_count = occurrence.patterns and #occurrence.patterns or 0
@@ -199,51 +200,81 @@ local modify_operator = {
 }
 
 -- Move to the next occurrence match, whether marked or unmarked
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local match_next = {
   mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceMatchNext)",
   desc = "Next occurrence match",
-  callback = function(occurrence)
+  callback = function(occurrence, config)
+    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    if pattern_count == 0 then
+      word.callback(occurrence, config)
+    end
     occurrence:match_cursor({ direction = "forward", wrap = true })
   end,
 }
 
 -- Move to the previous occurrence match, whether marked or unmarked
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local match_previous = {
   mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceMatchPrevious)",
   desc = "Previous occurrence match",
-  callback = function(occurrence)
+  callback = function(occurrence, config)
+    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    if pattern_count == 0 then
+      word.callback(occurrence, config)
+    end
     occurrence:match_cursor({ direction = "backward", wrap = true })
   end,
 }
 
 -- Move to the next marked occurrence
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local next = {
   mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceNext)",
   desc = "Next marked occurrence",
-  callback = function(occurrence)
+  callback = function(occurrence, config)
+    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    if pattern_count == 0 then
+      word.callback(occurrence, config)
+    end
     occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
   end,
 }
 
 -- Move to the previous marked occurrence
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local previous = {
   mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrencePrevious)",
   desc = "Previous marked occurrence",
-  callback = function(occurrence)
+  callback = function(occurrence, config)
+    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    if pattern_count == 0 then
+      word.callback(occurrence, config)
+    end
     occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
   end,
 }
 
 -- Mark the occurrence match nearest to the cursor
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local mark = {
   mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceMark)",
   desc = "Mark occurrence",
-  callback = function(occurrence)
+  callback = function(occurrence, config)
+    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    if pattern_count == 0 then
+      word.callback(occurrence, config)
+    end
     local range = occurrence:match_cursor()
     if range then
       occurrence:mark(range)
@@ -252,42 +283,60 @@ local mark = {
 }
 
 -- Unmark the occurrence match nearest to the cursor
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local unmark = {
   mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceUnmark)",
   desc = "Unmark occurrence",
-  callback = function(occurrence)
-    local range = occurrence:match_cursor()
-    if range then
-      occurrence:unmark(range)
+  callback = function(occurrence, config)
+    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    if pattern_count ~= 0 then
+      local range = occurrence:match_cursor()
+      if range then
+        occurrence:unmark(range)
+      end
     end
   end,
 }
 
 -- Mark all occurrence matches in the buffer
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local mark_all = {
   mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceMarkAll)",
   desc = "Mark occurrences",
-  callback = function(occurrence)
-    return occurrence:mark_all()
+  callback = function(occurrence, config)
+    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    if pattern_count == 0 then
+      word.callback(occurrence, config)
+    end
+    occurrence:mark_all()
   end,
 }
 
 -- Unmark all occurrence matches in the buffer
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local unmark_all = {
   mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceUnmarkAll)",
   desc = "Unmark occurrences",
-  callback = function(occurrence)
-    return occurrence:unmark_all()
+  callback = function(occurrence, config)
+    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
+    if pattern_count ~= 0 then
+      occurrence:unmark_all()
+    end
   end,
 }
 
 -- Mark all occurrence matches in the current visual selection
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local mark_in_selection = {
   mode = "v",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceMarkInSelection)",
   desc = "Mark occurences",
   callback = function(occurrence)
     local selection_range = Range:of_selection()
@@ -300,9 +349,11 @@ local mark_in_selection = {
 }
 
 -- Unmark all occurrence matches in the current visual selection
----@type occurrence.KeymapConfig
+---@type occurrence.OccurrenceModeConfig
 local unmark_in_selection = {
   mode = "v",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceUnmarkInSelection)",
   desc = "Unmark occurrences",
   callback = function(occurrence)
     local selection_range = Range:of_selection()
