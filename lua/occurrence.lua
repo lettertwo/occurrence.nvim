@@ -2,14 +2,6 @@ local api = require("occurrence.api")
 local command = require("occurrence.command")
 local resolve_buffer = require("occurrence.resolve_buffer")
 
--- Helper to convert snake_case to CapCase
-local function to_capcase(snake_str)
-  local result = snake_str:gsub("_(%w)", function(c)
-    return c:upper()
-  end)
-  return result:sub(1, 1):upper() .. result:sub(2)
-end
-
 -- Global config set by setup(), can be nil
 ---@type occurrence.Config?
 local _global_config = nil
@@ -90,17 +82,14 @@ for name, api_config in pairs(api) do
   -- Register `Occurrence <name>` subcommand
   command.add(name, { impl = occurrence[name] })
 
-  -- Register `<Plug>(OccurrenceName)` keymap
-  vim.keymap.set(
-    api_config.mode or { "n", "v" },
-    api_config.plug or ("<Plug>(Occurrence" .. to_capcase(name) .. ")"),
-    occurrence[name],
-    {
+  if api_config.plug ~= nil then
+    -- Register `<Plug>(OccurrenceName)` keymap
+    vim.keymap.set(api_config.mode or { "n", "v" }, api_config.plug, occurrence[name], {
       desc = api_config.desc or ("Occurrence: " .. name),
       expr = api_config.expr or false,
       silent = true,
-    }
-  )
+    })
+  end
 end
 
 ---Resolve config with priority: config param > setup(config) > default
@@ -200,6 +189,14 @@ function occurrence.setup(opts)
   end
 end
 
+-- Get the Occurrence instance for the given buffer.
+-- If `buffer` is not provided, the current buffer will be used.
+---@param buffer? integer
+---@return occurrence.Occurrence | nil `nil` if there is no active occurrence for the buffer.
+function occurrence.get(buffer)
+  return require("occurrence.Occurrence").get(buffer)
+end
+
 -- Get occurrence count information for the current buffer.
 -- Similar to `:h searchcount()` but for occurrence matches.
 -- Returns the position of the cursor within matches and the total count.
@@ -209,9 +206,8 @@ end
 ---@return occurrence.Status | nil `nil` if there is no active occurrence for the buffer.
 function occurrence.status(opts)
   opts = opts or {}
-  local buffer = opts.buffer or vim.api.nvim_get_current_buf()
 
-  local occ = require("occurrence.Occurrence").get(buffer)
+  local occ = occurrence.get(opts.buffer)
   if not occ or occ:is_disposed() or #occ.patterns == 0 then
     return nil
   end

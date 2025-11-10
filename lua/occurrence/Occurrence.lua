@@ -21,31 +21,40 @@ local OCCURRENCE_CACHE = {}
 
 ---@module 'occurrence.Occurrence'
 
--- Function to be used as a callback for an action.
+-- Function to be used as a callback for a keymap
 -- The first argument will always be the `Occurrence` for the current buffer.
 -- The second argument will be the current `Config`.
 -- If the function returns `false`, the occurrence will be disposed.
----@alias occurrence.ActionCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): false?
+---@alias occurrence.KeymapCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): false?
 
--- An action that will exit operator_pending mode, set occurrences
--- of the current word and then re-enter operator-pending mode
+-- A configuration for an occurrence mode keymap.
+-- A keymap defined this way will be buffer-local and
+-- active only when occurrence mode is active.
+---@class (exact) occurrence.KeymapConfig
+-- The callback function to invoke when the keymap is triggered.
+---@field callback occurrence.KeymapCallback
+-- The mode(s) in which the keymap is active.
+-- Note that, regardless of these modes, the keymap will
+-- only be active when occurrence mode is active.
+---@field mode? "n" | "v" | ("n" | "v")[]
+-- An optional description for the keymap.
+-- Similar to the `desc` field in `:h vim.keymap.set` options.
+---@field desc? string
+
+-- A configuration for a global keymap that will exit operator_pending mode,
+-- set occurrences of the current word and then re-enter operator-pending mode
 -- with `:h opfunc`.
----@class (exact) occurrence.OperatorModifierConfig
+---@class (exact) occurrence.OperatorModifierConfig: occurrence.KeymapConfig
 ---@field type "operator-modifier"
 ---@field mode "o"
 ---@field expr true
 ---@field plug? string
----@field desc? string
----@field callback? occurrence.ActionCallback
 
--- An action that will run and then activate occurrence mode keymaps,
--- if not already active.
----@class (exact) occurrence.OccurrenceModeConfig
+-- A configuration for a global keymap that will run and then
+-- activate occurrence mode keymaps, if not already active.
+---@class (exact) occurrence.OccurrenceModeConfig: occurrence.KeymapConfig
 ---@field type "occurrence-mode"
----@field mode? "n" | "v" | ("n" | "v")[]
 ---@field plug? string
----@field desc? string
----@field callback? occurrence.ActionCallback
 
 -- Internal descriptor for actions
 ---@alias occurrence.ApiConfig
@@ -642,16 +651,16 @@ function Occurrence:activate_occurrence_mode(config)
 end
 
 -- Apply the given `action` and `config` to this occurrence.
--- If `action` is a string, it will be resolved to an API action config.
--- If `action` is a table with a `callback` field, it will be treated as an action config:
---   - If `action.type == "occurrence-mode"`, `config:activate_occurrence_mode` will be called after the callback.
---   - If `action.type == "operator-modifier"`, `config:modify_operator` will be called after the callback.
+-- If `action` is a string, it will be resolved to a keymap config.
+-- If `action` is a table with a `callback` field, it will be treated as a keymap config:
+--   - If `action.type == "occurrence-mode"`, `self:activate_occurrence_mode` will be called after the callback.
+--   - If `action.type == "operator-modifier"`, `self:modify_operator` will be called after the callback.
 -- Finally, if `action` is callable, it will be called directly.
 -- In all cases, the action callback will receive this `Occurrence` and the `config` as arguments,
 -- and if it returns `false`, any followup behavior (as with "occurrence-mode" and "operator-modifier" types)
 -- will be skipped, and this occurrence will be disposed.
 ---@param config occurrence.Config
----@param action occurrence.Api | occurrence.ApiConfig | occurrence.KeymapConfig | occurrence.ActionCallback
+---@param action occurrence.KeymapAction | occurrence.ApiConfig | occurrence.KeymapConfig | occurrence.KeymapCallback
 function Occurrence:apply(config, action)
   local callback = nil
   local action_config = nil

@@ -312,8 +312,6 @@ describe("api", function()
 
   describe("API annotations", function()
     it("type annotations exist for all exported API functions", function()
-      local api = require("occurrence.api")
-
       -- Read the source file to check for annotations
       local source_path = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h:h") .. "/lua/occurrence.lua"
       local file = io.open(source_path, "r")

@@ -114,17 +114,17 @@ describe("README examples", function()
 
       plugin.setup({
         default_keymaps = false,
+        keymaps = {
+          ["<Tab>"] = "next",
+          ["<S-Tab>"] = "previous",
+        },
         on_activate = function(map)
-          -- Custom navigation
-          map("n", "<Tab>", "<Plug>(OccurrenceNext)")
-          map("n", "<S-Tab>", "<Plug>(OccurrencePrevious)")
-
           -- Batch operations
           map("n", "<leader>a", function()
-            require("occurrence").mark_all()
+            assert(require("occurrence").get()):mark_all()
           end)
           map("n", "<leader>x", function()
-            require("occurrence").unmark_all()
+            assert(require("occurrence").get()):unmark_all()
           end)
 
           -- Exit
@@ -170,10 +170,10 @@ describe("README examples", function()
       local has_rot13 = false
       local has_swapcase = false
       for _, map in ipairs(mappings) do
-        if map.lhs == "<Tab>" and map.rhs == "<Plug>(OccurrenceNext)" then
+        if map.lhs == "<Tab>" and map.desc == "Next marked occurrence" then
           has_tab = true
         end
-        if map.lhs == "<S-Tab>" and map.rhs == "<Plug>(OccurrencePrevious)" then
+        if map.lhs == "<S-Tab>" and map.desc == "Previous marked occurrence" then
           has_stab = true
         end
         if map.lhs == "\\a" then

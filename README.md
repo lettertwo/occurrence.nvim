@@ -227,17 +227,18 @@ You can disable default keymaps and set up custom ones:
 ```lua
 require("occurrence").setup({
   default_keymaps = false,  -- Disable defaults
-  on_activate = function(map)
+  keymaps = {
     -- Custom navigation
-    map("n", "<Tab>", "<Plug>(OccurrenceNext)")
-    map("n", "<S-Tab>", "<Plug>(OccurrencePrevious)")
-
+    ["<Tab>"] = "next",
+    ["<S-Tab>"] = "previous",
+  },
+  on_activate = function(map)
     -- Batch operations
     map("n", "<leader>a", function()
-      require('occurrence').mark_all()
+      assert(require("occurrence").get()):mark_all()
     end)
     map("n", "<leader>x", function()
-      require('occurrence').unmark_all()
+      assert(require("occurrence").get()):unmark_all()
     end)
 
     -- Exit

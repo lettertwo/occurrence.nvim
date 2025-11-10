@@ -314,7 +314,7 @@ local unmark_in_selection = {
   end,
 }
 
----@enum (key) occurrence.Api
+---@enum (key) occurrence.KeymapAction
 local api = {
   word = word,
   selection = selection,

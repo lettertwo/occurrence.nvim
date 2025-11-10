@@ -8,21 +8,7 @@ local config = {}
 ---@alias occurrence.OperatorKeymapEntry occurrence.OperatorConfig | occurrence.BuiltinOperator | string | false
 ---@alias occurrence.OperatorKeymapConfig { [string]: occurrence.OperatorKeymapEntry }
 
--- A configuration for an occurrence mode keymap.
--- A keymap defined this way will be buffer-local and
--- active only when occurrence mode is active.
----@class occurrence.KeymapConfig
--- The callback function to invoke when the keymap is triggered.
----@field callback occurrence.ActionCallback
--- The mode(s) in which the keymap is active.
--- Note that, regardless of these modes, the keymap will
--- only be active when occurrence mode is active.
----@field mode? "n" | "v" | ("n" | "v")[]
--- An optional description for the keymap.
--- Similar to the `desc` field in `:h vim.keymap.set` options.
----@field desc? string
-
----@alias occurrence.OccurrenceModeKeymapEntry occurrence.KeymapConfig | occurrence.Api | string | false
+---@alias occurrence.OccurrenceModeKeymapEntry occurrence.KeymapConfig | occurrence.KeymapAction | string | false
 ---@alias occurrence.OccurrenceModeKeymapConfig { [string]: occurrence.OccurrenceModeKeymapEntry }
 
 -- Options for configuring occurrence.nvim.
@@ -77,7 +63,7 @@ local config = {}
 --`map(mode, lhs, rhs, opts)`
 ---@field on_activate? fun(map: occurrence.KeymapSetFn): nil
 
----@type { [string]: occurrence.Api }
+---@type { [string]: occurrence.KeymapAction }
 local DEFAULT_OCCURRENCE_KEYMAPS = {
   ["<Esc>"] = "deactivate",
   ["<C-c>"] = "deactivate",
@@ -166,12 +152,12 @@ function Config:get_keymap_config(name)
   end
 
   if keymap_config == nil then
-    local api = require("occurrence.api")
-    keymap_config = api[name]
-    ---@cast keymap_config -occurrence.Api
+    local keymaps = require("occurrence.api")
+    keymap_config = keymaps[name]
+    ---@cast keymap_config -occurrence.KeymapAction
   end
 
-  -- Validate user-provided keymap config, but not built-in api configs
+  -- Validate user-provided keymap config, but not built-in configs
   if keymap_config ~= nil and self.keymaps[name] ~= nil and type(self.keymaps[name]) == "table" then
     local ok, err = pcall(validate_keymap_config, keymap_config)
     if not ok then
