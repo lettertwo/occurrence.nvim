@@ -183,6 +183,15 @@ function occurrence.setup(opts)
       --   desc = api.modify_operator_around.desc,
       -- })
     end
+
+    -- Create the main Occurrence command with subcommands
+    vim.api.nvim_create_user_command("Occurrence", command.execute, {
+      nargs = "+",
+      desc = "Occurrence command",
+      force = true,
+      complete = command.complete,
+      preview = command.preview,
+    })
   end
 end
 
@@ -204,14 +213,5 @@ function occurrence.status(opts)
 
   return occ:status({ marked = opts.marked })
 end
-
--- Create the main Occurrence command with subcommands
-vim.api.nvim_create_user_command("Occurrence", command.execute, {
-  nargs = "+",
-  desc = "Occurrence command",
-  force = true,
-  complete = command.complete,
-  preview = command.preview,
-})
 
 return occurrence
