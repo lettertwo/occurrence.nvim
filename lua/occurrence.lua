@@ -14,6 +14,17 @@ end
 ---@type occurrence.Config?
 local _global_config = nil
 
+---@type [string|string[], string, string, table][]
+local DEFAULT_GLOBAL_KEYMAPS = {
+  -- Normal and visual mode default
+  { { "n", "v" }, "go", api.current.plug, { desc = api.current.desc } },
+  -- Operator-pending mode default
+  { "o", "o", api.modify_operator.plug, { desc = api.modify_operator.desc } },
+  -- TODO: support inner and around occurrence operator modifiers
+  -- { "o", io", api.modify_operator_inner.plug, { desc = api.modify_operator_inner.desc } },
+  -- { "o","ao", api.modify_operator_around.plug, { desc = api.modify_operator_around.desc } },
+}
+
 ---@class occurrence
 -- Find occurrences of the word under the cursor, mark all matches,
 -- and activate occurrence mode
@@ -126,17 +137,16 @@ end
 -- and cancelling active occurrences.
 -- Automatically called by `setup({})`.
 function occurrence.reset()
+  local prev_config = _global_config
   _global_config = nil
   for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
     require("occurrence.Occurrence").del(resolve_buffer(buffer))
   end
   -- Remove default keymaps if they exist
-  for _, mode in ipairs({ "n", "v", "o" }) do
-    local keymap = vim.api.nvim_get_keymap(mode)
-    for _, km in ipairs(keymap) do
-      if (km.lhs == "go" and km.rhs == api.current.plug) or (km.lhs == "o" and km.rhs == api.modify_operator.plug) then
-        pcall(vim.keymap.del, mode, km.lhs)
-      end
+  if prev_config and prev_config.default_keymaps then
+    for _, keymap in ipairs(DEFAULT_GLOBAL_KEYMAPS) do
+      local mode, lhs, _, opts = unpack(keymap)
+      vim.keymap.del(mode, lhs, opts)
     end
   end
 end
@@ -154,10 +164,9 @@ end
 -- do nothing unless called with new `opts`.
 ---@param opts? occurrence.Options
 function occurrence.setup(opts)
-  if _global_config and opts == nil then
-    return
+  if _global_config and (opts == nil or vim.tbl_isempty(opts)) then
+    return -- No-op if already configured and no new opts provided
   end
-  opts = opts or {}
   local config = require("occurrence.Config").new(opts)
   if _global_config ~= config then
     if _global_config ~= nil then
@@ -166,6 +175,10 @@ function occurrence.setup(opts)
     _global_config = config
     -- Set up default keymaps if enabled
     if config.default_keymaps then
+      for _, keymap in ipairs(DEFAULT_GLOBAL_KEYMAPS) do
+        vim.keymap.set(unpack(keymap))
+      end
+
       -- Normal and visual mode default
       vim.keymap.set({ "n", "v" }, "go", api.current.plug, {
         desc = api.current.desc,
@@ -174,14 +187,6 @@ function occurrence.setup(opts)
       vim.keymap.set("o", "o", api.modify_operator.plug, {
         desc = api.modify_operator.desc,
       })
-
-      -- TODO: support inner and around occurrence operator modifiers
-      -- vim.keymap.set("o", "io", api.modify_operator_inner.plug, {
-      --   desc = api.modify_operator_inner.desc,
-      -- })
-      -- vim.keymap.set("o", "ao", api.modify_operator_around.plug, {
-      --   desc = api.modify_operator_around.desc,
-      -- })
     end
 
     -- Create the main Occurrence command with subcommands
