@@ -35,7 +35,7 @@ describe("Extmarks", function()
       assert.is_function(extmarks.mark)
       assert.is_function(extmarks.get_mark)
       assert.is_function(extmarks.unmark)
-      assert.is_function(extmarks.iter_marks)
+      assert.is_function(extmarks.iter)
     end)
 
     it("creates independent Extmarks instances", function()
@@ -382,11 +382,11 @@ describe("Extmarks", function()
       extmarks:mark(range3)
 
       local count = 0
-      for original, current in extmarks:iter_marks() do
+      for id, current in extmarks:iter() do
         count = count + 1
-        assert.is_not_nil(original)
+        assert.is_not_nil(id)
         assert.is_not_nil(current)
-        assert.is_table(original)
+        assert.is_number(id)
         assert.is_table(current)
       end
 
@@ -406,7 +406,7 @@ describe("Extmarks", function()
       local search_range = Range.new(Location.new(0, 0), Location.new(2, 0))
 
       local count = 0
-      for original in extmarks:iter_marks({ range = search_range }) do
+      for _, original in extmarks:iter(search_range) do
         count = count + 1
         assert.is_true(original.start.line < 3) -- should not include line 3
       end
@@ -414,38 +414,25 @@ describe("Extmarks", function()
       assert.is_true(count >= 2) -- should include range1 and range2
     end)
 
-    it("returns original and current ranges", function()
+    it("returns id and current ranges", function()
       local first_range = Range.new(Location.new(1, 0), Location.new(1, 8))
       extmarks:mark(first_range)
       local second_range = Range.new(Location.new(2, 5), Location.new(2, 15))
       extmarks:mark(second_range)
 
-      local marks = extmarks:iter_marks()
+      local marks = extmarks:iter()
 
-      local original, current = marks()
-      assert.same({ 1, 0, 1, 8 }, original)
-      assert.same(original, current)
+      local id, current = marks()
+      assert.is_number(id)
+      assert.same(first_range, current)
 
       -- modify buffer to shift the next extmark
       vim.api.nvim_buf_set_lines(0, 0, 0, false, { "inserted line at top" })
-      original, current = marks()
-      assert.same({ 2, 5, 2, 15 }, original)
+      -- get next mark
+      id, current = marks()
+      assert.is_number(id)
+      assert.not_same(second_range, current)
       assert.same({ 3, 5, 3, 15 }, current) -- should have shifted down
-    end)
-
-    it("handles reverse iteration option", function()
-      local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
-      local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
-
-      extmarks:mark(range1)
-      extmarks:mark(range2)
-
-      local ranges = {}
-      for original in extmarks:iter_marks({ reverse = true }) do
-        table.insert(ranges, original)
-      end
-
-      assert.same({ range2, range1 }, ranges)
     end)
   end)
 

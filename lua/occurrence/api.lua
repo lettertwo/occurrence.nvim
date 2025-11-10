@@ -270,9 +270,7 @@ local mark_all = {
   mode = "n",
   desc = "Mark occurrences",
   callback = function(occurrence)
-    for range in occurrence:matches() do
-      occurrence:mark(range)
-    end
+    return occurrence:mark_all()
   end,
 }
 
@@ -282,9 +280,7 @@ local unmark_all = {
   mode = "n",
   desc = "Unmark occurrences",
   callback = function(occurrence)
-    for range in occurrence.extmarks:iter_marks() do
-      occurrence:unmark(range)
-    end
+    return occurrence:unmark_all()
   end,
 }
 
@@ -311,7 +307,7 @@ local unmark_in_selection = {
   callback = function(occurrence)
     local selection_range = Range:of_selection()
     if selection_range then
-      for range in occurrence.extmarks:iter_marks({ range = selection_range }) do
+      for _, range in occurrence.extmarks:iter(selection_range) do
         occurrence:unmark(range)
       end
     end

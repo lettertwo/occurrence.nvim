@@ -303,7 +303,7 @@ function Occurrence:status(opts)
 
   if marked_only then
     -- Count marked occurrences
-    for _, range in self.extmarks:iter_marks() do
+    for _, range in self.extmarks:iter() do
       total = total + 1
       if range:contains(pos) then
         current = total
@@ -383,6 +383,33 @@ function Occurrence:unmark(range)
   return success
 end
 
+-- Mark all occurrences in the buffer.
+---@return boolean marked Whether occurrences were marked.
+function Occurrence:mark_all()
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
+  local success = false
+  for match in self:matches() do
+    if self.extmarks:mark(match) then
+      success = true
+    end
+  end
+  self.extmarks:update_current()
+  return success
+end
+
+-- Unmark all occurrences in the buffer.
+---@return boolean unmarked Whether occurrences were unmarked.
+function Occurrence:unmark_all()
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
+  local success = false
+  for match in self:matches() do
+    if self.extmarks:unmark(match) then
+      success = true
+    end
+  end
+  return success
+end
+
 -- Whether or not the buffer contains at least one match for the occurrence.
 ---@param range? occurrence.Range
 ---@return boolean
@@ -408,7 +435,7 @@ end
 -- If `patterns` is provided, only yields occurrences matching these patterns.
 ---@param range? occurrence.Range
 ---@param patterns? string | string[]
----@return fun(): occurrence.Range next_match
+---@return fun(): occurrence.Range? next_match
 function Occurrence:matches(range, patterns)
   local start_location = range and range.start or Location.new(0, 0)
   local last_location = start_location
@@ -574,7 +601,7 @@ function Occurrence:activate_occurrence_mode(config)
   end
 
   -- Set up buffer-local keymaps for occurrence mode actions
-  for action_key, action_name in pairs(config.keymaps) do
+  for action_key in pairs(config.keymaps) do
     local action_config = config:get_keymap_config(action_key)
     if action_config then
       local desc = action_config.desc

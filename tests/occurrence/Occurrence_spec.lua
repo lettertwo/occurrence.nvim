@@ -508,7 +508,7 @@ describe("Occurrence", function()
       foo:mark(Range.deserialize("0:0::1:0"))
 
       local marked = {}
-      for mark in foo.extmarks:iter_marks() do
+      for _, mark in foo.extmarks:iter() do
         table.insert(marked, tostring(mark))
       end
 
@@ -529,7 +529,7 @@ describe("Occurrence", function()
       occ:mark()
 
       local marked = {}
-      for mark in occ.extmarks:iter_marks() do
+      for _, mark in occ.extmarks:iter() do
         table.insert(marked, tostring(mark))
       end
       assert.same({
@@ -549,7 +549,7 @@ describe("Occurrence", function()
       foo:mark(Range.deserialize("0:0::1:0"))
 
       local marked = {}
-      for mark in foo.extmarks:iter_marks({ range = Range.deserialize("0:0::0:4") }) do
+      for _, mark in foo.extmarks:iter(Range.deserialize("0:0::0:4")) do
         table.insert(marked, tostring(mark))
       end
 
@@ -567,7 +567,7 @@ describe("Occurrence", function()
       occ:mark(Range.deserialize("0:0::1:15"))
 
       local marked = {}
-      for mark in occ.extmarks:iter_marks({ range = Range.deserialize("0:0::0:15") }) do
+      for _, mark in occ.extmarks:iter(Range.deserialize("0:0::0:15")) do
         table.insert(marked, tostring(mark))
       end
       assert.same({
@@ -589,7 +589,7 @@ describe("Occurrence", function()
       occ:mark()
 
       local marked = {}
-      for mark in occ.extmarks:iter_marks() do
+      for _, mark in occ.extmarks:iter() do
         table.insert(marked, tostring(mark))
       end
       assert.same({
@@ -610,7 +610,12 @@ describe("Occurrence", function()
 
       assert.is_true(occ:mark())
 
-      local marked = vim.iter(occ.extmarks:iter_marks()):map(tostring):totable()
+      local marked = vim
+        .iter(occ.extmarks:iter())
+        :map(function(_, r)
+          return tostring(r)
+        end)
+        :totable()
 
       assert.same({
         "Range(start: Location(0, 12), stop: Location(1, 11))",
@@ -629,7 +634,12 @@ describe("Occurrence", function()
 
       assert.is_true(occ:mark())
 
-      local marked = vim.iter(occ.extmarks:iter_marks()):map(tostring):totable()
+      local marked = vim
+        .iter(occ.extmarks:iter())
+        :map(function(_, r)
+          return tostring(r)
+        end)
+        :totable()
 
       assert.same({
         "Range(start: Location(0, 8), stop: Location(1, 11))",

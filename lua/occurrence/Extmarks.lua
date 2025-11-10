@@ -96,20 +96,19 @@ function ExtmarkMap:get(id_or_range)
 end
 
 -- Get an iterator of extmarks.
--- The iterator yields a tuple of two `Range` values for each extmark:
--- - The orginal range of the extmark.
--- - The current 'live' range of the extmark.
----@param opts? { range?: occurrence.Range, reverse?: boolean }
----@return fun(): occurrence.Range?, occurrence.Range? next_extmark
-function ExtmarkMap:iter(opts)
-  local range = opts and opts.range or Range.new(Location.new(0, 0), Location.new(vim.fn.line("$"), 0))
+-- The iterator yields a tuple for each extmark of:
+-- - The id of the extmark
+-- - The current 'live' range of the extmark
+---@param range? occurrence.Range
+---@return fun(): number?, occurrence.Range? next_extmark
+function ExtmarkMap:iter(range)
+  range = range or Range.of_buffer()
   -- If `reverse` is true, invert the start and stop locations.
-  local start = opts and opts.reverse and range.stop or range.start
-  local stop = opts and opts.reverse and range.start or range.stop
+  local start = range.start:to_extmarkpos()
+  local stop = range.stop:to_extmarkpos()
 
   --- List of (extmark_id, row, col) tuples in traversal order.
-  --- NOTE: If `end` is less than `start`, marks are returned in reverse order.
-  local marks = vim.api.nvim_buf_get_extmarks(self.buffer, self.ns, start:to_extmarkpos(), stop:to_extmarkpos(), {})
+  local marks = vim.api.nvim_buf_get_extmarks(self.buffer, self.ns, start, stop, {})
   local index = 1
 
   local function next_extmark()
@@ -121,7 +120,7 @@ function ExtmarkMap:iter(opts)
       local current_location =
         Location.from_extmarkpos(vim.api.nvim_buf_get_extmark_by_id(self.buffer, self.ns, id, {}))
       if original_range ~= nil and current_location ~= nil then
-        return original_range, original_range:move(current_location)
+        return id, original_range:move(current_location)
       end
     end
   end
@@ -229,7 +228,7 @@ end
 ---@param range? occurrence.Range
 ---@return boolean
 function Extmarks:has_any_marks(range)
-  local iter = self.marks:iter({ range = range })
+  local iter = self.marks:iter(range)
   return iter() ~= nil
 end
 
@@ -279,16 +278,13 @@ end
 
 -- Get an iterator of mark extmarks.
 -- If a `range` is provided, only yields the extmarks contained within the given `Range`.
--- If the `reverse` option is `true` (default is `false`), yields the extmarks in reverse order.
---
--- The iterator yields a tuple of two `Range` values for each extmark:
--- - The orginal range of the extmark.
--- - The current 'live' range of the extmark.
---
----@param opts? { range?: occurrence.Range, reverse?: boolean }
----@return fun(): occurrence.Range?, occurrence.Range? next_extmark
-function Extmarks:iter_marks(opts)
-  return self.marks:iter(opts)
+-- The iterator yields a tuple for each extmark of:
+-- - The id of the extmark
+-- - The current 'live' range of the extmark
+---@param range? occurrence.Range
+---@return fun(): number?, occurrence.Range? next_extmark
+function Extmarks:iter(range)
+  return self.marks:iter(range)
 end
 
 -- Clear the current occurrence highlight.
@@ -307,9 +303,9 @@ function Extmarks:update_current(cursor)
   self.current:clear()
 
   if cursor then
-    for mark in self:iter_marks() do
-      if mark:contains(cursor) then
-        self.current:add(mark)
+    for _, range in self:iter() do
+      if range:contains(cursor) then
+        self.current:add(range)
         break
       end
     end

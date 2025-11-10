@@ -31,7 +31,7 @@ describe("api", function()
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(2, match_count, "Should find 2 'foo' occurrences")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 'foo' occurrences")
     end)
 
@@ -44,7 +44,7 @@ describe("api", function()
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(2, match_count, "Should have 2 'foo' occurrences initially")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(0, marked_count, "Should have 0 'foo' occurrences marked initially")
 
       -- Move cursor to 'bar' and mark
@@ -56,7 +56,7 @@ describe("api", function()
       assert.equals(3, match_count, "Should find 1 additional 'bar' occurrence")
 
       -- Check that only 'bar' occurrences are marked
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(1, marked_count, "Should haveo only 1 'bar' occurrence marked")
     end)
   end)
@@ -75,7 +75,7 @@ describe("api", function()
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(2, match_count, "Should find 2 'bar' occurrences")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 'bar' occurrences")
     end)
   end)
@@ -94,7 +94,7 @@ describe("api", function()
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(2, match_count, "Should find 2 '\\woo' occurrences")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 'foo' occurrences")
     end)
 
@@ -138,7 +138,7 @@ describe("api", function()
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(1, match_count, "Should find 1 'baz' occurrence")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(1, marked_count, "Should mark 1 'baz' occurrence")
     end)
 
@@ -156,7 +156,7 @@ describe("api", function()
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(1, match_count, "Should find 1 'bar' occurrence")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(1, marked_count, "Should mark 1 'bar' occurrence")
     end)
 
@@ -174,7 +174,7 @@ describe("api", function()
       local match_count = #vim.iter(occurrence:matches()):totable()
       assert.equals(2, match_count, "Should find 2 'foo' occurrences")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 'foo' occurrences")
     end)
   end)
@@ -186,7 +186,7 @@ describe("api", function()
       occurrence:add_pattern([[ba\w]])
       api.mark_all.callback(occurrence, Config.new())
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(4, marked_count, "Should mark 2 'foo' and 2 ba\\w occurrences")
     end)
   end)
@@ -199,13 +199,13 @@ describe("api", function()
       api.mark_all.callback(occurrence, Config.new())
 
       -- Verify they are marked
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(4, marked_count, "Should mark 4 occurrences")
 
       -- Then unmark all
       api.unmark_all.callback(occurrence, Config.new())
 
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(0, marked_count, "Should unmark all occurrences")
     end)
   end)
@@ -217,18 +217,18 @@ describe("api", function()
 
       api.mark.callback(occurrence, Config.new())
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(1, marked_count, "Should mark 1 occurrence at cursor")
 
       -- Mark again at same position should not increase count
       api.mark.callback(occurrence, Config.new())
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(1, marked_count, "Should still have 1 occurrence marked")
 
       -- Move cursor to second 'foo' and mark
       vim.api.nvim_win_set_cursor(0, { 1, 12 }) -- Position at second 'foo'
       api.mark.callback(occurrence, Config.new())
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 occurrences total")
     end)
   end)
@@ -240,18 +240,18 @@ describe("api", function()
 
       -- Mark both 'foo' occurrences
       api.mark_all.callback(occurrence, Config.new())
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 occurrences initially")
 
       -- Unmark first 'foo'
       api.unmark.callback(occurrence, Config.new())
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(1, marked_count, "Should unmark 1 occurrence at cursor")
 
       -- Move to second 'foo' and unmark
       vim.api.nvim_win_set_cursor(0, { 1, 12 }) -- Position at second 'foo'
       api.unmark.callback(occurrence, Config.new())
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(0, marked_count, "Should unmark all occurrences")
     end)
 
@@ -261,14 +261,14 @@ describe("api", function()
 
       -- Mark both 'foo' occurrences
       api.mark_all.callback(occurrence, Config.new())
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 occurrences initially")
 
       -- Move cursor to 'bar' where no 'foo' exists
       vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
       api.unmark.callback(occurrence, Config.new())
 
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(1, marked_count, "Should unmark 1 occurrence nearest to cursor")
     end)
   end)
@@ -283,13 +283,13 @@ describe("api", function()
       -- First call should toggle mark (mark the current occurrence)
       api.toggle.callback(occurrence, Config.new())
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(1, marked_count, "Should mark the one at cursor")
 
       -- Second call should toggle (unmark)
       api.toggle.callback(occurrence, Config.new())
 
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(0, marked_count, "Should unmark the one at cursor")
     end)
 
@@ -299,13 +299,13 @@ describe("api", function()
       local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
       api.toggle.callback(occurrence, Config.new())
-      local marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should find and mark both 'foo' occurrences")
 
       -- Should find and mark all occurrences of 'bar'
       vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
       api.toggle.callback(occurrence, Config.new())
-      marked_count = #vim.iter(occurrence.extmarks:iter_marks()):totable()
+      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(4, marked_count, "Should find and mark both 'bar' occurrences")
     end)
   end)

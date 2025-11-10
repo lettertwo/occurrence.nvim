@@ -131,11 +131,10 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
     log.debug("range:", range)
   end
 
-  local marks =
-    vim.iter(vim.iter(occurrence.extmarks:iter_marks({ range = range })):fold({}, function(acc, origin, edit)
-      table.insert(acc, { origin, edit })
-      return acc
-    end))
+  local marks = vim.iter(vim.iter(occurrence.extmarks:iter(range)):fold({}, function(acc, id, edit)
+    table.insert(acc, { id, edit })
+    return acc
+  end))
 
   if count and count > 0 then
     log.debug("count:", count)

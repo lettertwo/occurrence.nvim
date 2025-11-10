@@ -124,10 +124,7 @@ describe("Performance Tests", function()
       occurrence:mark()
 
       local start_time = vim.loop.hrtime()
-      local count = 0
-      for _ in occurrence.extmarks:iter_marks() do
-        count = count + 1
-      end
+      local count = #vim.iter(occurrence.extmarks:iter()):totable()
       local elapsed = (vim.loop.hrtime() - start_time) / 1e6
 
       assert.is_true(count > 0, "Should find marks")
