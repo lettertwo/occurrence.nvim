@@ -737,7 +737,7 @@ function Occurrence:activate_occurrence_mode(config)
       elseif action_config.callback then
         -- Fall back to direct callback
         self.keymap:set(mode, action_key, function()
-          action_config.callback(self, config)
+          self:apply(config, action_config)
         end, { desc = desc })
       else
         -- No plug or callback defined
@@ -832,6 +832,7 @@ function Occurrence:apply(config, action)
   if callback and callable(callback) then
     local result = callback(self, config)
     if result == false then
+      log.debug("Occurrence mode action cancelled")
       self:dispose()
       return
     end
