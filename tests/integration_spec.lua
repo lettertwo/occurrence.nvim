@@ -42,7 +42,9 @@ describe("integration tests", function()
 
       feedkeys("q") -- Simulate pressing the normal keymap to activate occurrence on the current word
 
-      assert.spy(notify_stub).was_called_with(match.is_match("No matches found"), vim.log.levels.WARN, match._)
+      assert
+        .spy(notify_stub)
+        .was_called_with(match.is_match("No matches found"), vim.log.levels.WARN, { title = "Occurrence" })
     end)
 
     it("sets up keymaps for cancelling", function()
@@ -422,7 +424,7 @@ describe("integration tests", function()
 
       assert
         .spy(notify_stub)
-        .was_called_with(match.is_match("Operator 'c' is not supported"), vim.log.levels.WARN, match._)
+        .was_called_with(match.is_match("Operator 'c' is not supported"), vim.log.levels.WARN, { title = "Occurrence" })
 
       -- There should be no marks since operator was unsupported.
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})

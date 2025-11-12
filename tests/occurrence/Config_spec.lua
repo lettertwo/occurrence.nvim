@@ -35,7 +35,7 @@ describe("Config", function()
       assert.has_no.errors(function()
         Config.new(valid_opts)
       end)
-      assert.spy(vim.notify).was_not_called_with(match._, vim.log.levels.WARN, match._)
+      assert.spy(vim.notify).was_not_called()
     end)
 
     it("validates keymaps with custom KeymapConfig", function()
@@ -52,7 +52,7 @@ describe("Config", function()
       assert.has_no.errors(function()
         Config.new(valid_opts)
       end)
-      assert.spy(vim.notify).was_not_called_with(match._, vim.log.levels.WARN, match._)
+      assert.spy(vim.notify).was_not_called()
     end)
 
     it("rejects invalid keymap values", function()
@@ -64,24 +64,26 @@ describe("Config", function()
       }
 
       Config.new(invalid_opts)
-      assert.spy(vim.notify).was_called_with(match.has_match("keymap value"), vim.log.levels.WARN, match._)
+      assert
+        .spy(vim.notify)
+        .was_called_with(match.has_match("keymap value"), vim.log.levels.WARN, { title = "Occurrence" })
     end)
 
     it("handles invalid options gracefully with warning", function()
       local conf1 = Config.new({ invalid_option = "value" })
-      assert.spy(vim.notify).was_called_with(match.has_match("unknown option"), vim.log.levels.WARN, match._)
+      assert.spy(vim.notify).was_called_with(match.has_match("unknown option"), vim.log.levels.WARN, { title = "Occurrence" })
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
       ---@diagnostic disable-next-line: assign-type-mismatch
       local conf2 = Config.new({ operators = "invalid_type" })
-      assert.spy(vim.notify).was_called_with(match.has_match("operators: expected table"), vim.log.levels.WARN, match._)
+      assert.spy(vim.notify).was_called_with(match.has_match("operators: expected table"), vim.log.levels.WARN, { title = "Occurrence" })
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
       ---@diagnostic disable-next-line: param-type-mismatch
       local conf3 = Config.new("not_a_table")
-      assert.spy(vim.notify).was_called_with(match.has_match("opts: expected table"), vim.log.levels.WARN, match._)
+      assert.spy(vim.notify).was_called_with(match.has_match("opts: expected table"), vim.log.levels.WARN, { title = "Occurrence" })
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
