@@ -303,14 +303,17 @@ describe("README examples", function()
       })
 
       plugin.setup({
-        on_activate = function(map)
+        keymaps = {
           -- dd - Delete marked occurrences on current line
-          map("n", "dd", function()
-            local occ = require("occurrence.Occurrence").get()
-            local range = require("occurrence.Range").of_line()
-            occ:apply_operator("delete", range, "line")
-          end, { desc = "Delete marked occurrences on line" })
-        end,
+          ["dd"] = {
+            mode = "n",
+            desc = "Delete marked occurrences on line",
+            callback = function(occ)
+              local range = require("occurrence.Range").of_line()
+              occ:apply_operator("delete", range, "line")
+            end,
+          },
+        },
       })
 
       -- Place cursor on second "foo"
@@ -360,13 +363,16 @@ describe("README examples", function()
       })
 
       plugin.setup({
-        on_activate = function(map)
+        keymaps = {
           -- D - Delete marked occurrences from cursor to end of line
-          map("n", "D", function()
-            local occ = require("occurrence.Occurrence").get()
-            occ:apply_operator("delete", "$")
-          end, { desc = "Delete marked occurrences from cursor to end of line" })
-        end,
+          ["D"] = {
+            mode = "n",
+            desc = "Delete marked occurrences from cursor to end of line",
+            callback = function(occ)
+              occ:apply_operator("delete", "$")
+            end,
+          },
+        },
       })
 
       -- Place cursor on second "foo"
