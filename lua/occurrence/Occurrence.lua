@@ -519,6 +519,19 @@ function Occurrence:matches(range, patterns)
   return next_match
 end
 
+-- Get an iterator of marked occurrence ranges.
+-- If a `range` is provided, only yields the marks contained within the given `Range`.
+---@param range? occurrence.Range
+---@return fun(): occurrence.Range? next_mark
+function Occurrence:marks(range)
+  local next_extmark = self.extmarks:iter()
+  local function next_mark()
+    local _, mark = next_extmark()
+    return mark
+  end
+  return next_mark
+end
+
 -- Add an additional text pattern to search for.
 -- If the pattern was already added, this is a no-op.
 ---@param text string
