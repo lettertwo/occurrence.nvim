@@ -1,129 +1,130 @@
 local Cursor = require("occurrence.Cursor")
 local Range = require("occurrence.Range")
 
-local feedkeys = require("occurrence.feedkeys")
 local log = require("occurrence.log")
 
 ---@module 'occurrence.api'
 
--- Find occurrences of the word under the cursor, mark all matches,
--- and activate occurrence mode
----@type occurrence.OccurrenceModeConfig
-local word = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceWord)",
-  desc = "Find occurrences of word",
-  callback = function(occurrence)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
-    if word == "" then
-      log.warn("No word under cursor")
-      return
+-- Modify a pending operator to act on occurrences of the word
+-- under the cursor. Only useful in operator-pending mode
+-- (e.g., `c`, `d`, etc.)
+--
+-- Once a pending operator is modified, the operator will act
+-- on occurrences within the range specified by the subsequent motion.
+--
+-- Note that this action does not activate occurrence mode,
+-- and it does not have any effect when occurrence mode is active,
+-- as operators already act on occurrences in that mode.
+---@type occurrence.OperatorModifierConfig
+local modify_operator = {
+  mode = "o",
+  expr = true,
+  plug = "<Plug>(OccurrenceModifyOperator)",
+  desc = "Occurrences",
+  type = "operator-modifier",
+  callback = function(occurrence, ...)
+    if not occurrence:has_matches() then
+      occurrence:of_word(true)
     end
-    -- mark all occurrences of the newest pattern
-    occurrence:add_pattern(word, "word")
-    if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then
-      local pattern = occurrence.patterns[#occurrence.patterns]
-      for range in occurrence:matches(nil, pattern) do
-        occurrence:mark(range)
-      end
-    end
-  end,
-}
-
--- Find occurrences of the current visual selection, mark all
--- matches, and activate occurrence mode
----@type occurrence.OccurrenceModeConfig
-local selection = {
-  mode = "v",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceSelection)",
-  desc = "Find occurrences of selection",
-  callback = function(occurrence)
-    local range = Range.of_selection()
-    assert(range, "no visual selection")
-    local text = table.concat(
-      vim.api.nvim_buf_get_text(0, range.start.line, range.start.col, range.stop.line, range.stop.col, {}),
-      "\n"
-    )
-    if text == "" then
-      log.warn("Empty visual selection")
-      return
-    end
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    -- Clear visual selection
-    feedkeys.change_mode("n", { noflush = true, silent = true })
-    -- mark all occurrences of the newest pattern
-    occurrence:add_pattern(text, "selection")
-    if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then
-      local pattern = occurrence.patterns[#occurrence.patterns]
-      for match in occurrence:matches(nil, pattern) do
-        occurrence:mark(match)
-      end
+    if not occurrence.extmarks:has_any_marks() then
+      return false
     end
   end,
 }
 
--- Find occurrences of the last search pattern, mark all matches,
--- and activate occurrence mode
+-- Mark one or more occurrences and activate occurrence mode.
+--
+-- If occurrence already has matches, mark matches based on:
+-- - In visual mode, if matches exist in the range of the visual
+--   selection, mark those matches.
+-- - Otherwise, if a match exists at the cursor, mark that match.
+--
+-- If no occurrence match exists to satisfy the above, add a new pattern based on:
+--   - In visual mode, mark occurrences of the visual selection.
+--   - If `:h hlsearch` is active, mark occurrences of the search pattern.
+--   - Otherwise, mark occurrences of the word under the cursor.
 ---@type occurrence.OccurrenceModeConfig
-local pattern = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrencePattern)",
-  desc = "Find occurrences of search pattern",
-  callback = function(occurrence)
-    local search_pattern = vim.fn.getreg("/")
-
-    if search_pattern == "" then
-      log.warn("No search pattern available")
-      return
-    end
-
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    -- Clear search highlight
-    vim.cmd.nohlsearch()
-    -- mark all occurrences of the newest pattern
-    occurrence:add_pattern(search_pattern)
-    if occurrence.patterns ~= nil and #occurrence.patterns > pattern_count then
-      local pattern = occurrence.patterns[#occurrence.patterns]
-      for range in occurrence:matches(nil, pattern) do
-        occurrence:mark(range)
-      end
-    end
-  end,
-}
-
--- Smart entry action that adapts to the current context. In
--- visual mode: acts like `selection`. Otherwise, if `:h hlsearch`
--- is active: acts like `pattern`. Otherwise: acts like `word`.
--- Marks all matches and activates occurrence mode
----@type occurrence.OccurrenceModeConfig
-local current = {
+local mark = {
   mode = { "n", "v" },
   type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceCurrent)",
-  desc = "Find occurrences",
-  callback = function(occurrence, ...)
-    if vim.fn.mode():match("[vV]") then
-      return selection.callback(occurrence, ...)
-    elseif vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "" then
-      return pattern.callback(occurrence, ...)
+  plug = "<Plug>(OccurrenceMark)",
+  desc = "Mark occurrence",
+  callback = function(occurrence)
+    local visual = vim.fn.mode():match("[vV]") ~= nil
+    local hlsearch = vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= ""
+
+    if occurrence:has_matches() then
+      if visual then
+        local selection_range = Range.of_selection()
+        if selection_range and occurrence:has_matches(selection_range) then
+          for range in occurrence:matches(selection_range) do
+            occurrence:mark(range)
+          end
+        end
+      else
+        local cursor = Cursor.save()
+        local range = occurrence:match_cursor()
+        if range and range:contains(cursor.location) then
+          occurrence:mark(range)
+        else
+          cursor:restore()
+          occurrence:of_word(true)
+        end
+      end
+    elseif visual then
+      occurrence:of_selection(true)
+    elseif hlsearch then
+      occurrence:of_pattern(true)
     else
-      return word.callback(occurrence, ...)
+      occurrence:of_word(true)
     end
   end,
 }
 
--- Smart toggle action that activates occurrence mode or toggles
--- marks. In normal mode: If no patterns exist, acts like `word`
--- to start occurrence mode. Otherwise, toggles the mark on the
--- match under the cursor, or adds a new word pattern if not on a
--- match. In visual mode: If no patterns exist, acts like
--- `selection` to start occurrence mode. Otherwise, toggles marks
--- on all matches within the selection, or adds a new selection
--- pattern if no matches.
+-- Unmark one or more occurrences.
+--
+-- If occurrence has matches, unmark matches based on:
+-- - In visual mode, unmark matches in the range of the visual selection.
+-- - Otherwise, if a match exists at the cursor, unmark that match.
+--
+-- If no match exists to satisfy the above, does nothing.
+---@type occurrence.OccurrenceModeConfig
+local unmark = {
+  mode = { "n", "v" },
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceUnmark)",
+  desc = "Unmark occurrence",
+  callback = function(occurrence)
+    local visual = vim.fn.mode():match("[vV]") ~= nil
+    if occurrence:has_matches() then
+      if visual then
+        local selection_range = Range:of_selection()
+        if selection_range then
+          for range in occurrence:matches(selection_range) do
+            occurrence:unmark(range)
+          end
+        end
+      else
+        local range = occurrence:match_cursor()
+        if range then
+          occurrence:unmark(range)
+        end
+      end
+    end
+  end,
+}
+
+-- Mark or unmark one (or more) occurrence(s) and activate occurrence mode.
+--
+-- If occurrence already has matches, toggle matches based on:
+-- - In visual mode, if matches exist in the range of the visual
+--   selection, toggle marks on those matches.
+-- - Otherwise, if a match exists at the cursor, toggle that mark.
+--
+-- If no occurrence match exists to satisfy the above, add a new pattern based on:
+--   - In visual mode, mark the closest occurrence of the visual selection.
+--   - If `:h hlsearch` is active, mark the closest occurrence of the search pattern.
+--   - Otherwise, mark the closest occurrence of the word under the cursor.
 ---@type occurrence.OccurrenceModeConfig
 local toggle = {
   mode = { "n", "v" },
@@ -131,41 +132,123 @@ local toggle = {
   plug = "<Plug>(OccurrenceToggle)",
   desc = "Add/Toggle occurrence mark(s)",
   callback = function(occurrence, ...)
-    if vim.fn.mode():match("[vV]") then
-      local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-      if pattern_count == 0 then
-        return selection.callback(occurrence, ...)
-      end
-      local selection_range = Range.of_selection()
-      if selection_range and occurrence:has_matches(selection_range) then
-        for range in occurrence:matches(selection_range) do
-          if not occurrence:mark(range) then
-            occurrence:unmark(range)
+    local visual = vim.fn.mode():match("[vV]") ~= nil
+    local hlsearch = vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= ""
+
+    if occurrence:has_matches() then
+      if visual then
+        local selection_range = Range.of_selection()
+        if selection_range and occurrence:has_matches(selection_range) then
+          for range in occurrence:matches(selection_range) do
+            if not occurrence:mark(range) then
+              occurrence:unmark(range)
+            end
           end
         end
       else
-        return selection.callback(occurrence, ...)
-      end
-    else
-      local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-      if pattern_count == 0 then
-        return word.callback(occurrence, ...)
-      end
-      local cursor = Cursor.save()
-      local range = occurrence:match_cursor()
-      if range and range:contains(cursor.location) then
-        if not occurrence:mark(range) then
-          occurrence:unmark(range)
+        local cursor = Cursor.save()
+        local range = occurrence:match_cursor()
+        if range and range:contains(cursor.location) then
+          if not occurrence:mark(range) then
+            occurrence:unmark(range)
+          end
+        else
+          cursor:restore()
+          if occurrence:of_word() then
+            occurrence:mark(occurrence:match_cursor())
+            cursor:restore()
+          end
         end
-      else
-        cursor:restore()
-        return word.callback(occurrence, ...)
       end
+    elseif visual then
+      if occurrence:of_selection() then
+        occurrence:mark(occurrence:match_cursor())
+      end
+    elseif hlsearch then
+      if occurrence:of_pattern() then
+        occurrence:mark(occurrence:match_cursor())
+      end
+    elseif occurrence:of_word() then
+      occurrence:mark(occurrence:match_cursor())
     end
   end,
 }
 
--- Clear all marks and patterns, and deactivate occurrence mode
+-- Move to the next marked occurrence and activate occurrence mode.
+--
+-- If occurrence has no matches, acts like `mark`
+-- and then moves to the next marked occurrence.
+---@type occurrence.OccurrenceModeConfig
+local next = {
+  mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceNext)",
+  desc = "Next marked occurrence",
+  callback = function(occurrence, ...)
+    if not occurrence:has_matches() then
+      mark.callback(occurrence, ...)
+    end
+    occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
+  end,
+}
+
+-- Move to the previous marked occurrence and activate occurrence mode.
+--
+-- If occurrence has no matches, acts like `mark`
+-- and then moves to the previous marked occurrence.
+---@type occurrence.OccurrenceModeConfig
+local previous = {
+  mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrencePrevious)",
+  desc = "Previous marked occurrence",
+  callback = function(occurrence, ...)
+    if not occurrence:has_matches() then
+      mark.callback(occurrence, ...)
+    end
+    occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
+  end,
+}
+
+-- Move to the next occurrence match, whether marked or unmarked,
+-- and activate occurrence mode.
+--
+-- If occurrence has no matches, acts like `mark`
+-- and then moves to the next occurrence match.
+---@type occurrence.OccurrenceModeConfig
+local match_next = {
+  mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceMatchNext)",
+  desc = "Next occurrence match",
+  callback = function(occurrence, ...)
+    if not occurrence:has_matches() then
+      mark.callback(occurrence, ...)
+    end
+    occurrence:match_cursor({ direction = "forward", wrap = true })
+  end,
+}
+
+-- Move to the previous occurrence match, whether marked or unmarked,
+-- and activate occurrence mode.
+--
+-- If occurrence has no matches, acts like `mark`
+-- and then moves to the previous occurrence match.
+---@type occurrence.OccurrenceModeConfig
+local match_previous = {
+  mode = "n",
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceMatchPrevious)",
+  desc = "Previous occurrence match",
+  callback = function(occurrence, ...)
+    if not occurrence:has_matches() then
+      mark.callback(occurrence, ...)
+    end
+    occurrence:match_cursor({ direction = "backward", wrap = true })
+  end,
+}
+
+-- Clear all marks and patterns, and deactivate occurrence mode.
 ---@type occurrence.OccurrenceModeConfig
 local deactivate = {
   mode = "n",
@@ -181,214 +264,16 @@ local deactivate = {
   end,
 }
 
--- Modify a pending operator to act on occurrences of the word
--- under the cursor. Used in operator-pending mode (e.g., `coo`
--- changes word occurrences, `doo` deletes them)
----@type occurrence.OperatorModifierConfig
-local modify_operator = {
-  mode = "o",
-  expr = true,
-  plug = "<Plug>(OccurrenceModifyOperator)",
-  desc = "Occurrences",
-  type = "operator-modifier",
-  callback = function(occurrence, ...)
-    word.callback(occurrence, ...)
-    if not occurrence.extmarks:has_any_marks() then
-      return false
-    end
-  end,
-}
-
--- Move to the next occurrence match, whether marked or unmarked
----@type occurrence.OccurrenceModeConfig
-local match_next = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceMatchNext)",
-  desc = "Next occurrence match",
-  callback = function(occurrence, config)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count == 0 then
-      word.callback(occurrence, config)
-    end
-    occurrence:match_cursor({ direction = "forward", wrap = true })
-  end,
-}
-
--- Move to the previous occurrence match, whether marked or unmarked
----@type occurrence.OccurrenceModeConfig
-local match_previous = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceMatchPrevious)",
-  desc = "Previous occurrence match",
-  callback = function(occurrence, config)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count == 0 then
-      word.callback(occurrence, config)
-    end
-    occurrence:match_cursor({ direction = "backward", wrap = true })
-  end,
-}
-
--- Move to the next marked occurrence
----@type occurrence.OccurrenceModeConfig
-local next = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceNext)",
-  desc = "Next marked occurrence",
-  callback = function(occurrence, config)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count == 0 then
-      word.callback(occurrence, config)
-    end
-    occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
-  end,
-}
-
--- Move to the previous marked occurrence
----@type occurrence.OccurrenceModeConfig
-local previous = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrencePrevious)",
-  desc = "Previous marked occurrence",
-  callback = function(occurrence, config)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count == 0 then
-      word.callback(occurrence, config)
-    end
-    occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
-  end,
-}
-
--- Mark the occurrence match nearest to the cursor
----@type occurrence.OccurrenceModeConfig
-local mark = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceMark)",
-  desc = "Mark occurrence",
-  callback = function(occurrence, config)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count == 0 then
-      word.callback(occurrence, config)
-    end
-    local range = occurrence:match_cursor()
-    if range then
-      occurrence:mark(range)
-    end
-  end,
-}
-
--- Unmark the occurrence match nearest to the cursor
----@type occurrence.OccurrenceModeConfig
-local unmark = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceUnmark)",
-  desc = "Unmark occurrence",
-  callback = function(occurrence, config)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count ~= 0 then
-      local range = occurrence:match_cursor()
-      if range then
-        occurrence:unmark(range)
-      end
-    end
-  end,
-}
-
--- Mark all occurrence matches in the buffer
----@type occurrence.OccurrenceModeConfig
-local mark_all = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceMarkAll)",
-  desc = "Mark occurrences",
-  callback = function(occurrence, config)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count == 0 then
-      word.callback(occurrence, config)
-    end
-    occurrence:mark_all()
-  end,
-}
-
--- Unmark all occurrence matches in the buffer
----@type occurrence.OccurrenceModeConfig
-local unmark_all = {
-  mode = "n",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceUnmarkAll)",
-  desc = "Unmark occurrences",
-  callback = function(occurrence, config)
-    local pattern_count = occurrence.patterns and #occurrence.patterns or 0
-    if pattern_count ~= 0 then
-      occurrence:unmark_all()
-    end
-  end,
-}
-
--- Mark all occurrence matches in the current visual selection
----@type occurrence.OccurrenceModeConfig
-local mark_in_selection = {
-  mode = "v",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceMarkInSelection)",
-  desc = "Mark occurences",
-  callback = function(occurrence)
-    local selection_range = Range:of_selection()
-    if selection_range then
-      for range in occurrence:matches(selection_range) do
-        occurrence:mark(range)
-      end
-    end
-  end,
-}
-
--- Unmark all occurrence matches in the current visual selection
----@type occurrence.OccurrenceModeConfig
-local unmark_in_selection = {
-  mode = "v",
-  type = "occurrence-mode",
-  plug = "<Plug>(OccurrenceUnmarkInSelection)",
-  desc = "Unmark occurrences",
-  callback = function(occurrence)
-    local selection_range = Range:of_selection()
-    if selection_range then
-      for _, range in occurrence.extmarks:iter(selection_range) do
-        occurrence:unmark(range)
-      end
-    end
-  end,
-}
-
 ---@enum (key) occurrence.KeymapAction
 local api = {
-  word = word,
-  selection = selection,
-  pattern = pattern,
-  current = current,
-
+  modify_operator = modify_operator,
+  mark = mark,
+  unmark = unmark,
+  toggle = toggle,
   next = next,
   previous = previous,
   match_next = match_next,
   match_previous = match_previous,
-
-  mark = mark,
-  unmark = unmark,
-
-  mark_all = mark_all,
-  unmark_all = unmark_all,
-
-  mark_in_selection = mark_in_selection,
-  unmark_in_selection = unmark_in_selection,
-
-  toggle = toggle,
-
-  modify_operator = modify_operator,
   deactivate = deactivate,
 }
 

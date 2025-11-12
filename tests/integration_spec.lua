@@ -36,7 +36,7 @@ describe("integration tests", function()
       bufnr = util.buffer("unique_word_that_appears_only_once")
 
       plugin.setup({})
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceCurrent)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       vim.cmd([[silent! /nonexistent_pattern<CR>]]) -- Search for a pattern that won't match anything
 
@@ -49,7 +49,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({})
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -92,7 +92,7 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({})
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -151,7 +151,7 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({})
-      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all occurrences)
       feedkeys(normal_key)
@@ -207,7 +207,7 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({})
-      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (cursor at position 0)
       feedkeys(normal_key)
@@ -276,7 +276,7 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({})
-      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Move to 'bar' and activate occurrence
       feedkeys("w") -- Move to 'bar'
@@ -332,7 +332,7 @@ describe("integration tests", function()
       bufnr = util.buffer({ "no matches on this line", "foo bar baz foo" })
 
       plugin.setup({})
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceCurrent)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       feedkeys("j") -- Move to second line
       feedkeys("q") -- Activate occurrence (marks all 'foo')
@@ -358,7 +358,7 @@ describe("integration tests", function()
 
       local normal_key = "q"
       plugin.setup({})
-      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- simulate pressing normal keymap to find 'foo'
       feedkeys(normal_key)
@@ -705,7 +705,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -752,7 +752,7 @@ describe("integration tests", function()
           ["n"] = false, -- Disable default 'n' keymap
         },
       })
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -790,7 +790,7 @@ describe("integration tests", function()
           ["<C-n>"] = "next", -- Alias <C-n> to next action
         },
       })
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -824,7 +824,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -866,7 +866,7 @@ describe("integration tests", function()
           end, { desc = "Custom on_activate keymap" })
         end,
       })
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
@@ -918,7 +918,7 @@ describe("integration tests", function()
         },
       })
 
-      vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys("q")
@@ -962,7 +962,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -1006,7 +1006,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -1050,7 +1050,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -1095,7 +1095,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceWord)", { buffer = bufnr })
+      vim.keymap.set("n", normal_key, "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys(normal_key)
@@ -1147,7 +1147,7 @@ describe("integration tests", function()
           },
         },
       })
-      vim.keymap.set("n", "z", "<Plug>(OccurrenceCurrent)", { buffer = bufnr })
+      vim.keymap.set("n", "z", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
       -- Activate occurrence on 'foo' (marks all foo occurrences)
       feedkeys("z")

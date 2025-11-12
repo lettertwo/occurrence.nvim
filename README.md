@@ -1,6 +1,6 @@
 # occurrence.nvim
 
-A Neovim plugin for marking and operating on multiple occurrences. Mark words, selections, or search patterns, then use native Vim operators to batch edit them.
+A Neovim plugin to mark occurrences of words/patterns/selections in a buffer and perform operations on them.
 
 <!-- panvimdoc-ignore-start -->
 
@@ -15,9 +15,10 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 - Last search pattern from `/` or `?`
 - Automatic pattern escaping and vim regex support
 
-### ⚡ Native Operator Integration
+### ⚡ Native and Custom Operator Integration
 
 - Use standard Vim operators: `c`, `d`, `y`, `p`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`
+- Define custom operators to work with occurrences
 - Two interaction modes: mark-then-operate or operator-pending modifier
 - Works with motions and text objects (`ip`, `$`, `G`, etc.)
 - Dot-repeat support for all operations
@@ -50,6 +51,8 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 {
   "lettertwo/occurrence.nvim",
   event = "BufReadPost", -- If you want to lazy load
+  ---@module "occurrence"
+  ---@type occurrence.Options
   -- opts = {} -- setup is optional; the defaults will work out of the box.
 }
 ```
@@ -86,8 +89,9 @@ Marking occurrences can be done in several ways:
 Once occurrences are marked, you can navigate, add and remove them:
 
 - **Navigate**: Use `n`/`N` to jump between marked occurrences, or `gn`/`gN` for all occurrences
-- **Mark individual**: `ga` to mark current occurrence, `gx` to unmark
-- **Toggle mark**: `go` to toggle mark on current occurrence
+- **Add matches**: `ga` to add a new occurrence
+- **Remove marks**: `gx` to unmark current occurrence
+- **Toggle individual marks**: `go` to toggle mark on current occurrence
 
 ## Operating on occurrences
 
@@ -125,7 +129,7 @@ require("occurrence").setup({
   -- If `false`, global keymaps, such as the default `go` to activate
   -- occurrence mode, or the default `o` to modify a pending operator,
   -- are not set, so activation keymaps must be set manually,
-  -- e.g., `vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceCurrent)")``
+  -- e.g., `vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceMark)")``
   -- or `vim.keymap.set("o", "<C-o>", "<Plug>(OccurrenceModifyOperator)")`.
   --
   -- Additionally, when `false`, only keymaps explicitly defined in `keymaps`
@@ -249,10 +253,10 @@ require("occurrence").setup({
 })
 
 -- Set up custom keymaps using <Plug> mappings
-vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceCurrent)")
+vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceMark)")
 
 -- Or using the `:Occurrence` command:
-vim.keymap.set("v", "<C-o>", ":Occurrence selection<CR>")
+vim.keymap.set("v", "<C-o>", "<cmd>Occurrence toggle<CR>")
 
 -- Or using Lua API:
 vim.keymap.set("o", "<C-o>", function()
@@ -411,7 +415,7 @@ Mark different words and edit them together:
 
 go          " Mark all 'foo' occurrences (cursor on first 'foo')
 j2w         " Move cursor to 'bar' on line 2
-go          " Mark all 'bar' occurrences as well
+ga          " Mark all 'bar' occurrences as well
 cip         " 'c'hange all marked occurrences 'i'n 'p'aragraph
 test<CR>    " Type replacement
 <Esc>       " Exit
@@ -511,72 +515,20 @@ All actions are available in three ways:
 - **Lua API**:
 
   ```lua
-  require('occurrence').current()
+  require('occurrence').mark()
   ```
 
 - **Vim commands**:
 
   ```vim
-  :Occurrence current
+  :Occurrence mark
   ```
 
 - **<Plug> mappings**:
 
   ```vim
-  <Plug>(OccurrenceCurrent)
+  <Plug>(OccurrenceMark)
   ```
-
-### Entry Actions
-
-Actions that activate occurrence mode:
-
-word
-
-: `require('occurrence').word()`  
-`:Occurrence word`  
-`<Plug>(OccurrenceWord)`
-
-Find occurrences of word under cursor, mark all matches, and activate occurrence mode
-
-selection
-
-: `require('occurrence').selection()`  
-`:Occurrence selection`  
-`<Plug>(OccurrenceSelection)`
-
-Find occurrences of the current visual selection, mark all matches, and activate occurrence mode
-
-pattern
-
-: `require('occurrence').pattern()`  
-`:Occurrence pattern`  
-`<Plug>(OccurrencePattern)`
-
-Find occurrences of the last search pattern, mark all matches, and activate occurrence mode
-
-current
-
-: `require('occurrence').current()`  
-`:Occurrence current`  
-`<Plug>(OccurrenceCurrent)`
-
-Smart entry action that adapts to the current context. In visual mode: acts like `selection`. Otherwise, if `:h hlsearch` is active: acts like `pattern`. Otherwise: acts like `word`. Marks all matches and activates occurrence mode
-
-toggle
-
-: `require('occurrence').toggle()`  
-`:Occurrence toggle`  
-`<Plug>(OccurrenceToggle)`
-
-Smart toggle action that activates occurrence mode or toggles marks. In normal mode: If no patterns exist, acts like `word` to start occurrence mode. Otherwise, toggles the mark on the match under the cursor, or adds a new word pattern if not on a match. In visual mode: If no patterns exist, acts like `selection` to start occurrence mode. Otherwise, toggles marks on all matches within the selection, or adds a new selection pattern if no matches.
-
-deactivate
-
-: `require('occurrence').deactivate()`  
-`:Occurrence deactivate`  
-`<Plug>(OccurrenceDeactivate)`
-
-Clear all marks and patterns, and deactivate occurrence mode
 
 modify_operator
 
@@ -586,43 +538,9 @@ modify_operator
 
 Modify a pending operator to act on occurrences of the word under the cursor. Only useful in operator-pending mode (e.g., `c`, `d`, etc.)
 
-Note that this action does not activate occurrence mode. It simply modifies the pending operator to act on occurrences within the specified range.
+Once a pending operator is modified, the operator will act on occurrences within the range specified by the subsequent motion.
 
-### Occurrence Mode Actions
-
-Actions available when occurrence mode is active:
-
-next
-
-: `require('occurrence').next()`  
-`:Occurrence next`  
-`<Plug>(OccurrenceNext)`
-
-Move to the next marked occurrence
-
-previous
-
-: `require('occurrence').previous()`  
-`:Occurrence previous`  
-`<Plug>(OccurrencePrevious)`
-
-Move to the previous marked occurrence
-
-match_next
-
-: `require('occurrence').match_next()`  
-`:Occurrence match_next`  
-`<Plug>(OccurrenceMatchNext)`
-
-Move to the next occurrence match, whether marked or unmarked
-
-match_previous
-
-: `require('occurrence').match_previous()`  
-`:Occurrence match_previous`  
-`<Plug>(OccurrenceMatchPrevious)`
-
-Move to the previous occurrence match, whether marked or unmarked
+Note that this action does not activate occurrence mode, and it does not have any effect when occurrence mode is active, as operators already act on occurrences in that mode.
 
 mark
 
@@ -630,46 +548,100 @@ mark
 `:Occurrence mark`  
 `<Plug>(OccurrenceMark)`
 
-Mark the occurrence match nearest to the cursor
+Mark one or more occurrences and activate occurrence mode.
+
+If occurrence already has matches, mark matches based on:
+
+- In visual mode, if matches exist in the range of the visual selection, mark those matches.
+- Otherwise, if a match exists at the cursor, mark that match.
+
+If no occurrence match exists to satisfy the above, add a new pattern based on:
+
+- In visual mode, mark occurrences of the visual selection.
+- If `:h hlsearch` is active, mark occurrences of the search pattern.
+- Otherwise, mark occurrences of the word under the cursor.
 
 unmark
 
 : `require('occurrence').unmark()`  
-`:Occurrence unmark`
+`:Occurrence unmark`  
+`<Plug>(OccurrenceUnmark)`
 
-Unmark the occurrence match nearest to the cursor
+Unmark one or more occurrences.
 
-mark_all
+If occurrence has matches, unmark matches based on:
 
-: `require('occurrence').mark_all()`  
-`:Occurrence mark_all`  
-`<Plug>(OccurrenceMarkAll)`
+- In visual mode, unmark matches in the range of the visual selection.
+- Otherwise, if a match exists at the cursor, unmark that match.
 
-Mark all occurrence matches in the buffer
+If no match exists to satisfy the above, does nothing.
 
-unmark_all
+toggle
 
-: `require('occurrence').unmark_all()`  
-`:Occurrence unmark_all`  
-`<Plug>(OccurrenceUnmarkAll)`
+: `require('occurrence').toggle()`  
+`:Occurrence toggle`  
+`<Plug>(OccurrenceToggle)`
 
-Unmark all occurrence matches in the buffer
+Mark or unmark one (or more) occurrence(s) and activate occurrence mode.
 
-mark_in_selection
+If occurrence already has matches, toggle matches based on:
 
-: `require('occurrence').mark_in_selection()`  
-`:Occurrence mark_in_selection`  
-`<Plug>(OccurrenceMarkInSelection)`
+- In visual mode, if matches exist in the range of the visual selection, toggle marks on those matches.
+- Otherwise, if a match exists at the cursor, toggle that mark.
 
-Mark all occurrence matches in the current visual selection
+If no occurrence match exists to satisfy the above, add a new pattern based on:
 
-unmark_in_selection
+- In visual mode, mark the closest occurrence of the visual selection.
+- If `:h hlsearch` is active, mark the closest occurrence of the search pattern.
+- Otherwise, mark the closest occurrence of the word under the cursor.
 
-: `require('occurrence').unmark_in_selection()`  
-`:Occurrence unmark_in_selection`  
-`<Plug>(OccurrenceUnmarkInSelection)`
+next
 
-Unmark all occurrence matches in the current visual selection
+: `require('occurrence').next()`  
+`:Occurrence next`  
+`<Plug>(OccurrenceNext)`
+
+Move to the next marked occurrence and activate occurrence mode.
+
+If occurrence has no matches, acts like `mark` and then moves to the next marked occurrence.
+
+previous
+
+: `require('occurrence').previous()`  
+`:Occurrence previous`  
+`<Plug>(OccurrencePrevious)`
+
+Move to the previous marked occurrence and activate occurrence mode.
+
+If occurrence has no matches, acts like `mark` and then moves to the previous marked occurrence.
+
+match_next
+
+: `require('occurrence').match_next()`  
+`:Occurrence match_next`  
+`<Plug>(OccurrenceMatchNext)`
+
+Move to the next occurrence match, whether marked or unmarked, and activate occurrence mode.
+
+If occurrence has no matches, acts like `mark` and then moves to the next occurrence match.
+
+match_previous
+
+: `require('occurrence').match_previous()`  
+`:Occurrence match_previous`  
+`<Plug>(OccurrenceMatchPrevious)`
+
+Move to the previous occurrence match, whether marked or unmarked, and activate occurrence mode.
+
+If occurrence has no matches, acts like `mark` and then moves to the previous occurrence match.
+
+deactivate
+
+: `require('occurrence').deactivate()`  
+`:Occurrence deactivate`  
+`<Plug>(OccurrenceDeactivate)`
+
+Clear all marks and patterns, and deactivate occurrence mode.
 
 ## Builtin Operators
 

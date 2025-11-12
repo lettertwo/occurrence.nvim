@@ -37,7 +37,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
     -- Mark all 'foo' occurrences
     feedkeys("q")
@@ -77,7 +77,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
     -- Mark all 'foo' occurrences
     feedkeys("q")
@@ -108,7 +108,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
     -- Mark 'foo'
     feedkeys("q")
@@ -254,12 +254,12 @@ describe("dot repeat functionality", function()
       },
     })
 
-    vim.keymap.set("n", "go", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+    vim.keymap.set("n", "go", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
     feedkeys("4w") -- move to first 'text'
-    feedkeys("go")
+    feedkeys("go") -- add marks for 'text' and activate occurrence mode
     feedkeys("j^w") -- move to first 'line' on second line
-    feedkeys("go")
+    feedkeys("ga") -- add marks for 'line'; `ga` instead of `go` because `go` would toggle only the first mark
     feedkeys("cip")
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -379,7 +379,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
     -- Mark all 'foo' occurrences
     feedkeys("q")
@@ -421,7 +421,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
     -- Mark all 'foo' occurrences
     feedkeys("q")
@@ -455,7 +455,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
     -- Mark all 'foo' occurrences
     feedkeys("q")
@@ -492,7 +492,7 @@ describe("dot repeat functionality", function()
         },
       },
     })
-    vim.keymap.set("n", "q", "<Plug>(OccurrenceWord)", { buffer = bufnr })
+    vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
 
     -- Mark 'foo'
     feedkeys("q")

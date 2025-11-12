@@ -20,7 +20,7 @@ local config = {}
 -- If `false`, global keymaps, such as the default `go` to activate
 -- occurrence mode, or the default `o` to modify a pending operator,
 -- are not set, so activation keymaps must be set manually,
--- e.g., `vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceCurrent)")``
+-- e.g., `vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceMark)")``
 -- or `vim.keymap.set("o", "<C-o>", "<Plug>(OccurrenceModifyOperator)")`.
 --
 -- Additionally, when `false`, only keymaps explicitly defined in `keymaps`

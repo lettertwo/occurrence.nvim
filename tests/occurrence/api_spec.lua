@@ -1,6 +1,4 @@
 local assert = require("luassert")
-local match = require("luassert.match")
-local spy = require("luassert.spy")
 local util = require("tests.util")
 
 local api = require("occurrence.api")
@@ -19,45 +17,47 @@ describe("api", function()
     bufnr = nil
   end)
 
-  describe("word", function()
-    it("finds and marks all occurrences of word under cursor", function()
-      bufnr = util.buffer("foo bar baz foo")
+  describe("mark", function()
+    describe("word", function()
+      it("finds and marks all occurrences of word under cursor", function()
+        bufnr = util.buffer("foo bar baz foo")
 
-      local occurrence = Occurrence.get(bufnr)
+        local occurrence = Occurrence.get(bufnr)
 
-      api.word.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after word")
+        api.mark.callback(occurrence, Config.new())
+        assert.is_true(occurrence:has_matches(), "Should have matches after word")
 
-      local match_count = #vim.iter(occurrence:matches()):totable()
-      assert.equals(2, match_count, "Should find 2 'foo' occurrences")
+        local match_count = #vim.iter(occurrence:matches()):totable()
+        assert.equals(2, match_count, "Should find 2 'foo' occurrences")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(2, marked_count, "Should mark 2 'foo' occurrences")
-    end)
+        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(2, marked_count, "Should mark 2 'foo' occurrences")
+      end)
 
-    it("should only mark the new cursor word", function()
-      bufnr = util.buffer("foo bar baz foo")
+      it("should mark additional cursor word occurrences", function()
+        bufnr = util.buffer("foo bar baz foo, bar")
 
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
-      assert.is_true(occurrence:has_matches(), "Should have matches initially")
+        local occurrence = Occurrence.get(bufnr, "foo", "word")
+        assert.is_true(occurrence:has_matches(), "Should have matches initially")
 
-      local match_count = #vim.iter(occurrence:matches()):totable()
-      assert.equals(2, match_count, "Should have 2 'foo' occurrences initially")
+        local match_count = #vim.iter(occurrence:matches()):totable()
+        assert.equals(2, match_count, "Should have 2 'foo' occurrences initially")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(0, marked_count, "Should have 0 'foo' occurrences marked initially")
+        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(0, marked_count, "Should have 0 'foo' occurrences marked initially")
 
-      -- Move cursor to 'bar' and mark
-      vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
-      api.word.callback(occurrence, Config.new())
+        -- Move cursor to 'bar' and mark
+        vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
+        api.mark.callback(occurrence, Config.new())
 
-      assert.is_true(occurrence:has_matches(), "Should still have matches after word")
-      match_count = #vim.iter(occurrence:matches()):totable()
-      assert.equals(3, match_count, "Should find 1 additional 'bar' occurrence")
+        assert.is_true(occurrence:has_matches(), "Should still have matches after word")
+        match_count = #vim.iter(occurrence:matches()):totable()
+        assert.equals(4, match_count, "Should find 2 additional 'bar' occurrences")
 
-      -- Check that only 'bar' occurrences are marked
-      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(1, marked_count, "Should haveo only 1 'bar' occurrence marked")
+        -- Check that only the two 'bar' occurrences are marked
+        marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(2, marked_count, "Should have 2 'bar' occurrences marked")
+      end)
     end)
   end)
 
@@ -69,7 +69,7 @@ describe("api", function()
 
       local occurrence = Occurrence.get(bufnr)
 
-      api.selection.callback(occurrence, Config.new())
+      api.mark.callback(occurrence, Config.new())
       assert.is_true(occurrence:has_matches(), "Should have matches after selection")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
@@ -78,49 +78,27 @@ describe("api", function()
       local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 'bar' occurrences")
     end)
-  end)
 
-  describe("pattern", function()
-    it("finds and marks all occurrences of last search", function()
-      bufnr = util.buffer("foo bar baz foo")
-      vim.fn.setreg("/", [[\woo]])
+    describe("pattern", function()
+      it("finds and marks all occurrences of last search", function()
+        bufnr = util.buffer("foo bar baz foo")
 
-      local occurrence = Occurrence.get(bufnr)
+        vim.cmd([[silent! /\woo]])
 
-      api.pattern.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after pattern")
-      assert.is_same({ [[\woo]] }, occurrence.patterns, "Should use '\\woo' search pattern")
+        local occurrence = Occurrence.get(bufnr)
 
-      local match_count = #vim.iter(occurrence:matches()):totable()
-      assert.equals(2, match_count, "Should find 2 '\\woo' occurrences")
+        api.mark.callback(occurrence, Config.new())
+        assert.is_true(occurrence:has_matches(), "Should have matches after pattern")
+        assert.is_same({ [[\woo]] }, occurrence.patterns, "Should use '\\woo' search pattern")
 
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(2, marked_count, "Should mark 2 'foo' occurrences")
+        local match_count = #vim.iter(occurrence:matches()):totable()
+        assert.equals(2, match_count, "Should find 2 '\\woo' occurrences")
+
+        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(2, marked_count, "Should mark 2 'foo' occurrences")
+      end)
     end)
 
-    it("warns when no search pattern available", function()
-      -- mock vim.notify to capture warnings
-      local original_notify = vim.notify
-      vim.notify = spy.new(function() end)
-
-      vim.fn.setreg("/", "")
-
-      bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.get(bufnr)
-
-      api.pattern.callback(occurrence, Config.new())
-
-      assert
-        .spy(vim.notify)
-        .was_called_with(match.is_match("No search pattern available"), vim.log.levels.WARN, match._)
-      assert.is_false(occurrence:has_matches(), "Should have no matches when no search pattern")
-
-      -- restore original notify
-      vim.notify = original_notify
-    end)
-  end)
-
-  describe("current", function()
     it("it uses selection when active", function()
       vim.v.hlsearch = 1
       vim.fn.setreg("/", "bar")
@@ -131,8 +109,8 @@ describe("api", function()
       local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
 
-      api.current.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after current")
+      api.mark.callback(occurrence, Config.new())
+      assert.is_true(occurrence:has_matches(), "Should have matches after mark")
       assert.is_same({ [[\V\Cbaz]] }, occurrence.patterns, "Should use escaped 'baz' selection as pattern")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
@@ -148,9 +126,9 @@ describe("api", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local occurrence = Occurrence.get(bufnr)
-      api.current.callback(occurrence, Config.new())
+      api.mark.callback(occurrence, Config.new())
 
-      assert.is_true(occurrence:has_matches(), "Should have matches after current")
+      assert.is_true(occurrence:has_matches(), "Should have matches after mark")
       assert.is_same({ "bar" }, occurrence.patterns, "Should use 'bar' search pattern")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
@@ -167,8 +145,8 @@ describe("api", function()
 
       local occurrence = Occurrence.get(bufnr)
 
-      api.current.callback(occurrence, Config.new())
-      assert.is_true(occurrence:has_matches(), "Should have matches after current")
+      api.mark.callback(occurrence, Config.new())
+      assert.is_true(occurrence:has_matches(), "Should have matches after mark")
       assert.is_same({ [[\V\C\<foo\>]] }, occurrence.patterns, "Should use escaped '<foo>' cursor word as pattern")
 
       local match_count = #vim.iter(occurrence:matches()):totable()
@@ -176,37 +154,6 @@ describe("api", function()
 
       local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 'foo' occurrences")
-    end)
-  end)
-
-  describe("mark_all", function()
-    it("marks all occurrences", function()
-      bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
-      occurrence:add_pattern([[ba\w]])
-      api.mark_all.callback(occurrence, Config.new())
-
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(4, marked_count, "Should mark 2 'foo' and 2 ba\\w occurrences")
-    end)
-  end)
-
-  describe("unmark_all", function()
-    it("unmarks all occurrences", function()
-      bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
-      occurrence:add_pattern([[ba\w]])
-      api.mark_all.callback(occurrence, Config.new())
-
-      -- Verify they are marked
-      local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(4, marked_count, "Should mark 4 occurrences")
-
-      -- Then unmark all
-      api.unmark_all.callback(occurrence, Config.new())
-
-      marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(0, marked_count, "Should unmark all occurrences")
     end)
   end)
 
@@ -236,10 +183,10 @@ describe("api", function()
   describe("unmark", function()
     it("unmarks occurrence at cursor position", function()
       bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr)
 
       -- Mark both 'foo' occurrences
-      api.mark_all.callback(occurrence, Config.new())
+      api.mark.callback(occurrence, Config.new())
       local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 occurrences initially")
 
@@ -257,10 +204,10 @@ describe("api", function()
 
     it("unmarks the nearest occurrence if no occurrence at cursor", function()
       bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr)
 
       -- Mark both 'foo' occurrences
-      api.mark_all.callback(occurrence, Config.new())
+      api.mark.callback(occurrence, Config.new())
       local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 2 occurrences initially")
 
@@ -293,20 +240,19 @@ describe("api", function()
       assert.equals(0, marked_count, "Should unmark the one at cursor")
     end)
 
-    it("should add new cursor word marks", function()
+    it("should add single new cursor word marks", function()
       bufnr = util.buffer("foo bar baz foo bar")
 
       local occurrence = Occurrence.get(bufnr)
       assert.is_false(occurrence:has_matches())
       api.toggle.callback(occurrence, Config.new())
       local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(2, marked_count, "Should find and mark both 'foo' occurrences")
+      assert.equals(1, marked_count, "Should mark 1 'foo' occurrence")
 
-      -- Should find and mark all occurrences of 'bar'
       vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- Position at 'bar'
       api.toggle.callback(occurrence, Config.new())
       marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
-      assert.equals(4, marked_count, "Should find and mark both 'bar' occurrences")
+      assert.equals(2, marked_count, "Should mark 1 'bar' occurrence")
     end)
   end)
 

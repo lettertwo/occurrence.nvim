@@ -9,7 +9,7 @@ local _global_config = nil
 ---@type [string|string[], string, string, table][]
 local DEFAULT_GLOBAL_KEYMAPS = {
   -- Normal and visual mode default
-  { { "n", "v" }, "go", api.current.plug, { desc = api.current.desc } },
+  { { "n", "v" }, "go", api.mark.plug, { desc = api.mark.desc } },
   -- Operator-pending mode default
   { "o", "o", api.modify_operator.plug, { desc = api.modify_operator.desc } },
   -- TODO: support inner and around occurrence operator modifiers
@@ -18,55 +18,82 @@ local DEFAULT_GLOBAL_KEYMAPS = {
 }
 
 ---@class occurrence
--- Find occurrences of the word under the cursor, mark all matches,
--- and activate occurrence mode
----@field word fun(opts?: occurrence.Options): nil
--- Find occurrences of the current visual selection, mark all
--- matches, and activate occurrence mode
----@field selection fun(opts?: occurrence.Options): nil
--- Find occurrences of the last search pattern, mark all matches,
--- and activate occurrence mode
----@field pattern fun(opts?: occurrence.Options): nil
--- Smart entry action that adapts to the current context. In
--- visual mode: acts like `selection`. Otherwise, if `:h hlsearch`
--- is active: acts like `pattern`. Otherwise: acts like `word`.
--- Marks all matches and activates occurrence mode
----@field current fun(opts?: occurrence.Options): nil
--- Move to the next marked occurrence
----@field next fun(opts?: occurrence.Options): nil
--- Move to the previous marked occurrence
----@field previous fun(opts?: occurrence.Options): nil
--- Move to the next occurrence match, whether marked or unmarked
----@field match_next fun(opts?: occurrence.Options): nil
--- Move to the previous occurrence match, whether marked or unmarked
----@field match_previous fun(opts?: occurrence.Options): nil
--- Mark the occurrence match nearest to the cursor
----@field mark fun(opts?: occurrence.Options): nil
--- Unmark the occurrence match nearest to the cursor
----@field unmark fun(opts?: occurrence.Options): nil
--- Smart toggle action that activates occurrence mode or toggles
--- marks. In normal mode: If no patterns exist, acts like `word`
--- to start occurrence mode. Otherwise, toggles the mark on the
--- match under the cursor, or adds a new word pattern if not on a
--- match. In visual mode: If no patterns exist, acts like
--- `selection` to start occurrence mode. Otherwise, toggles marks
--- on all matches within the selection, or adds a new selection
--- pattern if no matches.
----@field toggle fun(opts?: occurrence.Options): nil
--- Mark all occurrence matches in the buffer
----@field mark_all fun(opts?: occurrence.Options): nil
--- Unmark all occurrence matches in the buffer
----@field unmark_all fun(opts?: occurrence.Options): nil
--- Mark all occurrence matches in the current visual selection
----@field mark_in_selection fun(opts?: occurrence.Options): nil
--- Unmark all occurrence matches in the current visual selection
----@field unmark_in_selection fun(opts?: occurrence.Options): nil
--- Clear all marks and patterns, and deactivate occurrence mode
----@field deactivate fun(opts?: occurrence.Options): nil
+--
 -- Modify a pending operator to act on occurrences of the word
 -- under the cursor. Only useful in operator-pending mode
 -- (e.g., `c`, `d`, etc.)
+--
+-- Once a pending operator is modified, the operator will act
+-- on occurrences within the range specified by the subsequent motion.
+--
+-- Note that this action does not activate occurrence mode,
+-- and it does not have any effect when occurrence mode is active,
+-- as operators already act on occurrences in that mode.
 ---@field modify_operator fun(opts?: occurrence.Options): nil
+--
+-- Mark one or more occurrences and activate occurrence mode.
+--
+-- If occurrence already has matches, mark matches based on:
+-- - In visual mode, if matches exist in the range of the visual
+--   selection, mark those matches.
+-- - Otherwise, if a match exists at the cursor, mark that match.
+--
+-- If no occurrence match exists to satisfy the above, add a new pattern based on:
+--   - In visual mode, mark occurrences of the visual selection.
+--   - If `:h hlsearch` is active, mark occurrences of the search pattern.
+--   - Otherwise, mark occurrences of the word under the cursor.
+---@field mark fun(opts?: occurrence.Options): nil
+--
+-- Unmark one or more occurrences.
+--
+-- If occurrence has matches, unmark matches based on:
+-- - In visual mode, unmark matches in the range of the visual selection.
+-- - Otherwise, if a match exists at the cursor, unmark that match.
+--
+-- If no match exists to satisfy the above, does nothing.
+---@field unmark fun(opts?: occurrence.Options): nil
+--
+-- Mark or unmark one (or more) occurrence(s) and activate occurrence mode.
+--
+-- If occurrence already has matches, toggle matches based on:
+-- - In visual mode, if matches exist in the range of the visual
+--   selection, toggle marks on those matches.
+-- - Otherwise, if a match exists at the cursor, toggle that mark.
+--
+-- If no occurrence match exists to satisfy the above, add a new pattern based on:
+--   - In visual mode, mark the closest occurrence of the visual selection.
+--   - If `:h hlsearch` is active, mark the closest occurrence of the search pattern.
+--   - Otherwise, mark the closest occurrence of the word under the cursor.
+---@field toggle fun(opts?: occurrence.Options): nil
+--
+-- Move to the next marked occurrence and activate occurrence mode.
+--
+-- If occurrence has no matches, acts like `mark`
+-- and then moves to the next marked occurrence.
+---@field next fun(opts?: occurrence.Options): nil
+--
+-- Move to the previous marked occurrence and activate occurrence mode.
+--
+-- If occurrence has no matches, acts like `mark`
+-- and then moves to the previous marked occurrence.
+---@field previous fun(opts?: occurrence.Options): nil
+--
+-- Move to the next occurrence match, whether marked or unmarked,
+-- and activate occurrence mode.
+--
+-- If occurrence has no matches, acts like `mark`
+-- and then moves to the next occurrence match.
+---@field match_next fun(opts?: occurrence.Options): nil
+--
+-- Move to the previous occurrence match, whether marked or unmarked,
+-- and activate occurrence mode.
+--
+-- If occurrence has no matches, acts like `mark`
+-- and then moves to the previous occurrence match.
+---@field match_previous fun(opts?: occurrence.Options): nil
+--
+-- Clear all marks and patterns, and deactivate occurrence mode.
+---@field deactivate fun(opts?: occurrence.Options): nil
 local occurrence = {}
 
 -- Generate public API functions and commands for all api functions and
@@ -167,15 +194,6 @@ function occurrence.setup(opts)
       for _, keymap in ipairs(DEFAULT_GLOBAL_KEYMAPS) do
         vim.keymap.set(unpack(keymap))
       end
-
-      -- Normal and visual mode default
-      vim.keymap.set({ "n", "v" }, "go", api.current.plug, {
-        desc = api.current.desc,
-      })
-      -- Operator-pending mode default
-      vim.keymap.set("o", "o", api.modify_operator.plug, {
-        desc = api.modify_operator.desc,
-      })
     end
 
     -- Create the main Occurrence command with subcommands

@@ -523,6 +523,7 @@ end
 -- If the pattern was already added, this is a no-op.
 ---@param text string
 ---@param pattern_type? occurrence.PatternType The type of occurrence matching to use. Default is 'pattern'.
+---@return string pattern The added pattern
 function Occurrence:add_pattern(text, pattern_type)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
   local pattern = text:gsub("\n", "\\n")
@@ -534,7 +535,7 @@ function Occurrence:add_pattern(text, pattern_type)
 
   for _, existing in ipairs(self.patterns) do
     if existing == pattern then
-      return
+      return pattern
     end
   end
 
@@ -542,6 +543,118 @@ function Occurrence:add_pattern(text, pattern_type)
   for match in self:matches(nil, pattern) do
     self.extmarks:add(match)
   end
+  return pattern
+end
+
+-- Add a pattern for the current visual selection.
+-- If `mark` is `true`, all occurrences of the selection will be marked.
+-- Returns `true` if a new pattern was added, `false` otherwise.
+-- If no visual selection exists, or if the visual selection is empty,
+-- logs a warning and returns `false`.
+--
+-- Clears the visual selection after adding the pattern.
+--
+---@param mark? boolean Whether to mark all occurrences of the selection.
+---@return boolean success Whether a new pattern was added.
+function Occurrence:of_selection(mark)
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
+
+  local range = Range.of_selection()
+  if not range then
+    log.warn("No visual selection")
+    return false
+  end
+
+  local text = table.concat(
+    vim.api.nvim_buf_get_text(self.buffer, range.start.line, range.start.col, range.stop.line, range.stop.col, {}),
+    "\n"
+  )
+  if text == "" then
+    log.warn("Empty visual selection")
+    return false
+  end
+
+  local pattern = self:add_pattern(text, "selection")
+
+  -- Clear visual selection
+  feedkeys.change_mode("n", { noflush = true, silent = true })
+
+  if mark then
+    -- mark all occurrences of the newest pattern
+    for match in self:matches(nil, pattern) do
+      self:mark(match)
+    end
+  end
+
+  return true
+end
+
+-- Add the last search pattern.
+-- If `mark` is `true`, all occurrences of the pattern will be marked.
+-- Returns `true` if a new pattern was added, `false` otherwise.
+-- If no last search pattern exists, logs a warning and returns `false`.
+--
+-- Clears the search highlight after adding the pattern.
+--
+---@param mark? boolean Whether to mark all occurrences of the pattern.
+---@return boolean success Whether a new pattern was added.
+function Occurrence:of_pattern(mark)
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
+
+  local search_pattern = vim.fn.getreg("/")
+
+  if search_pattern == "" then
+    log.warn("No search pattern available")
+    return false
+  end
+
+  local pattern = self:add_pattern(search_pattern, "pattern")
+
+  -- Clear search highlight
+  vim.cmd.nohlsearch()
+
+  if mark then
+    -- mark all occurrences of the newest pattern
+    for match in self:matches(nil, pattern) do
+      self:mark(match)
+    end
+  end
+
+  return true
+end
+
+-- Add a pattern for the word under the cursor.
+-- If `mark` is `true`, all occurrences of the word will be marked.
+-- Returns `true` if a new pattern was added, `false` otherwise.
+-- If no word exists under the cursor, logs a warning and returns `false`.
+---@param mark? boolean Whether to mark all occurrences of the word.
+---@return boolean success Whether a new pattern was added.
+function Occurrence:of_word(mark)
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
+
+  local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
+
+  if word == "" then
+    log.warn("No word under cursor")
+    return false
+  end
+
+  local pattern = self:add_pattern(word, "word")
+
+  if mark then
+    -- mark all occurrences of the newest pattern
+    for match in self:matches(nil, pattern) do
+      self:mark(match)
+    end
+  end
+
+  return true
+end
+
+-- Whether occurrence mode is currently active for this occurrence.
+---@return boolean
+function Occurrence:is_active()
+  return not self:is_disposed() and self.keymap:is_active()
 end
 
 function Occurrence:clear()

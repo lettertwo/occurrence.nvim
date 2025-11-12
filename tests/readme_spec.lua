@@ -41,8 +41,8 @@ describe("README examples", function()
           map("n", "q", "<Plug>(OccurrenceDeactivate)")
         end,
       })
-      vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceCurrent)")
-      vim.keymap.set("v", "<C-o>", "<cmd>Occurrence selection<CR>")
+      vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceMark)")
+      vim.keymap.set("v", "<C-o>", "<cmd>Occurrence toggle<CR>")
       vim.keymap.set("o", "<C-o>", function()
         require("occurrence").modify_operator()
       end)
@@ -50,7 +50,7 @@ describe("README examples", function()
       local mappings = vim.api.nvim_get_keymap("n")
       local has_leader_o = false
       for _, map in ipairs(mappings) do
-        if map.lhs == "\\o" and map.rhs == "<Plug>(OccurrenceCurrent)" then
+        if map.lhs == "\\o" and map.rhs == "<Plug>(OccurrenceMark)" then
           has_leader_o = true
         end
       end
@@ -59,7 +59,7 @@ describe("README examples", function()
       mappings = vim.api.nvim_get_keymap("v")
       local has_ctrl_o_v = false
       for _, map in ipairs(mappings) do
-        if map.lhs == "<C-O>" and map.rhs == "<Cmd>Occurrence selection<CR>" then
+        if map.lhs == "<C-O>" and map.rhs == "<Cmd>Occurrence toggle<CR>" then
           has_ctrl_o_v = true
         end
       end
@@ -84,7 +84,7 @@ describe("README examples", function()
 
       feedkeys("ggv2w<C-o>")
       marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
-      assert.equals(2, #marks, "Two occurrences of the visual selection should be marked")
+      assert.equals(1, #marks, "Only the first occurrence of the visual selection should be marked")
 
       feedkeys("q")
       marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
@@ -140,14 +140,14 @@ describe("README examples", function()
       })
 
       -- Set up custom keymaps using <Plug> mappings
-      vim.keymap.set({ "n", "v" }, "<leader>o", "<Plug>(OccurrenceCurrent)")
+      vim.keymap.set({ "n", "v" }, "<leader>o", "<Plug>(OccurrenceMark)")
 
       -- Verify keymaps are set
       local mappings = vim.api.nvim_get_keymap("n")
       local has_leader_o = false
       for _, map in ipairs(mappings) do
         -- Default <leader> is "\"
-        if map.lhs == "\\o" and map.rhs == "<Plug>(OccurrenceCurrent)" then
+        if map.lhs == "\\o" and map.rhs == "<Plug>(OccurrenceMark)" then
           has_leader_o = true
         end
       end
@@ -663,7 +663,7 @@ describe("README examples", function()
       -- Place cursor on first "foo" on line 1
       vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
-      -- mark "foo" occurrences
+      -- mark "foo" occurrences and enter occurrence mode
       feedkeys("go")
 
       -- Verify "foo" marks
@@ -672,7 +672,7 @@ describe("README examples", function()
 
       -- Move to "bar" and mark it too
       vim.api.nvim_win_set_cursor(0, { 1, 18 }) -- Move to middle of "bar"
-      feedkeys("go") -- This adds all "bar" occurrences as a new pattern
+      feedkeys("ga") -- This adds all "bar" occurrences as a new pattern
 
       -- Verify both "foo" and "bar" marks
       marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
