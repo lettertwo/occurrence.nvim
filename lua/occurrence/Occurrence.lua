@@ -666,6 +666,8 @@ end
 ---@param config occurrence.Config
 ---@param operator_key? string If nil, modifies the pending operator.
 function Occurrence:modify_operator(config, operator_key)
+  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
+
   local count, register = vim.v.count, vim.v.register
   operator_key = operator_key or vim.v.operator
 
@@ -805,6 +807,11 @@ function Occurrence:apply(config, action)
       ---@cast action_config occurrence.OperatorModifierConfig
       if self.keymap:is_active() then
         log.debug("Operator modifier skipped; occurrence mode is active!")
+        return
+      end
+
+      if not vim.api.nvim_get_mode().mode:match("o") then
+        log.error("modify_operator can only be called in operator-pending mode")
         return
       end
 

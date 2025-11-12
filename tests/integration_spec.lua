@@ -431,6 +431,27 @@ describe("integration tests", function()
       assert.equals(0, #marks, "No 'foo' occurrences should be marked")
     end)
 
+    it("warns when trying to modify operator outside of operator-pending mode", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({})
+
+      vim.keymap.set("n", "q", "<cmd>Occurrence modify_operator<CR>", { buffer = bufnr })
+
+      -- Simulate pressing 'q' in normal mode (not operator-pending)
+      feedkeys("q")
+
+      vim.wait(0) -- The operator-modifier action is async.
+
+      assert
+        .spy(notify_stub)
+        .was_called_with(match.has_match("pending mode"), vim.log.levels.ERROR, { title = "Occurrence" })
+
+      -- There should be no marks since we were not in operator-pending mode.
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(0, #marks, "No 'foo' occurrences should be marked")
+    end)
+
     it("modifies operator supported via direct_api method", function()
       bufnr = util.buffer("foo bar baz foo")
 
