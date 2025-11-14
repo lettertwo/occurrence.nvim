@@ -287,6 +287,20 @@ function Extmarks:iter(range)
   return self.marks:iter(range)
 end
 
+---@param range? occurrence.Range
+---@param count? integer
+---@return [number, occurrence.Range][]
+function Extmarks:collect(range, count)
+  local marks = vim.iter(vim.iter(self:iter(range)):fold({}, function(acc, id, edit)
+    table.insert(acc, { id, edit })
+    return acc
+  end))
+  if count and count > 0 then
+    marks = marks:take(count)
+  end
+  return marks:totable()
+end
+
 -- Clear the current occurrence highlight.
 function Extmarks:clear_current()
   assert(not self:is_disposed(), "Cannot use a disposed Extmarks")

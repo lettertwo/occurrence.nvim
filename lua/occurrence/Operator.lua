@@ -27,28 +27,6 @@ local log = require("occurrence.log")
 ---@field method "direct_api"
 ---@field replacement? string | string[] | occurrence.ReplacementFunction Text to replace the occurrence with, or a function that returns the replacement text.
 
--- Function to be used as a callback for an operator action.
--- It will receive the following arguments:
--- - The `occurrence` for the current buffer.
--- - The `operator_name` (e.g. "d", "y", etc). If `nil`, it will be taken from `vim.v.operator`.
--- - The `range` of motion (e.g. "daw", "y$", etc). If `nil`, the full buffer range will be used.
--- - The `count` (e.g. "2d", "3y", etc). If `nil`, all occurrences in the `range` will be used.
--- - The `register` (e.g. '"*d', '"ay', etc). If `nil`, the default register will be used.
--- - The `register_type` (e.g. "v", "V", etc). If `nil`, it will be inferred from the text yanked to the register.
----@alias occurrence.OperatorCallback fun(occurrence: occurrence.Occurrence, operator_name?: string, range?: occurrence.Range, count?: integer, register?: string, register_type?: string): nil
-
----@class (exact) occurrence.OperatorBase
----@field desc string
----@field callback occurrence.OperatorCallback
----@field uses_register boolean
----@field modifies_text boolean
-
----@class (exact) occurrence.VisualFeedkeysOperator: occurrence.OperatorBase
----@field method "visual_feedkeys"
-
----@class (exact) occurrence.CommandOperator: occurrence.OperatorBase
----@field method "command"
-
 ---@class occurrence.ReplacementContext
 ---@field location occurrence.Location
 ---@field total_count integer
@@ -58,10 +36,6 @@ local log = require("occurrence.log")
 -- Function to generate replacement text for direct_api method.
 -- If nil is returned on any n + 1 edits, the first edit replacement value is reused.
 ---@alias occurrence.ReplacementFunction fun(text?: string | string[], ctx: occurrence.ReplacementContext, index: integer): string | string[] | false | nil
-
----@class (exact) occurrence.DirectApiOperator: occurrence.OperatorBase
----@field method "direct_api"
----@field replacement? string | string[] | occurrence.ReplacementFunction
 
 ---@param candidate any
 ---@return boolean
@@ -131,69 +105,33 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
     log.debug("range:", range)
   end
 
-  local marks = vim.iter(vim.iter(occurrence.extmarks:iter(range)):fold({}, function(acc, id, edit)
-    table.insert(acc, { id, edit })
-    return acc
-  end))
-
-  if count and count > 0 then
-    log.debug("count:", count)
-    marks = marks:take(count)
-  end
-
-  if config.modifies_text then
-    log.debug("reversing edits for text modification")
-    marks = marks:rev()
-  end
-
   -- Initialize register if needed
   local reg = config.uses_register and Register.new(register, register_type) or nil
 
   local original_cursor = Cursor.save()
 
-  local edited = 0
-
   -- Cache for replacement values when using a function
   local cached_replacement = nil
 
-  marks = marks:totable()
+  local result = nil
 
-  log.debug("edits found:" .. #marks)
+  -- Apply the operation based on method
+  if config.method == "direct_api" then
+    if config.modifies_text then
+      result = occurrence:replace(function(i, text, _, edit, ctx)
+        -- Save to register if needed
+        if reg ~= nil and text ~= nil then
+          reg:add(text)
+        end
 
-  -- Apply operation to all occurrences
-  for i = 1, #marks do
-    local mark, edit = unpack(marks[i])
-    -- Create single undo block for all edits
-    if config.modifies_text and edited > 0 then
-      vim.cmd("silent! undojoin")
-    end
-
-    Cursor.move(edit.start)
-
-    -- Get text for register/processing
-    local text = nil
-    if config.uses_register or config.modifies_text or config.method == "direct_api" then
-      text =
-        vim.api.nvim_buf_get_text(occurrence.buffer, edit.start.line, edit.start.col, edit.stop.line, edit.stop.col, {})
-    end
-
-    -- Save to register if needed
-    if reg ~= nil and text ~= nil then
-      reg:add(text)
-    end
-
-    -- Apply the operation based on method
-    if config.method == "direct_api" then
-      if config.modifies_text then
         local replacement
         if type(config.replacement) == "function" then
-          local ctx = {
-            location = edit,
+          replacement = config.replacement(text, {
+            location = edit.start,
             register = register,
             register_type = register_type,
-            total_count = #marks,
-          }
-          replacement = config.replacement(text, ctx, i)
+            total_count = #ctx.marks,
+          }, i)
         else
           replacement = config.replacement
         end
@@ -204,15 +142,6 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
           return false
         end
 
-        if type(replacement) == "string" then
-          -- Split on newlines if present (e.g., from multi-line register content)
-          if replacement:find("\n") then
-            replacement = vim.split(replacement, "\n", { plain = true })
-          else
-            replacement = { replacement }
-          end
-        end
-
         replacement = replacement or cached_replacement or {}
         ---@cast replacement string[]
 
@@ -220,47 +149,35 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
           cached_replacement = replacement
         end
 
-        occurrence.extmarks:unmark(mark)
-        vim.api.nvim_buf_set_text(
-          occurrence.buffer,
-          edit.start.line,
-          edit.start.col,
-          edit.stop.line,
-          edit.stop.col,
-          replacement
-        )
-        edited = edited + 1
-      else
-        -- NOTE: at this point, "direct_api" that does not modify text is a no-op.
-        -- If it "uses_register", the text has already been yanked to the register.
-        -- Maybe we will want to support processing the text in some way in the future,
-        -- but that likely means rethinking "direct_api" with a replacement function as
-        -- something more general.
-        occurrence.extmarks:unmark(mark)
-        edited = edited + 1
-      end
-    elseif config.method == "command" then
-      local start_line, stop_line = edit.start.line + 1, edit.stop.line + 1
-      log.debug("execuing command: ", string.format("%d,%d%s", start_line, stop_line, operator_name))
-      occurrence.extmarks:unmark(mark)
-      vim.cmd(string.format("%d,%d%s", start_line, stop_line, operator_name))
-      edited = edited + 1
-    elseif config.method == "visual_feedkeys" then
-      -- Clear any visual selection before (re-)entering visual mode
-      feedkeys.change_mode("v", { force = true, silent = true })
-      Cursor.move(edit.stop)
-      occurrence.extmarks:unmark(mark)
-      log.debug("executing nvim_feedkeys:", operator_name)
-      feedkeys(operator_name, { noremap = true })
-      edited = edited + 1
+        return replacement
+      end, range, count)
     else
-      ---@diagnostic disable-next-line: undefined-field
-      error("Unknown operator method: " .. tostring(config.method))
+      occurrence:each(function(i, text, _, edit, ctx)
+        -- Save to register if needed
+        if reg ~= nil and text ~= nil then
+          reg:add(text)
+        end
+
+        if type(config.replacement) == "function" then
+          config.replacement(text, {
+            location = edit.start,
+            register = register,
+            register_type = register_type,
+            total_count = #ctx.marks,
+          }, i)
+        end
+      end, range, count)
     end
+  elseif config.method == "command" then
+    result = occurrence:execute(operator_name, range, count)
+  elseif config.method == "visual_feedkeys" then
+    result = occurrence:feedkeys(operator_name, range, count)
+  else
+    ---@diagnostic disable-next-line: undefined-field
+    error("Unknown operator method: " .. tostring(config.method))
   end
 
-  if edited == 0 then
-    log.debug("No occurrences to apply operator", operator_name)
+  if result == false then
     return false
   end
 
@@ -268,9 +185,6 @@ local function apply_operator(occurrence, config, operator_name, range, count, r
   if reg then
     reg:save()
   end
-
-  original_cursor:restore()
-  log.debug("Applied operator", operator_name, "to", edited, "occurrences. Method: ", config.method)
 end
 
 -- Register an `:h opfunc` that will apply an operator to occurrences within a range of motion,

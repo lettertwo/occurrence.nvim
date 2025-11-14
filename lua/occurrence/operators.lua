@@ -138,9 +138,7 @@ local distribute = {
     end
 
     -- Distribute lines cyclically across occurrences.
-    -- Since occurrences are processed in reverse order (for text modifications),
-    -- we need to compute the forward index to maintain correct distribution order.
-    local line_index = ((ctx.total_count - index) % #reg) + 1
+    local line_index = ((index - 1) % #reg) + 1
     return reg[line_index]
   end,
 }

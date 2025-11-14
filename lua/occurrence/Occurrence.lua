@@ -910,6 +910,140 @@ function Occurrence:apply_operator(operator_name, motion, motion_type)
   end
 end
 
+---@class occurrence.EachContext
+---@field occurrence occurrence.Occurrence
+---@field marks [number, occurrence.Range][]
+
+---@param callback fun(index: number, text: string[], mark: number, range: occurrence.Range, ctx: occurrence.EachContext): nil
+---@param range? occurrence.Range
+---@param count? integer
+function Occurrence:each(callback, range, count)
+  local marks = self.extmarks:collect(range, count)
+  log.debug("marks found:" .. #marks)
+  local ctx = { occurrence = self, marks = marks }
+  for i = 1, #marks do
+    local id, mark = unpack(marks[i])
+    local text =
+      vim.api.nvim_buf_get_text(self.buffer, mark.start.line, mark.start.col, mark.stop.line, mark.stop.col, {})
+    callback(i, text, id, mark, ctx)
+  end
+end
+
+---@param callback fun(index: number, text: string[], id: number, range: occurrence.Range, ctx: occurrence.EachContext): string | string[] | false
+---@param range? occurrence.Range
+---@param count? integer
+function Occurrence:replace(callback, range, count)
+  local edits = {}
+  local edited = 0
+
+  -- Collect edits in traversal order
+  self:each(function(index, text, mark, edit, ctx)
+    local replacement = callback(index, text, mark, edit, ctx)
+    if replacement and replacement ~= false then
+      if type(replacement) == "string" then
+        -- Split on newlines if present (e.g., from multi-line register content)
+        if replacement:find("\n") then
+          replacement = vim.split(replacement, "\n", { plain = true })
+        else
+          replacement = { replacement }
+        end
+      end
+      table.insert(edits, { mark, edit, replacement })
+    end
+  end, range, count)
+
+  log.debug("edits found:" .. #edits)
+
+  -- Apply edits in reverse order
+  for i = #edits, 1, -1 do
+    local id, mark, new_text = unpack(edits[i])
+    -- Create single undo block for all edits
+    if edited > 0 then
+      vim.cmd("silent! undojoin")
+    end
+    vim.api.nvim_buf_set_text(self.buffer, mark.start.line, mark.start.col, mark.stop.line, mark.stop.col, new_text)
+    self.extmarks:unmark(id)
+    edited = edited + 1
+  end
+
+  if edited == 0 then
+    log.debug("No marks in range")
+    return false
+  else
+    log.debug("Replaced", edited, "marks")
+  end
+end
+
+---@param command string
+---@param range? occurrence.Range
+---@param count? integer
+function Occurrence:execute(command, range, count)
+  local marks = self.extmarks:collect(range, count)
+  local executed = 0
+  log.debug("marks found:" .. #marks)
+
+  -- Execute command for each mark in reverse order
+  for i = #marks, 1, -1 do
+    local id, mark = unpack(marks[i])
+    -- Create single undo block for all edits
+    if executed > 0 then
+      vim.cmd("silent! undojoin")
+    end
+
+    local start_line, stop_line = mark.start.line + 1, mark.stop.line + 1
+    log.debug("executing command: ", string.format("%d,%d%s", start_line, stop_line, command))
+    self.extmarks:unmark(id)
+    vim.cmd(string.format("%d,%d%s", start_line, stop_line, command))
+
+    executed = executed + 1
+  end
+
+  if executed == 0 then
+    log.debug("No marks to execute command", command)
+    return false
+  else
+    log.debug("Executed command", command, "on", executed, "marks")
+  end
+end
+
+---@param keys string
+---@param range? occurrence.Range
+---@param count? integer
+function Occurrence:feedkeys(keys, range, count)
+  local marks = self.extmarks:collect(range, count)
+  local original_cursor = Cursor.save()
+  local edited = 0
+  log.debug("marks found:" .. #marks)
+
+  -- Visually select and feedkeys for each mark in reverse order
+  for i = #marks, 1, -1 do
+    local id, mark = unpack(marks[i])
+    -- Create single undo block for all edits
+    if edited > 0 then
+      vim.cmd("silent! undojoin")
+    end
+
+    Cursor.move(mark.start)
+    -- Clear any visual selection before (re-)entering visual mode
+    feedkeys.change_mode("v", { force = true, silent = true })
+    Cursor.move(mark.stop)
+    self.extmarks:unmark(id)
+    log.debug("executing nvim_feedkeys:", keys)
+    feedkeys(keys, { noremap = true })
+
+    edited = edited + 1
+  end
+
+  original_cursor:restore()
+
+  if edited == 0 then
+    log.debug("No marks to execute feedkeys", keys)
+    return false
+  else
+    log.debug("Executed feedkeys", keys, "on", edited, "marks")
+  end
+end
+
 -- Get or create an Occurrence for the given buffer and text.
 -- If no `buffer` is provided, the current buffer will be used.
 -- If a `text` pattern is provided, it will be added to the active occurrence patterns.
