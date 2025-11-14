@@ -750,7 +750,7 @@ function Occurrence:activate_occurrence_mode(config)
       elseif action_config.callback then
         -- Fall back to direct callback
         self.keymap:set(mode, action_key, function()
-          self:apply(config, action_config)
+          self:apply(action_config, config)
         end, { desc = desc })
       else
         -- No plug or callback defined
@@ -787,9 +787,9 @@ end
 -- In all cases, the action callback will receive this `Occurrence` and the `config` as arguments,
 -- and if it returns `false`, any followup behavior (as with "occurrence-mode" and "operator-modifier" types)
 -- will be skipped, and this occurrence will be disposed.
----@param config occurrence.Config
 ---@param action occurrence.KeymapAction | occurrence.ApiConfig | occurrence.KeymapConfig | occurrence.KeymapCallback
-function Occurrence:apply(config, action)
+---@param config occurrence.Config
+function Occurrence:apply(action, config)
   local callback = nil
   local action_config = nil
 
