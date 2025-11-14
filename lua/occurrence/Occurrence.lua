@@ -524,7 +524,7 @@ end
 ---@param range? occurrence.Range
 ---@return fun(): occurrence.Range? next_mark
 function Occurrence:marks(range)
-  local next_extmark = self.extmarks:iter()
+  local next_extmark = self.extmarks:iter(range)
   local function next_mark()
     local _, mark = next_extmark()
     return mark
