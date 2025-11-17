@@ -286,8 +286,8 @@ describe("api", function()
 
       -- Check that all exported functions have @field annotations
       local missing = {}
-      for name in pairs(api) do
-        if not annotated_fields[name] then
+      for name, config in pairs(api) do
+        if not config.operator and not annotated_fields[name] then
           table.insert(missing, name)
         end
       end

@@ -24,16 +24,16 @@ describe("dot repeat functionality", function()
     notify_stub:revert()
   end)
 
-  it("repeats direct_api operator on marked occurrences", function()
+  it("repeats replacement operator on marked occurrences", function()
     bufnr = util.buffer({ "foo bar foo baz", "foo test foo end" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         d = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "",
+          operator = function()
+            return ""
+          end,
         },
       },
     })
@@ -65,15 +65,17 @@ describe("dot repeat functionality", function()
     assert.same({}, marks, "All marks should be cleared after second operation")
   end)
 
-  it("repeats visual_feedkeys operator on marked occurrences", function()
+  it("repeats operator keys on marked occurrences", function()
     bufnr = util.buffer({ "foo bar foo baz", "foo test foo end" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         ["gU"] = {
-          method = "visual_feedkeys",
-          uses_register = false,
-          modifies_text = true,
+          operator = "gU",
+        },
+        [">"] = {
+          operator = ">>",
         },
       },
     })
@@ -94,51 +96,35 @@ describe("dot repeat functionality", function()
 
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ "FOO bar FOO baz", "FOO test FOO end" }, lines, "Second line 'foo' should be uppercased")
-  end)
 
-  it("repeats command method operator on marked occurrences", function()
-    bufnr = util.buffer({ "  foo indented", "  foo also indented" })
-
-    plugin.setup({
-      operators = {
-        ["<"] = {
-          method = "command",
-          uses_register = false,
-          modifies_text = true,
-        },
-      },
-    })
-    vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
-
-    -- Mark 'foo'
+    -- Mark all 'FOO' occurrences
     feedkeys("q")
 
     -- Indent left
-    feedkeys("<$")
+    feedkeys(">$")
 
-    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "foo indented", "  foo also indented" }, lines, "first 'foo' line should be indented left")
+    lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    assert.same({ "FOO bar FOO baz", "		FOO test FOO end" }, lines, "Second line 'FOO' should be indented left")
 
-    -- Move to 'bar' and mark it
-    feedkeys("j")
-
-    -- Repeat indent left operation
+    -- Move to top line and repeat
+    feedkeys("k")
     feedkeys(".")
 
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "foo indented", "foo also indented" }, lines, "second 'foo' line should be indented left")
+    assert.same({ "	FOO bar FOO baz", "		FOO test FOO end" }, lines, "First line 'FOO' should be indented left")
   end)
 
   it("repeats modified operator with count", function()
     bufnr = util.buffer({ "foo bar foo baz foo bar end foo bar" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         d = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "",
+          mode = "o",
+          operator = function()
+            return ""
+          end,
         },
       },
     })
@@ -183,12 +169,12 @@ describe("dot repeat functionality", function()
     })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         c = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "abc",
+          operator = function()
+            return "abc"
+          end,
         },
       },
     })
@@ -244,12 +230,12 @@ describe("dot repeat functionality", function()
     })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         c = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "abc",
+          operator = function()
+            return "abc"
+          end,
         },
       },
     })
@@ -294,12 +280,12 @@ describe("dot repeat functionality", function()
     bufnr = util.buffer({ "foo bar foo baz foo bar end foo bar" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         d = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "",
+          operator = function()
+            return ""
+          end,
         },
       },
     })
@@ -331,12 +317,12 @@ describe("dot repeat functionality", function()
     bufnr = util.buffer({ "foo bar foo baz foo bar end foo bar" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         d = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "",
+          operator = function()
+            return ""
+          end,
         },
       },
     })
@@ -370,12 +356,12 @@ describe("dot repeat functionality", function()
     bufnr = util.buffer({ "foo bar foo baz", "foo test foo end", "foo start foo mid foo end" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         d = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "",
+          operator = function()
+            return ""
+          end,
         },
       },
     })
@@ -412,12 +398,12 @@ describe("dot repeat functionality", function()
     bufnr = util.buffer({ "foo bar foo baz", "foo test foo end" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
-        d = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "",
+        delete = {
+          operator = function()
+            return ""
+          end,
         },
       },
     })
@@ -429,7 +415,7 @@ describe("dot repeat functionality", function()
     -- Programmatically invoke the operator on marked occurrences on the current line
     local occ = require("occurrence.Occurrence").get()
     local range = require("occurrence.Range").of_line()
-    occ:apply_operator("d", range, "line")
+    occ:apply_operator("delete", { motion = range, motion_type = "line" })
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ " bar  baz", "foo test foo end" }, lines, "'foo' occurrences on the first line should be deleted")
@@ -446,12 +432,12 @@ describe("dot repeat functionality", function()
     bufnr = util.buffer({ "foo bar foo baz", "foo test foo end" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         d = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "",
+          operator = function()
+            return ""
+          end,
         },
       },
     })
@@ -483,12 +469,12 @@ describe("dot repeat functionality", function()
     bufnr = util.buffer({ "foo bar foo baz", "test foo test end" })
 
     plugin.setup({
+      default_operators = false,
       operators = {
         d = {
-          method = "direct_api",
-          uses_register = true,
-          modifies_text = true,
-          replacement = "",
+          operator = function()
+            return ""
+          end,
         },
       },
     })

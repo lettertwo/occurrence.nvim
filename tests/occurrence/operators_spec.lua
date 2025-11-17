@@ -3,11 +3,18 @@ local stub = require("luassert.stub")
 local util = require("tests.util")
 
 local Config = require("occurrence.Config")
-local Operator = require("occurrence.Operator")
+local Location = require("occurrence.Location")
 local Occurrence = require("occurrence.Occurrence")
+local Range = require("occurrence.Range")
 
 describe("operators", function()
   local bufnr
+
+  before_each(function()
+    vim.o.expandtab = true
+    vim.o.tabstop = 2
+    vim.o.shiftwidth = 2
+  end)
 
   after_each(function()
     if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
@@ -33,8 +40,7 @@ describe("operators", function()
       assert.same({ "foo bar foo", "baz foo bar" }, initial_lines)
 
       -- Apply delete operator
-      local operator_config = assert(Config.new():get_operator_config("delete"))
-      Operator.apply(occurrence, operator_config, "d", nil, nil, '"')
+      occurrence:apply_operator("delete", { motion = Range.of_buffer() })
 
       -- Check that 'foo' occurrences were deleted
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -52,8 +58,7 @@ describe("operators", function()
       end
 
       -- Apply delete operator to default register
-      local operator_config = assert(Config.new():get_operator_config("delete"))
-      Operator.apply(occurrence, operator_config, "d", nil, nil, '"')
+      occurrence:apply_operator("delete", { motion = Range.of_buffer() })
 
       -- Check register content
       local register_content = vim.fn.getreg('"')
@@ -71,8 +76,7 @@ describe("operators", function()
       end
 
       -- Apply delete operator to register 'a'
-      local operator_config = assert(Config.new():get_operator_config("delete"))
-      Operator.apply(occurrence, operator_config, "d", nil, nil, "a")
+      occurrence:apply_operator("delete", { motion = Range.of_buffer(), register = "a" })
 
       -- Check register content
       local register_content = vim.fn.getreg("a")
@@ -95,8 +99,7 @@ describe("operators", function()
       assert.same({ "foo bar foo", "baz foo bar" }, initial_lines)
 
       -- Apply yank operator
-      local operator_config = assert(Config.new():get_operator_config("yank"))
-      Operator.apply(occurrence, operator_config, "y", nil, nil, '"')
+      occurrence:apply_operator("yank", { motion = Range.of_buffer() })
 
       -- Check that text was not modified
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -114,8 +117,7 @@ describe("operators", function()
       end
 
       -- Apply yank operator
-      local operator_config = assert(Config.new():get_operator_config("yank"))
-      Operator.apply(occurrence, operator_config, "y", nil, nil, '"')
+      occurrence:apply_operator("yank", { motion = Range.of_buffer(), register = '"' })
 
       -- Check register content
       local register_content = vim.fn.getreg('"')
@@ -132,8 +134,7 @@ describe("operators", function()
       end
 
       -- Apply yank operator
-      local operator_config = assert(Config.new():get_operator_config("yank"))
-      Operator.apply(occurrence, operator_config, "y", nil, nil, '"')
+      occurrence:apply_operator("yank", { motion = Range.of_buffer(), register = '"' })
 
       -- Check register content (multiple foo's concatenated)
       local register_content = vim.fn.getreg('"')
@@ -151,8 +152,7 @@ describe("operators", function()
       vim.fn.setreg("a", "inserted")
 
       -- Apply put operator using register 'a'
-      local operator_config = assert(Config.new():get_operator_config("put"))
-      Operator.apply(occurrence, operator_config, "p", nil, nil, "a")
+      occurrence:apply_operator("put", { motion = Range.of_buffer(), register = "a" })
 
       -- Check that all 'foo' occurrences were replaced with "inserted"
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -174,8 +174,7 @@ describe("operators", function()
 
       -- Should not error
       assert.has_no.errors(function()
-        local operator_config = assert(Config.new():get_operator_config("put"))
-        Operator.apply(occurrence, operator_config, "p", nil, nil, "a")
+        occurrence:apply_operator("put", { motion = Range.of_buffer(), register = "a" })
       end)
 
       -- Check that the occurrence was replaced with empty string (deleted)
@@ -192,8 +191,7 @@ describe("operators", function()
         source_occurrence:mark(range)
       end
 
-      local yank_config = assert(Config.new():get_operator_config("yank"))
-      Operator.apply(source_occurrence, yank_config, "y", nil, nil, '"')
+      source_occurrence:apply_operator("yank", { motion = Range.of_buffer(), register = '"' })
 
       -- Verify register has newline-separated content
       local register_content = vim.fn.getreg('"')
@@ -207,8 +205,7 @@ describe("operators", function()
 
       -- Apply put operator - should replicate multi-line content at each occurrence
       assert.has_no.errors(function()
-        local put_config = assert(Config.new():get_operator_config("put"))
-        Operator.apply(dest_occurrence, put_config, "p", nil, nil, '"')
+        dest_occurrence:apply_operator("put", { motion = Range.of_buffer(), register = '"' })
       end)
 
       -- Check that multi-line content was inserted at each destination
@@ -216,13 +213,7 @@ describe("operators", function()
       -- Since marks are processed in reverse: last dest, middle dest, first dest
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({
-        "source1",
-        "source2",
-        "source3 source1",
-        "source2",
-        "source3 source1",
-        "source2",
-        "source3",
+        "source1 source2 source3",
         "source1",
         "source2",
         "source3 source1",
@@ -244,8 +235,7 @@ describe("operators", function()
         source_occurrence:mark(range)
       end
 
-      local yank_config = assert(Config.new():get_operator_config("yank"))
-      Operator.apply(source_occurrence, yank_config, "y", nil, nil, '"')
+      source_occurrence:apply_operator("yank", { motion = Range.of_buffer(), register = '"' })
 
       -- Verify register has newline-separated content
       local register_content = vim.fn.getreg('"')
@@ -259,8 +249,7 @@ describe("operators", function()
 
       -- Apply distribute operator
       assert.has_no.errors(function()
-        local distribute_config = assert(Config.new():get_operator_config("distribute"))
-        Operator.apply(dest_occurrence, distribute_config, "gp", nil, nil, '"')
+        dest_occurrence:apply_operator("distribute", { motion = Range.of_buffer(), register = '"' })
       end)
 
       -- Check that each destination got one line (distributed)
@@ -272,7 +261,7 @@ describe("operators", function()
     end)
 
     it("cycles through lines when more destinations than lines", function()
-      bufnr = util.buffer("alpha beta\nPLACE PLACE PLACE PLACE PLACE")
+      bufnr = util.buffer({ "alpha beta", "PLACE PLACE PLACE PLACE PLACE" })
 
       -- Yank "alpha" and "beta" (2 values) using word pattern
       local source_occurrence = Occurrence.get(bufnr, "\\(alpha\\|beta\\)", "pattern")
@@ -285,8 +274,7 @@ describe("operators", function()
         end
       end
 
-      local yank_config = assert(Config.new():get_operator_config("yank"))
-      Operator.apply(source_occurrence, yank_config, "y", nil, nil, '"')
+      source_occurrence:apply_operator("yank", { motion = Range.of_buffer(), register = '"' })
 
       -- Verify register has 2 lines
       local register_content = vim.fn.getreg('"')
@@ -298,8 +286,7 @@ describe("operators", function()
         dest_occurrence:mark(range)
       end
 
-      local distribute_config = assert(Config.new():get_operator_config("distribute"))
-      Operator.apply(dest_occurrence, distribute_config, "gp", nil, nil, '"')
+      dest_occurrence:apply_operator("distribute", { motion = Range.of_buffer(), register = '"' })
 
       -- Check that distribution cycled correctly
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -323,8 +310,7 @@ describe("operators", function()
         end
       end
 
-      local yank_config = assert(Config.new():get_operator_config("yank"))
-      Operator.apply(source_occurrence, yank_config, "y", nil, nil, '"')
+      source_occurrence:apply_operator("yank", { motion = Range.of_buffer(), register = '"' })
 
       -- Verify register has 5 lines
       local register_content = vim.fn.getreg('"')
@@ -336,8 +322,7 @@ describe("operators", function()
         dest_occurrence:mark(range)
       end
 
-      local distribute_config = assert(Config.new():get_operator_config("distribute"))
-      Operator.apply(dest_occurrence, distribute_config, "gp", nil, nil, '"')
+      dest_occurrence:apply_operator("distribute", { motion = Range.of_buffer(), register = '"' })
 
       -- Check that only first 2 lines were used
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -363,8 +348,7 @@ describe("operators", function()
       input_stub.returns("test")
 
       -- Apply change operator
-      local operator_config = assert(Config.new():get_operator_config("change"))
-      Operator.apply(occurrence, operator_config, "c", nil, nil, '"')
+      occurrence:apply_operator("change", { motion = Range.of_buffer() })
 
       -- Check that all 'foo' occurrences were replaced with "test"
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -394,8 +378,7 @@ describe("operators", function()
       input_stub.returns("new")
 
       -- Apply change operator
-      local operator_config = assert(Config.new():get_operator_config("change"))
-      Operator.apply(occurrence, operator_config, "c", nil, nil, '"')
+      occurrence:apply_operator("change", { motion = Range.of_buffer(), register = '"' })
 
       -- Check register content contains original text
       local register_content = vim.fn.getreg('"')
@@ -418,8 +401,7 @@ describe("operators", function()
       input_stub.returns("changed")
 
       -- Apply change operator
-      local operator_config = assert(Config.new():get_operator_config("change"))
-      Operator.apply(occurrence, operator_config, "c", nil, nil, '"')
+      occurrence:apply_operator("change", { motion = Range.of_buffer(), register = '"' })
 
       -- Check that all occurrences were changed to the same text
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -433,28 +415,26 @@ describe("operators", function()
   end)
 
   describe("indent operators", function()
-    it("indent_left and indent_right are command-based operators", function()
-      bufnr = util.buffer("foo bar foo\nbaz foo bar")
-      -- Test that these don't error when called
+    it("indent_right indents lines with occurrences", function()
+      bufnr = util.buffer({ "foo bar foo", "  baz bar", "    baz foo bar" })
       local occurrence = Occurrence.get(bufnr, "foo", "word")
+      occurrence:mark()
 
-      -- Mark first occurrence
-      for range in occurrence:matches() do
-        occurrence:mark(range)
-        break
-      end
+      occurrence:apply_operator("indent_right", { motion = Range.of_buffer() })
 
-      assert.has_no.errors(function()
-        local cmd_stub = stub(vim, "cmd")
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "    foo bar foo", "  baz bar", "      baz foo bar" }, lines)
+    end)
 
-        local operator_config = assert(Config.new():get_operator_config("indent_left"))
-        Operator.apply(occurrence, operator_config, "<", nil, nil, nil)
+    it("indent_left unindents lines with occurrences", function()
+      bufnr = util.buffer({ "  foo bar foo", "    baz bar", "      baz foo bar" })
+      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      occurrence:mark()
 
-        -- Verify command was called
-        assert.stub(cmd_stub).was_called()
+      occurrence:apply_operator("indent_left", { motion = Range.of_buffer() })
 
-        cmd_stub:revert()
-      end)
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "foo bar foo", "    baz bar", "    baz foo bar" }, lines)
     end)
 
     it("indent_format formats indents for lines with occurrences", function()
@@ -462,8 +442,7 @@ describe("operators", function()
       local occurrence = Occurrence.get(bufnr, "foo", "word")
       occurrence:mark()
 
-      local operator_config = assert(Config.new():get_operator_config("indent_format"))
-      Operator.apply(occurrence, operator_config, "=")
+      occurrence:apply_operator("indent_format", { motion = Range.of_buffer() })
 
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({ "foo bar foo", "    baz bar", "    baz foo bar" }, lines) -- change expected output as necessary
@@ -481,8 +460,7 @@ describe("operators", function()
         occurrence:mark(range)
       end
       -- Apply change operator with uppercasing
-      local operator_config = assert(Config.new():get_operator_config("uppercase"))
-      Operator.apply(occurrence, operator_config, "gU", nil, nil, '"')
+      occurrence:apply_operator("uppercase", { motion = Range.of_buffer() })
       -- Check that all 'foo' occurrences were uppercased
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({ "FOO bar FOO", "baz FOO bar" }, final_lines)
@@ -496,8 +474,7 @@ describe("operators", function()
         occurrence:mark(range)
       end
       -- Apply change operator with lowercasing
-      local operator_config = assert(Config.new():get_operator_config("lowercase"))
-      Operator.apply(occurrence, operator_config, "gu", nil, nil, '"')
+      occurrence:apply_operator("lowercase", { motion = Range.of_buffer() })
       -- Check that all 'FOO' occurrences were lowercased
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({ "foo BAR foo", "BAZ foo BAR" }, final_lines)
@@ -513,8 +490,7 @@ describe("operators", function()
       end
 
       -- Apply change operator with case toggling
-      local operator_config = assert(Config.new():get_operator_config("swap_case"))
-      Operator.apply(occurrence, operator_config, "g~", nil, nil, '"')
+      occurrence:apply_operator("swap_case", { motion = Range.of_buffer() })
 
       -- Check that all 'foo' occurrences had their case toggled
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -531,17 +507,17 @@ describe("operators", function()
       assert.is_true(config:operator_is_supported("indent_left"))
       assert.is_true(config:operator_is_supported("indent_right"))
 
-      local delete_op = config:get_operator_config("delete")
-      local yank_op = config:get_operator_config("yank")
-      local change_op = config:get_operator_config("change")
-      local indent_left_op = config:get_operator_config("indent_left")
-      local indent_right_op = config:get_operator_config("indent_right")
+      local delete_op = assert(config:get_operator_config("delete"))
+      local yank_op = assert(config:get_operator_config("yank"))
+      local change_op = assert(config:get_operator_config("change"))
+      local indent_left_op = assert(config:get_operator_config("indent_left"))
+      local indent_right_op = assert(config:get_operator_config("indent_right"))
 
-      assert.is_true(Operator.is(delete_op))
-      assert.is_true(Operator.is(yank_op))
-      assert.is_true(Operator.is(change_op))
-      assert.is_true(Operator.is(indent_left_op))
-      assert.is_true(Operator.is(indent_right_op))
+      assert.is_truthy(delete_op.operator)
+      assert.is_truthy(yank_op.operator)
+      assert.is_truthy(change_op.operator)
+      assert.is_truthy(indent_left_op.operator)
+      assert.is_truthy(indent_right_op.operator)
     end)
 
     it("returns nil for unknown operators", function()
@@ -562,8 +538,7 @@ describe("operators", function()
       end
 
       -- Apply delete with count=1
-      local operator_config = assert(Config.new():get_operator_config("delete"))
-      Operator.apply(occurrence, operator_config, "d", nil, 1, '"')
+      occurrence:apply_operator("delete", { motion = Range.of_buffer(), count = 1 })
 
       -- Only one 'foo' should be deleted
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -573,8 +548,8 @@ describe("operators", function()
     end)
   end)
 
-  describe("range parameter", function()
-    it("applies operation only to occurrences in range", function()
+  describe("motion parameter", function()
+    it("applies operation only to occurrences in motion range", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
       -- Create multi-line buffer
       local test_bufnr = util.buffer("foo bar\nfoo baz\nfoo qux")
@@ -588,13 +563,10 @@ describe("operators", function()
       end
 
       -- Create a range that covers only the first line
-      local Range = require("occurrence.Range")
-      local Location = require("occurrence.Location")
       local line1_range = Range.new(Location.new(0, 0), Location.new(0, 7)) -- First line only
 
       -- Apply delete with range restriction
-      local operator_config = assert(Config.new():get_operator_config("delete"))
-      Operator.apply(occurrence, operator_config, "d", line1_range, nil, '"')
+      occurrence:apply_operator("delete", { motion = line1_range })
 
       -- Only 'foo' in first line should be affected
       local final_lines = vim.api.nvim_buf_get_lines(test_bufnr, 0, -1, false)
@@ -624,8 +596,7 @@ describe("operators", function()
 
       -- Should not error
       assert.has_no.errors(function()
-        local operator_config = assert(Config.new():get_operator_config("change"))
-        Operator.apply(occurrence, operator_config, "c", nil, nil, '"')
+        occurrence:apply_operator("change", { motion = Range.of_buffer() })
       end)
 
       input_stub:revert()
@@ -648,8 +619,7 @@ describe("operators", function()
       end
 
       -- Apply yank operator (doesn't modify text)
-      local operator_config = assert(Config.new():get_operator_config("yank"))
-      Operator.apply(occurrence, operator_config, "y", nil, nil, '"')
+      occurrence:apply_operator("yank", { motion = "G" })
 
       -- Cursor should be restored
       local final_pos = vim.api.nvim_win_get_cursor(0)

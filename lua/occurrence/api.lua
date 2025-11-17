@@ -5,16 +5,14 @@ local log = require("occurrence.log")
 
 ---@module 'occurrence.api'
 
--- Modify a pending operator to act on occurrences of the word
--- under the cursor. Only useful in operator-pending mode
--- (e.g., `c`, `d`, etc.)
+-- Modify a pending operator to operate on occurrences within a motion.
 --
--- Once a pending operator is modified, the operator will act
--- on occurrences within the range specified by the subsequent motion.
+-- When used in operator-pending mode (e.g., `doip`), this modifies
+-- the pending operator (`d`) to operate on all occurrences within
+-- the motion (`ip` = inner paragraph).
 --
--- Note that this action does not activate occurrence mode,
--- and it does not have any effect when occurrence mode is active,
--- as operators already act on occurrences in that mode.
+-- If no patterns exist, adds pattern for word under cursor.
+-- If no marks exist after callback, the operation is cancelled.
 ---@type occurrence.OperatorModifierConfig
 local modify_operator = {
   mode = "o",
@@ -22,7 +20,7 @@ local modify_operator = {
   plug = "<Plug>(OccurrenceModifyOperator)",
   desc = "Occurrences",
   type = "operator-modifier",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     if not occurrence:has_matches() then
       occurrence:of_word(true)
     end
@@ -131,7 +129,7 @@ local toggle = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceToggle)",
   desc = "Add/Toggle occurrence mark(s)",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     local visual = vim.fn.mode():match("[vV]") ~= nil
     local hlsearch = vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= ""
 
@@ -184,9 +182,9 @@ local next = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceNext)",
   desc = "Next marked occurrence",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     if not occurrence:has_matches() then
-      mark.callback(occurrence, ...)
+      mark.callback(occurrence)
     end
     occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
   end,
@@ -202,9 +200,9 @@ local previous = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrencePrevious)",
   desc = "Previous marked occurrence",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     if not occurrence:has_matches() then
-      mark.callback(occurrence, ...)
+      mark.callback(occurrence)
     end
     occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
   end,
@@ -221,9 +219,9 @@ local match_next = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceMatchNext)",
   desc = "Next occurrence match",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     if not occurrence:has_matches() then
-      mark.callback(occurrence, ...)
+      mark.callback(occurrence)
     end
     occurrence:match_cursor({ direction = "forward", wrap = true })
   end,
@@ -240,9 +238,9 @@ local match_previous = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceMatchPrevious)",
   desc = "Previous occurrence match",
-  callback = function(occurrence, ...)
+  callback = function(occurrence)
     if not occurrence:has_matches() then
-      mark.callback(occurrence, ...)
+      mark.callback(occurrence)
     end
     occurrence:match_cursor({ direction = "backward", wrap = true })
   end,
@@ -266,7 +264,6 @@ local deactivate = {
 
 ---@enum (key) occurrence.KeymapAction
 local api = {
-  modify_operator = modify_operator,
   mark = mark,
   unmark = unmark,
   toggle = toggle,
@@ -275,6 +272,141 @@ local api = {
   match_next = match_next,
   match_previous = match_previous,
   deactivate = deactivate,
+  modify_operator = modify_operator,
 }
 
-return api
+---@type occurrence.OperatorConfig
+local change = {
+  desc = "Change marked occurrences",
+  operator = function(_, ctx)
+    if ctx.replacement == nil then
+      local ok, input = pcall(vim.fn.input, {
+        prompt = "Change to: ",
+        cancelreturn = false,
+      })
+      if not ok then
+        -- User cancelled with Ctrl-C - return false to abort operation
+        ctx.replacement = false
+      end
+      ctx.replacement = input
+    end
+
+    return ctx.replacement
+  end,
+}
+
+---@type occurrence.OperatorConfig
+local delete = {
+  desc = "Delete marked occurrences",
+  operator = function()
+    return {}
+  end,
+}
+
+---@type occurrence.OperatorConfig
+local yank = {
+  desc = "Yank marked occurrences",
+  operator = function(_, ctx)
+    return ctx.register ~= nil
+  end,
+}
+
+---@type occurrence.OperatorConfig
+local put = {
+  desc = "Put text from register at marked occurrences",
+  operator = function(_, ctx)
+    if ctx.register == nil then
+      return false
+    end
+    local text = ctx.register.text
+    -- Clear register to avoid writing the text we back to it.
+    ctx.register = nil
+    return text
+  end,
+}
+
+---@type occurrence.OperatorConfig
+local distribute = {
+  desc = "Distribute lines from register across marked occurrences",
+  operator = function(current, ctx)
+    if ctx.register == nil then
+      return false
+    end
+
+    if ctx.replacement == nil then
+      ctx.replacement = ctx.register.text
+    end
+
+    -- Clear register to avoid writing the text we back to it.
+    ctx.register = nil
+
+    if #ctx.replacement == 0 then
+      return ""
+    end
+
+    -- Distribute lines cyclically across occurrences.
+    local line_index = ((current.index - 1) % #ctx.replacement) + 1
+    return ctx.replacement[line_index]
+  end,
+}
+
+---@type occurrence.OperatorConfig
+local indent_left = {
+  desc = "Indent left marked occurrences",
+  operator = "<",
+}
+
+---@type occurrence.OperatorConfig
+local indent_right = {
+  desc = "Indent right marked occurrences",
+  operator = ">",
+}
+
+---@type occurrence.OperatorConfig
+local indent_format = {
+  desc = "Format indent of marked occurrences",
+  operator = "=",
+}
+
+---@type occurrence.OperatorConfig
+local lowercase = {
+  desc = "Lowercase marked occurrences",
+  operator = "u",
+}
+
+---@type occurrence.OperatorConfig
+local uppercase = {
+  desc = "Uppercase marked occurrences",
+  operator = "U",
+}
+
+---@type occurrence.OperatorConfig
+local swap_case = {
+  desc = "Swap case of marked occurrences",
+  operator = "~",
+}
+
+---@type occurrence.OperatorConfig
+local rot13 = {
+  desc = "Rot13 encode marked occurrences",
+  operator = "g?",
+}
+
+-- Supported operators
+---@enum (key) occurrence.BuiltinOperator
+local operators = {
+  change = change,
+  delete = delete,
+  yank = yank,
+  put = put,
+  distribute = distribute,
+  indent_left = indent_left,
+  indent_right = indent_right,
+  indent_format = indent_format,
+  uppercase = uppercase,
+  lowercase = lowercase,
+  swap_case = swap_case,
+  rot13 = rot13,
+}
+
+return vim.tbl_extend("error", api, operators)

@@ -25,7 +25,7 @@ local OCCURRENCE_CACHE = {}
 -- The first argument will always be the `Occurrence` for the current buffer.
 -- The second argument will be the current `Config`.
 -- If the function returns `false`, the occurrence will be disposed.
----@alias occurrence.KeymapCallback fun(occurrence: occurrence.Occurrence, config: occurrence.Config): false?
+---@alias occurrence.KeymapCallback fun(occurrence: occurrence.Occurrence): false?
 
 -- A configuration for an occurrence mode keymap.
 -- A keymap defined this way will be buffer-local and
@@ -56,10 +56,67 @@ local OCCURRENCE_CACHE = {}
 ---@field type "occurrence-mode"
 ---@field plug string
 
+---@class (exact) occurrence.OperatorCurrent
+---@field id number The extmark id for the occurrence
+---@field index number 1-based index of the occurrence
+---@field range occurrence.Range The range of the occurrence
+---@field text string[] The text of the occurrence as a list of lines
+
+---@class (exact) occurrence.OperatorContext: { [string]: any }
+---@field occurrence occurrence.Occurrence
+---@field marks [number, occurrence.Range][]
+---@field mode 'n' | 'v' | 'o' The mode from which the operator is being triggered.
+---@field register? occurrence.Register The register being used for the operation.
+
+-- A function to be used as an operator on marked occurrences.
+-- The function will be called for each marked occurrence with the following arguments:
+--  - `current`: a table representing the occurrence currently being processed:
+--    - `id`: the extmark id for the occurrence
+--    - `index`: the index of the occurrence among all marked occurrences to be processed
+--    - `range`: a table representing the range of the occurrence (see `occurrence.OccurrenceRange`)
+--    - `text`: the text of the occurrence as a list of lines
+--  - `ctx`: a table containing context for the operation:
+--    - `occurrence`: the active occurrence state for the buffer (see `occurrence.Occurrence`)
+--    - `marks`: a list of all marked occurrences as `[id, range]` tuples
+--    - `mode`: the mode from which the operator is being triggered ('n', 'v', or 'o')
+--    - `register`: the register being used for the operation (see `occurrence.Register`)
+-- The `ctx` may also be used to store state between calls for each occurrence.
+--
+-- The function should return either:
+--   - `string | string[]` to replace the occurrence text
+--   - `nil | true` to leave the occurrence unchanged and proceed to the next occurrence
+--   - `false` to cancel the operation on this and all remaining occurrences
+--
+--  If the return value is truthy (not `nil | false`), the original text
+--  of the occurrence will be yanked to the register specified in `ctx.register`.
+--  To prevent this, set `ctx.register` to `nil`.
+---@alias occurrence.OperatorFn fun(mark: occurrence.OperatorCurrent, ctx: occurrence.OperatorContext): string | string[] | boolean | nil
+
+-- A configuration for a keymap that will run an operation
+-- on occurrences either as part of modifying a pending operator,
+-- or when occurrence mode is active.
+---@class (exact) occurrence.OperatorConfig
+-- The operatation to perform on each marked occcurence. Either:
+--   - a key sequence (e.g., `"gU"`) to be applied to the visual selection of each marked occurrence,
+--   - or a function that will be called for each marked occurrence.
+---@field operator string | occurrence.OperatorFn
+-- The mode(s) in which the operator keymap is active.
+-- Note that:
+--  - if "n" or "v" are included, the keymap will
+--    only be active when occurrence mode is active.
+--  - if "o" is included, a pending operator matching this keymap
+--    can be modified to operate on occurrences.
+-- Defaults to `{ "n", "v", "o" }`.
+---@field mode? "n" | "v" | "o" | ("n" | "v" | "o")[]
+-- An optional description for the keymap.
+-- Similar to the `desc` field in `:h vim.keymap.set` options.
+---@field desc? string
+
 -- Internal descriptor for actions
 ---@alias occurrence.ApiConfig
 ---   | occurrence.OccurrenceModeConfig
 ---   | occurrence.OperatorModifierConfig
+---   | occurrence.OperatorConfig
 
 ---@class occurrence.SearchFlags
 ---@field cursor? boolean Whether to accept a match at the cursor position.
@@ -676,15 +733,16 @@ function Occurrence:clear()
   self.patterns = {}
 end
 
----@param config occurrence.Config
 ---@param operator_key? string If nil, modifies the pending operator.
-function Occurrence:modify_operator(config, operator_key)
+---@param config? occurrence.Config
+function Occurrence:modify_operator(operator_key, config)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
 
   local count, register = vim.v.count, vim.v.register
   operator_key = operator_key or vim.v.operator
 
-  local operator_config = config:get_operator_config(operator_key)
+  config = require("occurrence").resolve_config(config)
+  local operator_config = config:get_operator_config(operator_key, "o")
 
   if not operator_config then
     log.warn(string.format("Operator '%s' is not supported", operator_key))
@@ -721,14 +779,20 @@ function Occurrence:modify_operator(config, operator_key)
         end)
       end,
     })
-    require("occurrence.Operator").create_opfunc("o", self, operator_config, operator_key, count, register)
+    -- Create the opfunc that will be called with the motion type
+    require("occurrence.Operator").create_opfunc(self, operator_config.operator, {
+      mode = "o",
+      count = count,
+      register = register,
+    })
     -- re-enter operator-pending mode
     feedkeys.change_mode("o", { silent = true })
   end)
 end
 
----@param config occurrence.Config
+---@param config? occurrence.Config
 function Occurrence:activate_occurrence_mode(config)
+  config = require("occurrence").resolve_config(config)
   if config.default_keymaps then
     -- Disable the default operator-pending mapping.
     -- Note that this isn't strictly necessary, since the modify operator
@@ -762,10 +826,25 @@ function Occurrence:activate_occurrence_mode(config)
   -- Set up buffer-local keymaps for operators
   for operator_key in pairs(config.operators) do
     local operator_config = config:get_operator_config(operator_key)
-    local operator = operator_config and require("occurrence.Operator").new(operator_key, operator_config)
-    if operator_config and operator then
+    if operator_config then
       local desc = operator_config.desc or ("'" .. operator_key .. "' on marked occurrences")
-      self.keymap:set({ "n", "v" }, operator_key, operator, { desc = desc, expr = true })
+      local mode = operator_config.mode
+      if mode ~= "o" then
+        if type(mode) == "table" then
+          mode = vim.tbl_filter(function(m)
+            return m ~= "o"
+          end, mode)
+        end
+        self.keymap:set(mode or { "n", "v" }, operator_key, function()
+          require("occurrence.Operator").create_opfunc(self, operator_config.operator, {
+            mode = vim.fn.mode():match("[vV]") and "v" or "n",
+            count = vim.v.count,
+            register = vim.v.register,
+          })
+          -- send g@ to trigger custom opfunc
+          return "g@"
+        end, { desc = desc, expr = true })
+      end
     else
       log.warn_once(string.format("Operator '%s' is not supported", operator_key))
     end
@@ -783,12 +862,13 @@ end
 -- If `action` is a table with a `callback` field, it will be treated as a keymap config:
 --   - If `action.type == "occurrence-mode"`, `self:activate_occurrence_mode` will be called after the callback.
 --   - If `action.type == "operator-modifier"`, `self:modify_operator` will be called after the callback.
+--   - If `action.type == "operator"`, the callback will be called directly with operator context.
 -- Finally, if `action` is callable, it will be called directly.
 -- In all cases, the action callback will receive this `Occurrence` and the `config` as arguments,
 -- and if it returns `false`, any followup behavior (as with "occurrence-mode" and "operator-modifier" types)
 -- will be skipped, and this occurrence will be disposed.
 ---@param action occurrence.KeymapAction | occurrence.ApiConfig | occurrence.KeymapConfig | occurrence.KeymapCallback
----@param config occurrence.Config
+---@param config? occurrence.Config
 function Occurrence:apply(action, config)
   local callback = nil
   local action_config = nil
@@ -835,7 +915,10 @@ function Occurrence:apply(action, config)
         return
       end
 
-      self:modify_operator(config)
+      self:modify_operator(nil, config)
+      return
+    elseif action_config.operator ~= nil then
+      self:apply_operator(action_config.operator, nil, config)
       return
     else
       callback = action_config.callback
@@ -843,7 +926,7 @@ function Occurrence:apply(action, config)
   end
 
   if callback and callable(callback) then
-    local result = callback(self, config)
+    local result = callback(self)
     if result == false then
       log.debug("Occurrence mode action cancelled")
       self:dispose()
@@ -855,192 +938,100 @@ function Occurrence:apply(action, config)
   end
 end
 
+---@class occurrence.ApplyOperatorOptions
+---@field mode? 'n' | 'v' | 'o' The mode in which to apply the operator
+---@field count? number The count to use for the operator
+---@field register? string The register to use for the operator
+---@field motion? string | occurrence.Range The range of motion (e.g. "aw", "$", etc), or a defined range. If `nil`, the full buffer range will be used.
+---@field motion_type? 'char' | 'line' | 'block' The type of motion, if `motion` is a `Range`. Defaults to 'char'.
+
 -- Apply an operator to marked occurrences.
 --
--- The `operator_name` may be a built-in operator (e.g., `"change"`, `"delete"`, etc),
--- or a key for an operator as defined in the `config.operators` table
--- (e.g., `"c"`, `"d"`, or any custom operator).
+-- The `operator` may be:
+--   - the name of a built-in or configured operator (e.g., `"change"`, `"delete"`, etc),
+--   - or a key sequence (e.g., `"gU"`) to be applied to the visual selection of each marked occurrence,
+--   - or a function that will be called for each marked occurrence.
 --
--- If `motion` is a `Range`, it will be used to create the visual selection.
--- If `motion` is a string like `"$"`,`"ip"`, etc., it will be used to create a motion via `:h feedkeys()`.
+-- The `:h operatorfunc` will be defined as a function that applies the operator
+-- to each marked occurrence in the range defined by a `motion` (optionally limited to `count` occurrences).
+--
+-- If `apply_operator` is called while in a visual mode,
+-- the current visual selection will be used instead of any `motion`.
+--
+-- Otherwise, the `motion` may be defined as:
+--   - a `Range` defining the range of motion,
+--   - or a string defining a motion (e.g., `"$"`, `"ip"`, etc).
+--   - or `nil` to enter operator-pending mode and await a motion input.
 --
 -- If `motion_type` is provided and `motion` is a `Range`, it will be used to determine
--- how the visual selection is created:
+-- how the range of selection should be interpreted:
 --   - `'char'` (default) for character-wise selection
 --   - `'line'` for line-wise selection
 --   - `'block'` for block-wise selection
--- Note that If `apply_operator` is called while in a visual mode,
--- the current visual selection will be used instead of any `motion`.
+--
+-- If `count` is provided, it will limit the number of occurrences to which the operator is applied
+-- to the smaller of `count` or the number of marked occurrences in the motion range.
 --
 -- If no occurrences are marked after the operation, the occurrence will be disposed.
----@param operator_name occurrence.BuiltinOperator | string
----@param motion? string | occurrence.Range The range of motion (e.g. "aw", "$", etc), or a defined range. If `nil`, the full buffer range will be used.
----@param motion_type? 'char' | 'line' | 'block' The type of motion, if `motion` is a `Range`. Defaults to 'char'.
-function Occurrence:apply_operator(operator_name, motion, motion_type)
+--
+---@param operator string | occurrence.OperatorFn
+---@param options? occurrence.ApplyOperatorOptions
+---@param config? occurrence.Config
+function Occurrence:apply_operator(operator, options, config)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
-  local config = require("occurrence").resolve_config()
-  local operator_config = config:get_operator_config(operator_name)
-  if type(operator_config) == "table" then
-    -- In visual mode, use the current visual selection.
-    if vim.fn.mode():find("[vV]") ~= nil then
-      motion = nil
-    elseif type(motion) ~= "string" then
-      -- Create a visual selection for the operator.
-      motion = motion or Range.of_buffer()
+
+  local visual = vim.fn.mode():match("[vV]") ~= nil
+  local mode = options and options.mode or (visual and "v" or "n")
+  local register = options and options.register or vim.v.register
+  -- We only want to consume the count if we are modifying an operator
+  -- or if it is explicitly provided. Otherwise, we assume `vim.v.count`
+  -- is meant for the motion that follows.
+  local count = options and options.count or (mode == "o" and vim.v.count or 0)
+  -- Resolve the motion (if not in visual mode)
+  local motion = (mode ~= "v" and options and options.motion) or nil
+
+  -- Force visual mode if motion is a Range
+  if motion ~= nil and type(motion) ~= "string" then
+    mode = "v"
+  end
+
+  -- Try to resolve a string operator to an operator config
+  -- before treating it as a key sequence.
+  if type(operator) == "string" then
+    config = require("occurrence").resolve_config(config)
+    local operator_config = config:get_operator_config(operator)
+    if operator_config and operator_config.operator then
+      operator = operator_config.operator
+    end
+  end
+
+  -- Create the opfunc that will be called with the motion type
+  require("occurrence.Operator").create_opfunc(self, operator, {
+    mode = mode,
+    count = count,
+    register = register,
+  })
+
+  if type(motion) == "string" then
+    -- Motion is a string: execute opfunc with motion
+    feedkeys("g@" .. motion, { noremap = true })
+  else
+    if motion ~= nil then
+      local motion_type = options and options.motion_type or nil
+      -- Motion is a Range: create visual selection and execute opfunc
+      motion_type = motion_type or "char"
       Cursor.move(motion.start)
       if motion_type == "line" then
         feedkeys.change_mode("V", { silent = true })
       elseif motion_type == "block" then
-        feedkeys.change_mode("", { silent = true })
+        feedkeys.change_mode("^V", { silent = true })
       else
         feedkeys.change_mode("v", { silent = true })
       end
       Cursor.move(motion.stop)
     end
-    require("occurrence.Operator").create_opfunc("v", self, operator_config, operator_name, vim.v.count, vim.v.register)
-    if type(motion) == "string" then
-      -- Apply opfunc to the motion.
-      feedkeys("g@" .. motion, { noremap = true })
-    else
-      -- Apply opfunc to the visual selection.
-      feedkeys("g@", { noremap = true })
-    end
-  else
-    log.error("Invalid operator:", operator_name)
-  end
-end
-
----@class occurrence.EachContext
----@field occurrence occurrence.Occurrence
----@field marks [number, occurrence.Range][]
-
----@param callback fun(index: number, text: string[], mark: number, range: occurrence.Range, ctx: occurrence.EachContext): nil
----@param range? occurrence.Range
----@param count? integer
-function Occurrence:each(callback, range, count)
-  local marks = self.extmarks:collect(range, count)
-  log.debug("marks found:" .. #marks)
-  local ctx = { occurrence = self, marks = marks }
-  for i = 1, #marks do
-    local id, mark = unpack(marks[i])
-    local text =
-      vim.api.nvim_buf_get_text(self.buffer, mark.start.line, mark.start.col, mark.stop.line, mark.stop.col, {})
-    callback(i, text, id, mark, ctx)
-  end
-end
-
----@param callback fun(index: number, text: string[], id: number, range: occurrence.Range, ctx: occurrence.EachContext): string | string[] | false
----@param range? occurrence.Range
----@param count? integer
-function Occurrence:replace(callback, range, count)
-  local edits = {}
-  local edited = 0
-
-  -- Collect edits in traversal order
-  self:each(function(index, text, mark, edit, ctx)
-    local replacement = callback(index, text, mark, edit, ctx)
-    if replacement and replacement ~= false then
-      if type(replacement) == "string" then
-        -- Split on newlines if present (e.g., from multi-line register content)
-        if replacement:find("\n") then
-          replacement = vim.split(replacement, "\n", { plain = true })
-        else
-          replacement = { replacement }
-        end
-      end
-      table.insert(edits, { mark, edit, replacement })
-    end
-  end, range, count)
-
-  log.debug("edits found:" .. #edits)
-
-  -- Apply edits in reverse order
-  for i = #edits, 1, -1 do
-    local id, mark, new_text = unpack(edits[i])
-    -- Create single undo block for all edits
-    if edited > 0 then
-      vim.cmd("silent! undojoin")
-    end
-    vim.api.nvim_buf_set_text(self.buffer, mark.start.line, mark.start.col, mark.stop.line, mark.stop.col, new_text)
-    self.extmarks:unmark(id)
-    edited = edited + 1
-  end
-
-  if edited == 0 then
-    log.debug("No marks in range")
-    return false
-  else
-    log.debug("Replaced", edited, "marks")
-  end
-end
-
----@param command string
----@param range? occurrence.Range
----@param count? integer
-function Occurrence:execute(command, range, count)
-  local marks = self.extmarks:collect(range, count)
-  local executed = 0
-  log.debug("marks found:" .. #marks)
-
-  -- Execute command for each mark in reverse order
-  for i = #marks, 1, -1 do
-    local id, mark = unpack(marks[i])
-    -- Create single undo block for all edits
-    if executed > 0 then
-      vim.cmd("silent! undojoin")
-    end
-
-    local start_line, stop_line = mark.start.line + 1, mark.stop.line + 1
-    log.debug("executing command: ", string.format("%d,%d%s", start_line, stop_line, command))
-    self.extmarks:unmark(id)
-    vim.cmd(string.format("%d,%d%s", start_line, stop_line, command))
-
-    executed = executed + 1
-  end
-
-  if executed == 0 then
-    log.debug("No marks to execute command", command)
-    return false
-  else
-    log.debug("Executed command", command, "on", executed, "marks")
-  end
-end
-
----@param keys string
----@param range? occurrence.Range
----@param count? integer
-function Occurrence:feedkeys(keys, range, count)
-  local marks = self.extmarks:collect(range, count)
-  local original_cursor = Cursor.save()
-  local edited = 0
-  log.debug("marks found:" .. #marks)
-
-  -- Visually select and feedkeys for each mark in reverse order
-  for i = #marks, 1, -1 do
-    local id, mark = unpack(marks[i])
-    -- Create single undo block for all edits
-    if edited > 0 then
-      vim.cmd("silent! undojoin")
-    end
-
-    Cursor.move(mark.start)
-    -- Clear any visual selection before (re-)entering visual mode
-    feedkeys.change_mode("v", { force = true, silent = true })
-    Cursor.move(mark.stop)
-    self.extmarks:unmark(id)
-    log.debug("executing nvim_feedkeys:", keys)
-    feedkeys(keys, { noremap = true })
-
-    edited = edited + 1
-  end
-
-  original_cursor:restore()
-
-  if edited == 0 then
-    log.debug("No marks to execute feedkeys", keys)
-    return false
-  else
-    log.debug("Executed feedkeys", keys, "on", edited, "marks")
+    -- Apply opfunc to the visual selection.
+    feedkeys("g@", { noremap = true })
   end
 end
 

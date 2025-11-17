@@ -13,11 +13,26 @@ local Register = {}
 ---@param register_type? string The type of register, e.g., "char", "line", or "block".
 ---@return occurrence.Register
 function register.new(register_name, register_type)
+  register_name = register_name or vim.v.register
+  local ok, text = pcall(vim.fn.getreg, register_name)
+  if not ok or not text or text == "" then
+    text = {}
+  end
+
+  if type(text) == "string" then
+    -- Split into lines for distribution
+    text = vim.split(text, "\n", { plain = true })
+  end
+
   return setmetatable({
-    register = register_name or vim.v.register,
+    register = register_name,
     type = register_type or "char", -- default to char motion
-    text = {},
+    text = text,
   }, { __index = Register })
+end
+
+function Register:clear()
+  self.text = {}
 end
 
 ---@param text string | string[] The text to add to the register.

@@ -71,19 +71,25 @@ describe("Config", function()
 
     it("handles invalid options gracefully with warning", function()
       local conf1 = Config.new({ invalid_option = "value" })
-      assert.spy(vim.notify).was_called_with(match.has_match("unknown option"), vim.log.levels.WARN, { title = "Occurrence" })
+      assert
+        .spy(vim.notify)
+        .was_called_with(match.has_match("unknown option"), vim.log.levels.WARN, { title = "Occurrence" })
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
       ---@diagnostic disable-next-line: assign-type-mismatch
       local conf2 = Config.new({ operators = "invalid_type" })
-      assert.spy(vim.notify).was_called_with(match.has_match("operators: expected table"), vim.log.levels.WARN, { title = "Occurrence" })
+      assert
+        .spy(vim.notify)
+        .was_called_with(match.has_match("operators: expected table"), vim.log.levels.WARN, { title = "Occurrence" })
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
       ---@diagnostic disable-next-line: param-type-mismatch
       local conf3 = Config.new("not_a_table")
-      assert.spy(vim.notify).was_called_with(match.has_match("opts: expected table"), vim.log.levels.WARN, { title = "Occurrence" })
+      assert
+        .spy(vim.notify)
+        .was_called_with(match.has_match("opts: expected table"), vim.log.levels.WARN, { title = "Occurrence" })
       ---@diagnostic disable-next-line: undefined-field
       vim.notify:clear()
 
@@ -190,32 +196,57 @@ describe("Config", function()
     it("returns operator config by key", function()
       local conf = Config.new()
       local op = assert(conf:get_operator_config("d"), "Expected operator config for 'd'")
-      assert.same(require("occurrence.operators").delete, op)
+      assert.same(require("occurrence.api").delete, op)
     end)
 
-    it("returns operator config by name", function()
+    it("returns builtin operator config by name", function()
       local conf = Config.new()
       local op = assert(conf:get_operator_config("delete"), "Expected operator config for 'delete'")
-      assert.same(require("occurrence.operators").delete, op)
+      assert.same(require("occurrence.api").delete, op)
     end)
 
-    it("returns the correct operator config for aliased operators", function()
+    it("returns custom operator config by name", function()
+      local custom_op = {
+        operator = function() end,
+      }
+      local conf = Config.new({
+        operators = {
+          custom = custom_op,
+        },
+      })
+      local op = assert(conf:get_operator_config("custom"), "Expected operator config for 'delete'")
+      assert.same(custom_op, op)
+    end)
+
+    it("returns the correct operator config for aliased builtin operators", function()
       local opts = {
         operators = {
           x = "delete",
         },
       }
       local conf = Config.new(opts)
-      local op = assert(conf:get_operator_config("x"), "Expected operator config for 'p'")
-      assert.same(require("occurrence.operators").delete, op)
+      local op = assert(conf:get_operator_config("x"), "Expected operator config for 'x'")
+      assert.same(require("occurrence.api").delete, op)
+    end)
+
+    it("returns the correct operator config for aliased custom operators", function()
+      local custom_op = {
+        operator = function() end,
+      }
+      local opts = {
+        operators = {
+          custom = custom_op,
+          x = "custom",
+        },
+      }
+      local conf = Config.new(opts)
+      local op = assert(conf:get_operator_config("x"), "Expected custom operator config for 'x'")
+      assert.same(custom_op, op)
     end)
 
     it("returns custom operator configs", function()
       local custom_op = {
-        desc = "Custom operator",
-        method = "command",
-        uses_register = false,
-        modifies_text = true,
+        operator = function() end,
       }
       local opts = {
         operators = {
@@ -225,6 +256,23 @@ describe("Config", function()
       local conf = Config.new(opts)
       local op = assert(conf:get_operator_config("custom"), "Expected operator config for 'custom'")
       assert.equals(custom_op, op)
+    end)
+
+    it("prevents operator alias loops", function()
+      local opts = {
+        operators = {
+          a = "b",
+          b = "custom",
+          custom = "a",
+        },
+      }
+      local conf = Config.new(opts)
+      assert.errors(function()
+        conf:get_operator_config("a")
+      end)
+      assert.errors(function()
+        conf:get_operator_config("b")
+      end)
     end)
   end)
 

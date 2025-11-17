@@ -452,17 +452,14 @@ describe("integration tests", function()
       assert.equals(0, #marks, "No 'foo' occurrences should be marked")
     end)
 
-    it("modifies operator supported via direct_api method", function()
+    it("modifies custom operator function", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({
+        default_operators = false,
         operators = {
           d = {
-            desc = "Delete on marked occurrences",
-            method = "direct_api",
-            uses_register = true,
-            modifies_text = true,
-            replacement = function()
+            operator = function()
               return ""
             end,
           },
@@ -493,16 +490,14 @@ describe("integration tests", function()
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
-    it("modifies operator supported via command method", function()
+    it("modifies custom operator keys", function()
       bufnr = util.buffer({ "foo bar baz foo", "  foo indented" })
 
       plugin.setup({
+        default_operators = false,
         operators = {
           ["<"] = {
-            desc = "Indent marked occurrences to the left",
-            method = "command",
-            uses_register = false,
-            modifies_text = true,
+            operator = "<",
           },
         },
       })
@@ -531,55 +526,14 @@ describe("integration tests", function()
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
-    it("modifies operator supported via visual_feedkeys method", function()
-      bufnr = util.buffer("foo bar baz foo")
-
-      plugin.setup({
-        operators = {
-          ["gU"] = {
-            desc = "Make marked occurrences uppercase",
-            method = "visual_feedkeys",
-            uses_register = false,
-            modifies_text = true,
-          },
-        },
-      })
-      vim.keymap.set("o", "q", "<Plug>(OccurrenceModifyOperator)", { buffer = bufnr })
-
-      -- Enter tilde operator-pending mode, modify operator
-      feedkeys("gUq")
-
-      vim.wait(0) -- The operator-modifier action is async.
-
-      -- Verify no changes have been made yet.
-      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      assert.equals("foo bar baz foo", lines[1], "No 'foo' occurrences should be modified yet")
-
-      -- Verify marks are created for all 'foo' occurrences
-      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
-      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
-
-      -- Complete a motion to apply operator
-      feedkeys("$")
-
-      lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      assert.equals("FOO bar baz FOO", lines[1], "Both 'foo' occurrences should be uppercased")
-
-      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
-      assert.same({}, marks, "No marks should remain after applying operator")
-    end)
-
     it("cancels operator modification if there are no marked occurrences", function()
       bufnr = util.buffer({ "", "foo bar baz foo" })
 
       plugin.setup({
+        default_operators = false,
         operators = {
           d = {
-            desc = "Delete on marked occurrences",
-            method = "direct_api",
-            uses_register = true,
-            modifies_text = true,
-            replacement = function()
+            operator = function()
               return ""
             end,
           },
@@ -637,13 +591,10 @@ describe("integration tests", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({
+        default_operators = false,
         operators = {
           d = {
-            desc = "Delete on marked occurrences",
-            method = "direct_api",
-            uses_register = true,
-            modifies_text = true,
-            replacement = function()
+            operator = function()
               return ""
             end,
           },
@@ -720,7 +671,7 @@ describe("integration tests", function()
         keymaps = {
           ["<Tab>"] = "next",
           ["x"] = {
-            callback = function(occ, config)
+            callback = function(occ)
               custom_keymap_called = true
               occ:dispose()
             end,
@@ -922,7 +873,7 @@ describe("integration tests", function()
   end)
 
   describe("operators", function()
-    it("applies direct_api operator to all marked occurrences", function()
+    it("applies operator to all marked occurrences", function()
       bufnr = util.buffer("foo bar baz foo")
 
       plugin.setup({
@@ -931,10 +882,7 @@ describe("integration tests", function()
         operators = {
           d = {
             desc = "Delete",
-            method = "direct_api",
-            uses_register = true,
-            modifies_text = true,
-            replacement = function()
+            operator = function()
               return ""
             end,
           },
@@ -971,17 +919,17 @@ describe("integration tests", function()
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
-    it("applies command operator to all marked occurrences", function()
+    it("applies operator keys to all marked occurrences", function()
       bufnr = util.buffer({ "foo bar baz foo", "  foo indented" })
 
       local normal_key = "q"
       plugin.setup({
+        default_operators = false,
+        default_keymaps = false,
         operators = {
           ["<"] = {
             desc = "Indent left",
-            method = "command",
-            uses_register = false,
-            modifies_text = true,
+            operator = "<",
           },
         },
       })
@@ -1015,17 +963,17 @@ describe("integration tests", function()
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
-    it("applies visual_feedkeys operator to all marked occurrences", function()
+    it("applies operator keys to all marked occurrences", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
       plugin.setup({
+        default_operators = false,
+        default_keymaps = false,
         operators = {
           ["gU"] = {
             desc = "Uppercase",
-            method = "visual_feedkeys",
-            uses_register = false,
-            modifies_text = true,
+            operator = "gU",
           },
         },
       })
@@ -1059,17 +1007,17 @@ describe("integration tests", function()
       assert.same({}, marks, "No marks should remain after applying operator")
     end)
 
-    it("applies visual_feedkeys operator to all marked occurrences in selection", function()
+    it("applies operator keys to all marked occurrences in selection", function()
       bufnr = util.buffer("foo bar baz foo")
 
       local normal_key = "q"
       plugin.setup({
+        default_operators = false,
+        default_keymaps = false,
         operators = {
           ["gU"] = {
             desc = "Uppercase",
-            method = "visual_feedkeys",
-            uses_register = false,
-            modifies_text = true,
+            operator = "gU",
           },
         },
       })
@@ -1104,17 +1052,17 @@ describe("integration tests", function()
       assert.equals(1, #marks, "One mark should remain for second 'foo'")
     end)
 
-    it("applies visual_feedkeys operator to a count of marked occurrences in selection", function()
+    it("applies operator keys to a count of marked occurrences in a motion", function()
       bufnr = util.buffer({ "foo bar baz foo", "bar baz foo bar baz foo" })
 
       local normal_key = "q"
       plugin.setup({
+        default_operators = false,
+        default_keymaps = false,
         operators = {
           ["U"] = {
             desc = "Uppercase",
-            method = "visual_feedkeys",
-            uses_register = false,
-            modifies_text = true,
+            operator = "U",
           },
         },
       })
@@ -1138,10 +1086,8 @@ describe("integration tests", function()
       end
       assert.equals("U", uppercase_key, "Uppercase key should be mapped")
 
-      feedkeys("Vj") -- Select the first 2 lines
-      -- Apply uppercase operator to 2 occurrences
-      feedkeys("3U")
-      vim.wait(0) -- The operator application is async.
+      -- Apply uppercase operator to first 3 occurrences
+      feedkeys("3Uj")
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same(
         { "FOO bar baz FOO", "bar baz FOO bar baz foo" },
@@ -1158,13 +1104,11 @@ describe("integration tests", function()
 
       -- Setup plugin with custom operator
       plugin.setup({
+        default_operators = false,
         operators = {
           q = {
             desc = "Custom operator: replace with 'test'",
-            method = "direct_api",
-            uses_register = true,
-            modifies_text = true,
-            replacement = function()
+            operator = function()
               return "test"
             end,
           },

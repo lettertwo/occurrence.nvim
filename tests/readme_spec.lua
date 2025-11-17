@@ -310,7 +310,7 @@ describe("README examples", function()
             desc = "Delete marked occurrences on line",
             callback = function(occ)
               local range = require("occurrence.Range").of_line()
-              occ:apply_operator("delete", range, "line")
+              return occ:apply_operator("delete", { motion = range, motion_type = "line" })
             end,
           },
         },
@@ -369,7 +369,7 @@ describe("README examples", function()
             mode = "n",
             desc = "Delete marked occurrences from cursor to end of line",
             callback = function(occ)
-              occ:apply_operator("delete", "$")
+              occ:apply_operator("delete", { motion = "$" })
             end,
           },
         },
@@ -440,7 +440,7 @@ describe("README examples", function()
           map("n", "cc", function()
             local occ = require("occurrence.Occurrence").get()
             local range = require("occurrence.Range").of_line()
-            occ:apply_operator("change", range, "line")
+            occ:apply_operator("change", { motion = range, motion_type = "line" })
           end, { desc = "Change marked occurrences on line" })
         end,
       })
@@ -500,7 +500,7 @@ describe("README examples", function()
           -- C - Change marked occurrences from cursor to end of line
           map("n", "C", function()
             local occ = require("occurrence.Occurrence").get()
-            occ:apply_operator("change", "$")
+            occ:apply_operator("change", { motion = "$" })
           end, { desc = "Change marked occurrences from cursor to end of line" })
         end,
       })
@@ -784,7 +784,7 @@ describe("README examples", function()
 
       -- Verify yank register has all sources
       local register = vim.fn.getreg('"')
-      assert.equals("alpha\nbeta\ngamma\n", register, "Register should contain all sources separated by newlines")
+      assert.equals("alpha\nbeta\ngamma", register, "Register should contain all sources separated by newlines")
 
       -- Exit occurrence mode
       feedkeys("<Esc>")

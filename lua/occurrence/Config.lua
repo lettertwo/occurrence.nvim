@@ -106,14 +106,11 @@ local DEFAULT_CONFIG = {
 ---@param value occurrence.OperatorConfig
 local function validate_operator_config(value)
   vim.validate("config", value, "table")
-  vim.validate("method", value.method, function(val)
-    return val == "visual_feedkeys" or val == "command" or val == "direct_api"
-  end, '"visual_feedkeys", "command", or "direct_api"')
-  vim.validate("uses_register", value.uses_register, "boolean")
-  vim.validate("modifies_text", value.modifies_text, "boolean")
-  if value.method == "direct_api" and value.modifies_text then
-    vim.validate("replacement", value.replacement, { "string", "table", "callable", "nil" }, true)
+  vim.validate("operator", value.operator, { "callable", "string" })
+  if value.mode then
+    vim.validate("mode", value.mode, { "string", "table" }, true)
   end
+  vim.validate("desc", value.desc, "string", true)
 end
 
 ---@param value occurrence.KeymapConfig
@@ -175,10 +172,28 @@ function Config:keymap_is_supported(name)
   return not not self:get_keymap_config(name)
 end
 
+---@param key string
+---@return string
+function Config:resolve_operator_key(key)
+  local resolved = self.operators[key]
+  local seen = {}
+  while type(resolved) == "string" do
+    if seen[key] then
+      error("Circular operator alias detected: '" .. key .. "' <-> '" .. resolved .. "'")
+    end
+    seen[key] = true
+    key = resolved
+    resolved = self.operators[key]
+  end
+  return key
+end
+
 ---@param name string
+---@param mode? "n" | "v" | "o"
 ---@return occurrence.OperatorConfig | nil
-function Config:get_operator_config(name)
+function Config:get_operator_config(name, mode)
   local operator_config = nil
+  name = self:resolve_operator_key(name)
   operator_config = self.operators[name]
   -- Explicitly disabled operator
   if operator_config == false then
@@ -186,12 +201,12 @@ function Config:get_operator_config(name)
   end
 
   if type(operator_config) == "string" then
-    name = operator_config
-    operator_config = nil
+    name = self:resolve_operator_key(operator_config)
+    operator_config = self.operators[name]
   end
 
   if operator_config == nil then
-    local builtins = require("occurrence.operators")
+    local builtins = require("occurrence.api")
     operator_config = builtins[name]
     ---@cast operator_config -occurrence.BuiltinOperator
   end
@@ -202,15 +217,29 @@ function Config:get_operator_config(name)
       log.warn_once(string.format("Invalid operator config for '%s': %s", name, err))
       return nil
     end
+
+    -- Validate mode if provided
+    if mode ~= nil then
+      if type(operator_config.mode) == "string" then
+        if operator_config.mode ~= mode then
+          return nil
+        end
+      elseif type(operator_config.mode) == "table" then
+        if not vim.tbl_contains(operator_config.mode, mode) then
+          return nil
+        end
+      end
+    end
   end
 
   return operator_config
 end
 
 ---@param name string
+---@param mode? "n" | "v" | "o"
 ---@return boolean
-function Config:operator_is_supported(name)
-  return not not self:get_operator_config(name)
+function Config:operator_is_supported(name, mode)
+  return not not self:get_operator_config(name, mode)
 end
 
 ---Check if the given options is already a config.
