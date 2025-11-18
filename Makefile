@@ -5,6 +5,8 @@ LUA_CPATH := './lua_modules/lib/lua/5.1/?.so;;'
 
 ./lua_modules/bin/%:
 	@mkdir -p $(@D)
+	@mkdir -p .luarocks
+	@luarocks config --scope project lua_version 5.1
 	@luarocks install $*
 
 ./vendor/panvimdoc/panvimdoc.sh:

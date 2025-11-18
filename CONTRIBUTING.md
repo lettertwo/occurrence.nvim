@@ -117,11 +117,7 @@ Optional. Reference issues and include breaking changes:
 Setup local [luarocks](https://github.com/luarocks/luarocks/wiki/Download) environment and run tests:
 
 ```bash
-# Install dependencies
-luarocks --local install busted
-luarocks --local install nlua
-
-# Run all tests
+# Run all tests (will install dependencies if needed)
 make test
 
 # Run performance tests only
