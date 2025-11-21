@@ -136,6 +136,28 @@ describe("README examples", function()
           ["y"] = "yank",
           ["g?"] = false, -- Disable ROT13
           ["g~"] = false, -- Disable swap case
+          -- Define a custom operator:
+          ["upper_first"] = {
+            desc = "Uppercase first letter",
+            ---@type occurrence.OperatorFn
+            operator = function(current)
+              local text = current.text
+              text[1] = text[1]:gsub("^%l", string.upper)
+              return text
+            end,
+          },
+          -- and bind it to a key:
+          ["gU"] = "upper_first",
+          -- or define it to a key directly:
+          ["gu"] = {
+            desc = "Lowercase first letter",
+            ---@type occurrence.OperatorFn
+            operator = function(current)
+              local text = current.text
+              text[1] = text[1]:gsub("^%l", string.lower)
+              return text
+            end,
+          },
         },
       })
 
@@ -169,6 +191,8 @@ describe("README examples", function()
       local has_yank = false
       local has_rot13 = false
       local has_swapcase = false
+      local has_upper_first = false
+      local has_lower_first = false
       for _, map in ipairs(mappings) do
         if map.lhs == "<Tab>" and map.desc == "Next marked occurrence" then
           has_tab = true
@@ -200,6 +224,12 @@ describe("README examples", function()
         if map.lhs == "g~" then
           has_swapcase = true
         end
+        if map.lhs == "gU" and map.desc == "Uppercase first letter" then
+          has_upper_first = true
+        end
+        if map.lhs == "gu" and map.desc == "Lowercase first letter" then
+          has_lower_first = true
+        end
       end
       assert.is_true(has_tab, "'<Tab>' keymap should be set for next occurrence")
       assert.is_true(has_stab, "'<S-Tab>' keymap should be set for previous occurrence")
@@ -211,6 +241,8 @@ describe("README examples", function()
       assert.is_true(has_yank, "'y' operator should be enabled for yank")
       assert.is_false(has_rot13, "'g?' operator should be disabled for ROT13")
       assert.is_false(has_swapcase, "'g~' operator should be disabled for swap case")
+      assert.is_true(has_upper_first, "'gU' operator should be enabled for upper first")
+      assert.is_true(has_lower_first, "'gu' operator should be enabled for lower first")
 
       feedkeys("<Tab>")
       local cursor = vim.api.nvim_win_get_cursor(0)
@@ -251,6 +283,8 @@ describe("README examples", function()
       has_yank = false
       has_rot13 = false
       has_swapcase = false
+      has_upper_first = false
+      has_lower_first = false
       for _, map in ipairs(mappings) do
         if map.lhs == "<Tab>" and map.rhs == "<Plug>(OccurrenceNext)" then
           has_tab = true
@@ -282,6 +316,12 @@ describe("README examples", function()
         if map.lhs == "g~" then
           has_swapcase = true
         end
+        if map.lhs == "gU" and map.desc == "Uppercase first letter" then
+          has_upper_first = true
+        end
+        if map.lhs == "gu" and map.desc == "Lowercase first letter" then
+          has_lower_first = true
+        end
       end
       assert.is_false(has_tab, "'<Tab>' keymap should be removed for next occurrence")
       assert.is_false(has_stab, "'<S-Tab>' keymap should be removed for previous occurrence")
@@ -293,6 +333,121 @@ describe("README examples", function()
       assert.is_false(has_yank, "'y' operator should be enabled for yank")
       assert.is_false(has_rot13, "'g?' operator should be disabled for ROT13")
       assert.is_false(has_swapcase, "'g~' operator should be disabled for swap case")
+      assert.is_false(has_upper_first, "'gU' operator should be removed for upper first")
+      assert.is_false(has_lower_first, "'gu' operator should be removed for lower first")
+    end)
+
+    it("describes custom upper_first operator accurately", function()
+      bufnr = util.buffer({
+        "lowercase this word",
+        "another lowercase word here",
+        "final lowercase word",
+      })
+
+      plugin.setup({
+        operators = {
+          ["upper_first"] = {
+            desc = "Uppercase first letter",
+            ---@type occurrence.OperatorFn
+            operator = function(current)
+              local text = current.text
+              text[1] = text[1]:gsub("^%l", string.upper)
+              return text
+            end,
+          },
+          ["gU"] = "upper_first",
+        },
+      })
+
+      -- Place cursor on "lowercase"
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("gUo")
+      vim.wait(0)
+      feedkeys("ip")
+
+      assert.same({
+        "Lowercase this word",
+        "another Lowercase word here",
+        "final Lowercase word",
+      }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "First letters should be uppercased")
+
+      --Place cusror on "word"
+      vim.api.nvim_win_set_cursor(0, { 1, 15 })
+
+      -- mark all occurrences of "word"
+      feedkeys("go")
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(3, #marks, "All 'word' occurrences should be marked")
+
+      feedkeys("gUip")
+
+      assert.same({
+        "Lowercase this Word",
+        "another Lowercase Word here",
+        "final Lowercase Word",
+      }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "First letters should be uppercased")
+
+      feedkeys("<Esc>")
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.same({}, marks, "All marks should be cleared")
+    end)
+
+    it("describes custom lower_first operator accurately", function()
+      bufnr = util.buffer({
+        "Uppercase This Word",
+        "Another Uppercase Word Here",
+        "Final Uppercase Word",
+      })
+
+      plugin.setup({
+        operators = {
+          ["gu"] = {
+            desc = "Lowercase first letter",
+            ---@type occurrence.OperatorFn
+            operator = function(current)
+              local text = current.text
+              text[1] = text[1]:gsub("^%u", string.lower)
+              return text
+            end,
+          },
+        },
+      })
+
+      -- Place cursor on "Uppercase"
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("guo")
+      vim.wait(0)
+      feedkeys("ip")
+
+      assert.same({
+        "uppercase This Word",
+        "Another uppercase Word Here",
+        "Final uppercase Word",
+      }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "First letters should be lowercased")
+
+      --Place cusror on "Word"
+      vim.api.nvim_win_set_cursor(0, { 1, 15 })
+
+      -- mark all occurrences of "Word"
+      feedkeys("go")
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(3, #marks, "All 'Word' occurrences should be marked")
+
+      feedkeys("guip")
+
+      assert.same({
+        "uppercase This word",
+        "Another uppercase word Here",
+        "Final uppercase word",
+      }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "First letters should be lowercased")
+
+      feedkeys("<Esc>")
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.same({}, marks, "All marks should be cleared")
     end)
 
     it("describes custom line-based dd operator accurately", function()

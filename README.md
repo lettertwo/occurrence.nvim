@@ -170,8 +170,9 @@ require("occurrence").setup({
 
   -- A table defining operators that can be modified to operate on occurrences.
   -- These operators will also be active as keymaps in occurrence mode.
-  -- Each key is a string representing the operator key, and each value is either:
-  --   - a string representing the name of a built-in operator,
+  -- Each key is a string representing either the operator key or
+  -- a custom operator name, and each value is either:
+  --   - a string representing the name of a builtin or custom operator,
   --   - a table defining a custom operator configuration,
   --   - or `false` to disable the operator.
   operators = {
@@ -266,62 +267,42 @@ end)
 
 ## Operators
 
-### Disabling Specific Operators
+Similarly to keymaps, you can disable default operators and set up custom ones.
 
 ```lua
 require("occurrence").setup({
+  default_operators = false,  -- Disable all defaults
   operators = {
-    ["c"] = "change",
-    ["d"] = "delete",
-    ["y"] = "yank",
-    ["g?"] = false,  -- Disable ROT13
-    ["g~"] = false,  -- Disable swap case
+    ["c"] = "change", -- Keep default change operator
+    ["d"] = "delete", -- Keep default delete operator
+    ["g~"] = false,  -- Disable swap case (if `default_operators` were `true`)
+    -- Define a custom operator:
+    ["upper_first"] = {
+      desc = "Uppercase first letter",
+      ---@type occurrence.OperatorFn
+      operator = function(current)
+        local text = current.text
+        text[1] = text[1]:gsub("^%l", string.upper)
+        return text
+      end
+    },
+    -- and bind it to a key:
+    ["gU"] = "upper_first",
+    -- or define it to a key directly:
+    ["gu"] = {
+      desc = "Lowercase first letter",
+      ---@type occurrence.OperatorFn
+      operator = function(current)
+        local text = current.text
+        text[1] = text[1]:gsub("^%u", string.lower)
+        return text
+      end
+    },
   },
 })
 ```
 
-### Custom Line-Based Operators
-
-Add operators that work on marked occurrences on the current line:
-
-```lua
-require("occurrence").setup({
-  -- Define them as custom keymaps:
-  keymaps = {
-    -- dd - Delete marked occurrences on current line
-    ["dd"] = {
-      mode = "n",
-      desc = "Delete marked occurrences on line",
-      callback = function(occ)
-        local range = require("occurrence.Range").of_line()
-        occ:apply_operator("delete", range, "line")
-      end,
-    },
-    -- D - Delete marked occurrences from cursor to end of line
-    ["D"] = {
-      mode = "n",
-      desc = "Delete marked occurrences from cursor to end of line",
-      callback = function(occ)
-        occ:apply_operator("delete", "$")
-      end,
-    },
-  },
-  -- or use the `on_activate` callback to set them up.
-  on_activate = function(map)
-    -- cc - Change marked occurrences on current line
-    map("n", "cc", function()
-      local occ = require('occurrence.Occurrence').get()
-      local range = require("occurrence.Range").of_line()
-      occ:apply_operator("change", range, "line")
-    end, { desc = "Change marked occurrences on line" })
-    -- C - Change marked occurrences from cursor to end of line
-    map("n", "C", function()
-      local occ = require("occurrence.Occurrence").get()
-      occ:apply_operator("change", "$")
-    end, { desc = "Change marked occurrences from cursor to end of line" })
-  end,
-})
-```
+For more on defining custom operators, see [Custom Operators](#custom-operators).
 
 ## Highlights
 
@@ -650,7 +631,7 @@ deactivate
 
 Clear all marks and patterns, and deactivate occurrence mode.
 
-## Builtin Operators
+# Builtin Operators
 
 The following operators are supported via `modify_operator` or with marked occurrences (configured via `operators` table):
 
@@ -668,6 +649,53 @@ The following operators are supported via `modify_operator` or with marked occur
 | `lowercase`     | `gu` | Convert to lowercase                                              |
 | `swap_case`     | `g~` | Swap case                                                         |
 | `rot13`         | `g?` | ROT13 encoding                                                    |
+
+# Custom Operators
+
+## Custom Line-Based Operators
+
+A custom operator defined via `operators` will always expect a motion or visual selection.
+To define a custom operator that operates on a fixed motion, define it as a keymap instead.
+For example, you could define operators that work on marked occurrences on the current line:
+
+```lua
+require("occurrence").setup({
+  -- Define them as custom keymaps:
+  keymaps = {
+    -- dd - Delete marked occurrences on current line
+    ["dd"] = {
+      mode = "n",
+      desc = "Delete marked occurrences on line",
+      callback = function(occ)
+        local range = require("occurrence.Range").of_line()
+        occ:apply_operator("delete", range, "line")
+      end,
+    },
+    -- D - Delete marked occurrences from cursor to end of line
+    ["D"] = {
+      mode = "n",
+      desc = "Delete marked occurrences from cursor to end of line",
+      callback = function(occ)
+        occ:apply_operator("delete", "$")
+      end,
+    },
+  },
+  -- or use the `on_activate` callback to set them up.
+  on_activate = function(map)
+    -- cc - Change marked occurrences on current line
+    map("n", "cc", function()
+      local occ = require('occurrence.Occurrence').get()
+      local range = require("occurrence.Range").of_line()
+      occ:apply_operator("change", range, "line")
+    end, { desc = "Change marked occurrences on line" })
+    -- C - Change marked occurrences from cursor to end of line
+    map("n", "C", function()
+      local occ = require("occurrence.Occurrence").get()
+      occ:apply_operator("change", "$")
+    end, { desc = "Change marked occurrences from cursor to end of line" })
+  end,
+})
+```
 
 <!-- panvimdoc-ignore-start -->
 

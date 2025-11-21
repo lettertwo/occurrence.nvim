@@ -1,12 +1,13 @@
 occurrence-api-reference	occurrence.txt	/*occurrence-api-reference*
 occurrence-api-reference-actions	occurrence.txt	/*occurrence-api-reference-actions*
-occurrence-api-reference-builtin-operators	occurrence.txt	/*occurrence-api-reference-builtin-operators*
 occurrence-api-reference-lua-api	occurrence.txt	/*occurrence-api-reference-lua-api*
+occurrence-builtin-operators	occurrence.txt	/*occurrence-builtin-operators*
 occurrence-configuration	occurrence.txt	/*occurrence-configuration*
 occurrence-configuration-highlights	occurrence.txt	/*occurrence-configuration-highlights*
 occurrence-configuration-keymaps	occurrence.txt	/*occurrence-configuration-keymaps*
 occurrence-configuration-operators	occurrence.txt	/*occurrence-configuration-operators*
 occurrence-configuration-statusline-integration	occurrence.txt	/*occurrence-configuration-statusline-integration*
+occurrence-custom-operators	occurrence.txt	/*occurrence-custom-operators*
 occurrence-deactivate	occurrence.txt	/*occurrence-deactivate*
 occurrence-installation	occurrence.txt	/*occurrence-installation*
 occurrence-mark	occurrence.txt	/*occurrence-mark*
