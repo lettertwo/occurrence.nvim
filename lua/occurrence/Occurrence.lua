@@ -881,7 +881,7 @@ function Occurrence:apply(action, config)
     action_config = action
   end
 
-  if action_config and (action_config.type or action_config.callback) then
+  if action_config and (action_config.type or action_config.callback or action_config.operator) then
     if action_config.type == "occurrence-mode" then
       ---@cast action_config occurrence.OccurrenceModeConfig
       local ok, result = pcall(action_config.callback, self, config)
@@ -1015,23 +1015,27 @@ function Occurrence:apply_operator(operator, options, config)
   if type(motion) == "string" then
     -- Motion is a string: execute opfunc with motion
     feedkeys("g@" .. motion, { noremap = true })
-  else
-    if motion ~= nil then
-      local motion_type = options and options.motion_type or nil
-      -- Motion is a Range: create visual selection and execute opfunc
-      motion_type = motion_type or "char"
-      Cursor.move(motion.start)
-      if motion_type == "line" then
-        feedkeys.change_mode("V", { silent = true })
-      elseif motion_type == "block" then
-        feedkeys.change_mode("^V", { silent = true })
-      else
-        feedkeys.change_mode("v", { silent = true })
-      end
-      Cursor.move(motion.stop)
+  elseif motion ~= nil then
+    local motion_type = options and options.motion_type or nil
+    -- Motion is a Range: create visual selection and execute opfunc
+    motion_type = motion_type or "char"
+    Cursor.move(motion.start)
+    if motion_type == "line" then
+      feedkeys.change_mode("V", { silent = true })
+    elseif motion_type == "block" then
+      feedkeys.change_mode("^V", { silent = true })
+    else
+      feedkeys.change_mode("v", { silent = true })
     end
+    Cursor.move(motion.stop)
+    -- Apply opfunc to the visually selected range.
+    feedkeys("g@", { noremap = true })
+  elseif visual then
     -- Apply opfunc to the visual selection.
     feedkeys("g@", { noremap = true })
+  else
+    -- enter operator-pending mode
+    feedkeys.change_mode("o", { silent = true })
   end
 end
 
