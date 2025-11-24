@@ -16,7 +16,7 @@ jobs:
     name: Create PR for docs updates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Check documentation
         id: check_docs
