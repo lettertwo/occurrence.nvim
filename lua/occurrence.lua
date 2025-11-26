@@ -100,10 +100,11 @@ local occurrence = {}
 -- register <Plug> mappings for all commands using CapCase convention.
 for name, api_config in pairs(api) do
   -- Create `occurrence.<name>` API function
-  occurrence[name] = function(opts)
-    -- TODO: explore passing args from commandline
-    local config, _ = occurrence.parse_opts(opts)
-    require("occurrence.Occurrence").get():apply(api_config, config)
+  ---@param args? occurrence.Options | occurrence.Config | occurrence.SubcommandArgs
+  occurrence[name] = function(args)
+    ---@diagnostic disable-next-line: redefined-local
+    local args, config = occurrence.parse_args(args)
+    require("occurrence.Occurrence").get():apply(api_config, args, config)
   end
 
   -- Register `Occurrence <name>` subcommand
@@ -135,18 +136,24 @@ function occurrence.resolve_config(config)
   return Config.new()
 end
 
--- Parse options table for API functions.
--- Note that `opts` may be string args coming from the command line.
----@param opts? occurrence.Options | occurrence.Config | string[]
----@return occurrence.Config
-function occurrence.parse_opts(opts)
-  if opts == nil or type(opts) ~= table or vim.tbl_isempty(opts) then
-    return occurrence.resolve_config()
-  elseif vim.islist(opts) then
-    -- TODO: support string[] options
-    error("Not implemented: string[] options are not supported yet")
+-- Parse args table for API functions.
+-- Note that `args` may be string args coming from the command line.
+---@param args? occurrence.Options | occurrence.Config | occurrence.SubcommandArgs
+---@return occurrence.SubcommandArgs?, occurrence.Config
+function occurrence.parse_args(args)
+  if
+    args == nil
+    or type(args) ~= table
+    or vim.tbl_isempty(args)
+    or vim.islist(args)
+    or args.count ~= nil
+    or args.range ~= nil
+  then
+    ---@cast args -occurrence.Options, -occurrence.Config
+    return args, occurrence.resolve_config()
   end
-  return occurrence.resolve_config(opts)
+  ---@cast args -occurrence.SubcommandArgs
+  return nil, occurrence.resolve_config(args)
 end
 
 -- Reset the occurrence plugin by removing keymaps
@@ -199,8 +206,9 @@ function occurrence.setup(opts)
     -- Create the main Occurrence command with subcommands
     vim.api.nvim_create_user_command("Occurrence", command.execute, {
       nargs = "+",
-      desc = "Occurrence command",
+      range = 0,
       force = true,
+      desc = "Occurrence command",
       complete = command.complete,
       preview = command.preview,
     })

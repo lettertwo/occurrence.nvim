@@ -245,7 +245,7 @@ describe("Occurrence", function()
 
       local foo = Occurrence.get(bufnr, "foo", "word")
       local matches = {}
-      for match in foo:matches(nil, "bar") do
+      for match in foo:matches(nil, nil, "bar") do
         table.insert(matches, tostring(match))
       end
 
@@ -259,7 +259,7 @@ describe("Occurrence", function()
 
       local foo = Occurrence.get(bufnr, "foo", "word")
       local matches = {}
-      for match in foo:matches(Range.deserialize("0:0::0:15"), "foo") do
+      for match in foo:matches(Range.deserialize("0:0::0:15"), nil, "foo") do
         table.insert(matches, tostring(match))
       end
 
@@ -278,7 +278,7 @@ describe("Occurrence", function()
       local occ = Occurrence.get(bufnr, "bar", "word")
       occ:add_pattern("baz", "word")
 
-      local matches = vim.iter(occ:matches(nil, "baz")):map(tostring):totable()
+      local matches = vim.iter(occ:matches(nil, nil, "baz")):map(tostring):totable()
       assert.same({
         "Range(start: Location(0, 16), stop: Location(0, 19))",
         "Range(start: Location(1, 16), stop: Location(1, 19))",
@@ -293,7 +293,7 @@ describe("Occurrence", function()
       occ:add_pattern("baz", "word")
 
       local matches = {}
-      for match in occ:matches(nil, { "foo", "baz" }) do
+      for match in occ:matches(nil, nil, { "foo", "baz" }) do
         table.insert(matches, tostring(match))
       end
       assert.same({
@@ -311,7 +311,7 @@ describe("Occurrence", function()
       occ:add_pattern("baz", "word")
 
       local matches = {}
-      for match in occ:matches(Range.deserialize("0:5::0:15"), { "foo", "baz" }) do
+      for match in occ:matches(Range.deserialize("0:5::0:15"), nil, { "foo", "baz" }) do
         table.insert(matches, tostring(match))
       end
       assert.same({

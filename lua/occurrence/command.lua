@@ -3,8 +3,12 @@ local log = require("occurrence.log")
 ---@module "occurrence.command"
 local command = {}
 
+---@class occurrence.SubcommandArgs: string[]
+---@field count? integer The count prefix given to the command
+---@field range? occurrence.Range The range given to the command
+
 ---@class occurrence.Subcommand
----@field impl fun(args:string[], opts: vim.api.keyset.create_user_command.command_args) The command implementation
+---@field impl fun(args: occurrence.SubcommandArgs) The command implementation
 -- :h command-preview
 -- Returns an integer:
 --   0: No preview is shown
@@ -32,13 +36,20 @@ end
 function command.execute(opts)
   local fargs = opts.fargs
   local subcommand_key = fargs[1]
-  local args = #fargs > 1 and { unpack(fargs, 2) } or {}
   local subcommand = subcommands[subcommand_key]
   if not subcommand then
     log.error("Unknown command: " .. tostring(subcommand_key))
     return
   end
-  subcommand.impl(args, opts)
+  local args = #fargs > 1 and { unpack(fargs, 2) } or {}
+  local range = opts.range -- The number of items in the command range: 0, 1 or 2
+  if range == 1 then
+    args.count = opts.count
+  elseif range == 2 then
+    local Range = require("occurrence.Range")
+    args.range = Range.new(Range.of_line(opts.line1).start, Range.of_line(opts.line2).stop)
+  end
+  subcommand.impl(args)
 end
 
 ---@param arglead string The leading portion of the argument being completed
@@ -49,7 +60,7 @@ function command.complete(arglead, cmdline, cursorpos)
   local subcommand_key, subcommand_arglead = cmdline:match("^['<,'>]*%S+[!]*%s+(%S*)%s(.*)$")
   if subcommand_key and subcommands[subcommand_key] and subcommands[subcommand_key].complete then
     return subcommands[subcommand_key].complete(subcommand_arglead, cursorpos)
-  elseif arglead then
+  elseif arglead and not subcommand_key or not subcommands[subcommand_key] then
     -- `:Occurrence <TAB>` or `:Occurrence <subcommand> <TAB>`
     return vim.tbl_keys(subcommands)
   end

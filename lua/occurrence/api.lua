@@ -1,4 +1,5 @@
 local Cursor = require("occurrence.Cursor")
+local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 
 local log = require("occurrence.log")
@@ -47,34 +48,54 @@ local mark = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceMark)",
   desc = "Mark occurrence",
-  callback = function(occurrence)
-    local visual = vim.fn.mode():match("[vV]") ~= nil
-    local hlsearch = vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= ""
+  callback = function(occurrence, args)
+    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local hlsearch = (args and args[1] ~= nil) or (vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "")
+    local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
+    local cursor = Cursor.save()
+    local new_pattern = nil
 
     if occurrence:has_matches() then
       if visual then
-        local selection_range = Range.of_selection()
+        local selection_range = args and args.range or Range.of_selection()
         if selection_range and occurrence:has_matches(selection_range) then
-          for range in occurrence:matches(selection_range) do
+          for range in occurrence:matches(selection_range, count) do
             occurrence:mark(range)
           end
         end
       else
-        local cursor = Cursor.save()
-        local range = occurrence:match_cursor()
-        if range and range:contains(cursor.location) then
-          occurrence:mark(range)
+        local match = occurrence:match_cursor()
+        if match and match:contains(cursor.location) then
+          for range in occurrence:matches(cursor.location, count or 1) do
+            occurrence:mark(range)
+          end
         else
           cursor:restore()
-          occurrence:of_word(true)
+          if hlsearch then
+            if occurrence:of_pattern(count == nil, args and args[1] or nil) then
+              new_pattern = occurrence.patterns[#occurrence.patterns]
+            end
+          elseif occurrence:of_word(count == nil) then
+            new_pattern = occurrence.patterns[#occurrence.patterns]
+          end
         end
       end
     elseif visual then
-      occurrence:of_selection(true)
+      if occurrence:of_selection(count == nil, args and args.range or nil) then
+        new_pattern = occurrence.patterns[#occurrence.patterns]
+      end
     elseif hlsearch then
-      occurrence:of_pattern(true)
-    else
-      occurrence:of_word(true)
+      if occurrence:of_pattern(count == nil, args and args[1] or nil) then
+        new_pattern = occurrence.patterns[#occurrence.patterns]
+      end
+    elseif occurrence:of_word(count == nil) then
+      new_pattern = occurrence.patterns[#occurrence.patterns]
+    end
+
+    if count ~= nil and new_pattern then
+      for range in occurrence:matches(cursor.location, count, new_pattern) do
+        occurrence:mark(range)
+      end
     end
   end,
 }
@@ -92,19 +113,20 @@ local unmark = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceUnmark)",
   desc = "Unmark occurrence",
-  callback = function(occurrence)
-    local visual = vim.fn.mode():match("[vV]") ~= nil
+  callback = function(occurrence, args)
+    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
+
     if occurrence:has_matches() then
       if visual then
-        local selection_range = Range:of_selection()
+        local selection_range = args and args.range or Range.of_selection()
         if selection_range then
-          for range in occurrence:matches(selection_range) do
+          for range in occurrence:matches(selection_range, count) do
             occurrence:unmark(range)
           end
         end
       else
-        local range = occurrence:match_cursor()
-        if range then
+        for range in occurrence:matches(Location.of_cursor(), count or 1) do
           occurrence:unmark(range)
         end
       end
@@ -129,45 +151,58 @@ local toggle = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceToggle)",
   desc = "Add/Toggle occurrence mark(s)",
-  callback = function(occurrence)
-    local visual = vim.fn.mode():match("[vV]") ~= nil
-    local hlsearch = vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= ""
+  callback = function(occurrence, args)
+    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local hlsearch = (args and args[1] ~= nil) or (vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "")
+    local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
+    local cursor = Cursor.save()
+    local new_pattern = nil
 
     if occurrence:has_matches() then
       if visual then
-        local selection_range = Range.of_selection()
+        local selection_range = args and args.range or Range.of_selection()
         if selection_range and occurrence:has_matches(selection_range) then
-          for range in occurrence:matches(selection_range) do
+          for range in occurrence:matches(selection_range, count) do
             if not occurrence:mark(range) then
               occurrence:unmark(range)
             end
           end
         end
       else
-        local cursor = Cursor.save()
-        local range = occurrence:match_cursor()
-        if range and range:contains(cursor.location) then
-          if not occurrence:mark(range) then
-            occurrence:unmark(range)
+        local match = occurrence:match_cursor()
+        if match and match:contains(cursor.location) then
+          for range in occurrence:matches(cursor.location, count or 1) do
+            if not occurrence:mark(range) then
+              occurrence:unmark(range)
+            end
           end
         else
           cursor:restore()
-          if occurrence:of_word() then
-            occurrence:mark(occurrence:match_cursor())
-            cursor:restore()
+          if hlsearch then
+            if occurrence:of_pattern(false, args and args[1] or nil) then
+              new_pattern = occurrence.patterns[#occurrence.patterns]
+            end
+          elseif occurrence:of_word() then
+            new_pattern = occurrence.patterns[#occurrence.patterns]
           end
         end
       end
     elseif visual then
-      if occurrence:of_selection() then
-        occurrence:mark(occurrence:match_cursor())
+      if occurrence:of_selection(false, args and args.range or nil) then
+        new_pattern = occurrence.patterns[#occurrence.patterns]
       end
     elseif hlsearch then
-      if occurrence:of_pattern() then
-        occurrence:mark(occurrence:match_cursor())
+      if occurrence:of_pattern(false, args and args[1] or nil) then
+        new_pattern = occurrence.patterns[#occurrence.patterns]
       end
     elseif occurrence:of_word() then
-      occurrence:mark(occurrence:match_cursor())
+      new_pattern = occurrence.patterns[#occurrence.patterns]
+    end
+
+    if new_pattern then
+      for range in occurrence:matches(cursor.location, count or 1, new_pattern) do
+        occurrence:mark(range)
+      end
     end
   end,
 }
@@ -182,11 +217,14 @@ local next = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceNext)",
   desc = "Next marked occurrence",
-  callback = function(occurrence)
+  callback = function(occurrence, args)
     if not occurrence:has_matches() then
       mark.callback(occurrence)
     end
-    occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
+    local count = args and args.count or vim.v.count1
+    for _ = 1, count do
+      occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
+    end
   end,
 }
 
@@ -200,11 +238,14 @@ local previous = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrencePrevious)",
   desc = "Previous marked occurrence",
-  callback = function(occurrence)
+  callback = function(occurrence, args)
     if not occurrence:has_matches() then
       mark.callback(occurrence)
     end
-    occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
+    local count = args and args.count or vim.v.count1
+    for _ = 1, count do
+      occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
+    end
   end,
 }
 
@@ -219,11 +260,14 @@ local match_next = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceMatchNext)",
   desc = "Next occurrence match",
-  callback = function(occurrence)
+  callback = function(occurrence, args)
     if not occurrence:has_matches() then
       mark.callback(occurrence)
     end
-    occurrence:match_cursor({ direction = "forward", wrap = true })
+    local count = args and args.count or vim.v.count1
+    for _ = 1, count do
+      occurrence:match_cursor({ direction = "forward", wrap = true })
+    end
   end,
 }
 
@@ -238,11 +282,14 @@ local match_previous = {
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceMatchPrevious)",
   desc = "Previous occurrence match",
-  callback = function(occurrence)
+  callback = function(occurrence, args)
     if not occurrence:has_matches() then
       mark.callback(occurrence)
     end
-    occurrence:match_cursor({ direction = "backward", wrap = true })
+    local count = args and args.count or vim.v.count1
+    for _ = 1, count do
+      occurrence:match_cursor({ direction = "backward", wrap = true })
+    end
   end,
 }
 

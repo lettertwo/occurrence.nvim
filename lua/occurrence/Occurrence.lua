@@ -25,7 +25,7 @@ local OCCURRENCE_CACHE = {}
 -- The first argument will always be the `Occurrence` for the current buffer.
 -- The second argument will be the current `Config`.
 -- If the function returns `false`, the occurrence will be disposed.
----@alias occurrence.KeymapCallback fun(occurrence: occurrence.Occurrence): false?
+---@alias occurrence.KeymapCallback fun(occurrence: occurrence.Occurrence, args?: occurrence.SubcommandArgs): false?
 
 -- A configuration for an occurrence mode keymap.
 -- A keymap defined this way will be buffer-local and
@@ -498,12 +498,29 @@ end
 
 -- Get an iterator of matching occurrence ranges.
 -- If `range` is provided, only yields the occurrences contained within the given `Range`.
+-- If `start` is provided instead of `range`, yields occurrences starting from the given `Location`.
+-- If `count` is provided, yields at most `count` occurrences.
 -- If `patterns` is provided, only yields occurrences matching these patterns.
 ---@param range? occurrence.Range
+---@param count? number
 ---@param patterns? string | string[]
 ---@return fun(): occurrence.Range? next_match
-function Occurrence:matches(range, patterns)
-  local start_location = range and range.start or Location.new(0, 0)
+---@overload fun(self: occurrence.Occurrence, start: occurrence.Location, count?: number, patterns?: string | string[]): fun(): occurrence.Range? next_match
+function Occurrence:matches(range, count, patterns)
+  local start_location = nil
+  if type(range) == "table" then
+    if range.start and range.start.col and range.start.line then
+      start_location = range.start
+    else
+      ---@cast range -occurrence.Range
+      if range.line and range.col then
+        ---@cast range +occurrence.Location
+        start_location = range
+        range = nil
+      end
+    end
+  end
+  start_location = start_location or Location.new(0, 0)
   local last_location = start_location
 
   if patterns == nil then
@@ -549,7 +566,12 @@ function Occurrence:matches(range, patterns)
     return acc
   end)
 
+  local total = 0
   local function next_match()
+    if count and count > 0 and total >= count then
+      return nil
+    end
+    total = total + 1
     local next_best_match = nil
     for _, next_pattern_match in ipairs(pattern_matchers) do
       local match = next_pattern_match.peek()
@@ -610,7 +632,7 @@ function Occurrence:add_pattern(text, pattern_type)
   end
 
   table.insert(self.patterns, pattern)
-  for match in self:matches(nil, pattern) do
+  for match in self:matches(nil, nil, pattern) do
     self.extmarks:add(match)
   end
   return pattern
@@ -625,11 +647,12 @@ end
 -- Clears the visual selection after adding the pattern.
 --
 ---@param mark? boolean Whether to mark all occurrences of the selection.
+---@param range? occurrence.Range The range of the visual selection. If not provided, uses the current visual selection.
 ---@return boolean success Whether a new pattern was added.
-function Occurrence:of_selection(mark)
+function Occurrence:of_selection(mark, range)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
 
-  local range = Range.of_selection()
+  range = range or Range.of_selection()
   if not range then
     log.warn("No visual selection")
     return false
@@ -651,7 +674,7 @@ function Occurrence:of_selection(mark)
 
   if mark then
     -- mark all occurrences of the newest pattern
-    for match in self:matches(nil, pattern) do
+    for match in self:matches(nil, nil, pattern) do
       self:mark(match)
     end
   end
@@ -667,11 +690,12 @@ end
 -- Clears the search highlight after adding the pattern.
 --
 ---@param mark? boolean Whether to mark all occurrences of the pattern.
+---@param search_pattern? string The search pattern to add. If not provided, uses the last search pattern.
 ---@return boolean success Whether a new pattern was added.
-function Occurrence:of_pattern(mark)
+function Occurrence:of_pattern(mark, search_pattern)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
 
-  local search_pattern = vim.fn.getreg("/")
+  search_pattern = search_pattern or vim.fn.getreg("/")
 
   if search_pattern == "" then
     log.warn("No search pattern available")
@@ -685,7 +709,7 @@ function Occurrence:of_pattern(mark)
 
   if mark then
     -- mark all occurrences of the newest pattern
-    for match in self:matches(nil, pattern) do
+    for match in self:matches(nil, nil, pattern) do
       self:mark(match)
     end
   end
@@ -698,11 +722,12 @@ end
 -- Returns `true` if a new pattern was added, `false` otherwise.
 -- If no word exists under the cursor, logs a warning and returns `false`.
 ---@param mark? boolean Whether to mark all occurrences of the word.
+---@param word? string The word to add. If not provided, uses the word under the cursor.
 ---@return boolean success Whether a new pattern was added.
-function Occurrence:of_word(mark)
+function Occurrence:of_word(mark, word)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
 
-  local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
+  word = word or vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
 
   if word == "" then
     log.warn("No word under cursor")
@@ -713,7 +738,7 @@ function Occurrence:of_word(mark)
 
   if mark then
     -- mark all occurrences of the newest pattern
-    for match in self:matches(nil, pattern) do
+    for match in self:matches(nil, nil, pattern) do
       self:mark(match)
     end
   end
@@ -733,13 +758,19 @@ function Occurrence:clear()
   self.patterns = {}
 end
 
----@param operator_key? string If nil, modifies the pending operator.
+---@class occurrence.ModifyOperatorOptions
+---@field operator? string The operator to modify (e.g. "d", "y", etc). If `nil`, modifies the pending operator.
+---@field count? number The count to use for the operator
+---@field register? string The register to use for the operator
+
+---@param options? occurrence.ModifyOperatorOptions
 ---@param config? occurrence.Config
-function Occurrence:modify_operator(operator_key, config)
+function Occurrence:modify_operator(options, config)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
 
-  local count, register = vim.v.count, vim.v.register
-  operator_key = operator_key or vim.v.operator
+  local count = (options and options.count) or vim.v.count
+  local register = (options and options.register) or vim.v.register
+  local operator_key = (options and options.operator) or vim.v.operator
 
   config = require("occurrence").resolve_config(config)
   local operator_config = config:get_operator_config(operator_key, "o")
@@ -814,7 +845,7 @@ function Occurrence:activate_occurrence_mode(config)
       elseif action_config.callback then
         -- Fall back to direct callback
         self.keymap:set(mode, action_key, function()
-          self:apply(action_config, config)
+          self:apply(action_config, nil, config)
         end, { desc = desc })
       else
         -- No plug or callback defined
@@ -868,8 +899,9 @@ end
 -- and if it returns `false`, any followup behavior (as with "occurrence-mode" and "operator-modifier" types)
 -- will be skipped, and this occurrence will be disposed.
 ---@param action occurrence.KeymapAction | occurrence.ApiConfig | occurrence.KeymapConfig | occurrence.KeymapCallback
+---@param args? occurrence.SubcommandArgs
 ---@param config? occurrence.Config
-function Occurrence:apply(action, config)
+function Occurrence:apply(action, args, config)
   local callback = nil
   local action_config = nil
 
@@ -884,7 +916,7 @@ function Occurrence:apply(action, config)
   if action_config and (action_config.type or action_config.callback or action_config.operator) then
     if action_config.type == "occurrence-mode" then
       ---@cast action_config occurrence.OccurrenceModeConfig
-      local ok, result = pcall(action_config.callback, self, config)
+      local ok, result = pcall(action_config.callback, self, args)
       if not ok or result == false then
         log.debug("Occurrence mode action cancelled")
         self:dispose()
@@ -903,22 +935,30 @@ function Occurrence:apply(action, config)
         return
       end
 
-      if not vim.api.nvim_get_mode().mode:match("o") then
+      if not vim.api.nvim_get_mode().mode:match("o") and (not args or not args[1]) then
         log.error("modify_operator can only be called in operator-pending mode")
         return
       end
 
-      local ok, result = pcall(action_config.callback, self, config)
+      local ok, result = pcall(action_config.callback, self, args)
       if not ok or result == false then
         log.debug("Operator modifier cancelled")
         self:dispose()
         return
       end
-
-      self:modify_operator(nil, config)
+      self:modify_operator(args and {
+        count = args.count,
+        operator = args[1],
+        register = args[2],
+      } or nil, config)
       return
     elseif action_config.operator ~= nil then
-      self:apply_operator(action_config.operator, nil, config)
+      self:apply_operator(action_config.operator, args and {
+        count = args.count,
+        motion = args.range,
+        motion_type = args.range and "line" or nil,
+        register = args[1],
+      } or nil, config)
       return
     else
       callback = action_config.callback
@@ -926,7 +966,7 @@ function Occurrence:apply(action, config)
   end
 
   if callback and callable(callback) then
-    local result = callback(self)
+    local result = callback(self, args)
     if result == false then
       log.debug("Occurrence mode action cancelled")
       self:dispose()
