@@ -62,6 +62,10 @@ local mark = {
           for range in occurrence:matches(selection_range, count) do
             occurrence:mark(range)
           end
+        else
+          if occurrence:of_selection(count == nil, args and args.range or nil) then
+            new_pattern = occurrence.patterns[#occurrence.patterns]
+          end
         end
       else
         local match = occurrence:match_cursor()

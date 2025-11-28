@@ -352,6 +352,133 @@ describe("integration tests", function()
       lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({ "no matches on this line" }, lines, "Buffer should only have one line")
     end)
+
+    it("respects hlsearch when active", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+
+      vim.cmd([[silent! /bar]]) -- Search for 'bar'
+
+      -- Activate occurrence (should mark 'bar' due to hlsearch)
+      feedkeys("q")
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(1, #marks, "Should have 1 mark for 'bar'")
+      assert.same({ { 1, 0, 4 } }, marks, "'bar' should be marked at position 4")
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
+
+    it("respects visual selection when in visual mode", function()
+      bufnr = util.buffer("foo bar baz foo bar")
+
+      plugin.setup({})
+      vim.keymap.set("v", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+
+      feedkeys("v2e") -- visually select `foo bar`
+
+      -- Activate occurrence (should mark 'foo bar' due to visual selection)
+      feedkeys("q")
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(2, #marks, "Should have 2 marks for 'foo'")
+      assert.same({ { 1, 0, 0 }, { 2, 0, 12 } }, marks, "Both 'foo bar' occurrences should be marked")
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
+
+    it("adds new word patterns while in occurrence mode", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+
+      -- Activate occurrence on 'foo'
+      feedkeys("q")
+
+      -- Verify marks for 'foo'
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      -- Move to 'bar' and add new pattern
+      feedkeys("w") -- Move to 'bar'
+      feedkeys("q")
+
+      -- Verify marks for 'foo' and 'bar'
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(3, #marks, "Both 'foo' occurrences and 'bar' should be marked")
+      assert.same({ { 1, 0, 0 }, { 3, 0, 4 }, { 2, 0, 12 } }, marks, "'foo' and 'bar' should be marked")
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
+
+    it("adds new search patterns while in occurrence mode", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+
+      vim.cmd([[silent! /ba]]) -- Search for 'ba'
+
+      -- Activate occurrence (should mark 'bar' and 'baz')
+      feedkeys("q")
+
+      -- Verify marks for 'bar' and 'baz'
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(2, #marks, "2 'ba' should be marked")
+      assert.same({ { 1, 0, 4 }, { 2, 0, 8 } }, marks, "2 'ba' should be marked")
+
+      -- Move to 'foo' and add new pattern
+      feedkeys("0") -- Move to start of line
+      vim.cmd([[silent! /foo]]) -- Search for 'ba'
+      feedkeys("q")
+
+      -- Verify marks for 'bar', 'baz', and both 'foo'
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(4, #marks, "Both 'foo' occurrences and 'ba' occurrences should be marked")
+      assert.same(
+        { { 3, 0, 0 }, { 1, 0, 4 }, { 2, 0, 8 }, { 4, 0, 12 } },
+        marks,
+        "'foo', 'bar', and 'baz' should be marked"
+      )
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
+
+    it("adds new visual selection patterns while in occurrence mode", function()
+      bufnr = util.buffer("foo bar baz bat foo bar baz bat")
+
+      plugin.setup({})
+      vim.keymap.set("v", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+
+      feedkeys("v2e") -- visually select `foo bar`
+
+      -- Activate occurrence (should mark 'foo bar' due to visual selection)
+      feedkeys("q")
+
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(2, #marks, "Should have 2 marks for 'foo bar'")
+      assert.same({ { 1, 0, 0 }, { 2, 0, 16 } }, marks, "Both 'foo bar' occurrences should be marked")
+
+      -- Visually select 'bar' and add new pattern
+      feedkeys("w") -- Move to 'bar'
+      feedkeys("v2e") -- Visually select 'bar baz'
+      feedkeys("q")
+
+      -- Verify marks for 'foo bar' and 'bar baz'
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(4, #marks, "Both 'foo bar' and 'bar baz' occurrences should be marked")
+      assert.same({ { 1, 0, 0 }, { 3, 0, 8 }, { 2, 0, 16 }, { 4, 0, 24 } }, marks, "All occurrences should be marked")
+
+      -- Clean up
+      feedkeys("<Esc>")
+    end)
   end)
 
   describe("deactivate", function()
