@@ -350,7 +350,7 @@ describe("integration tests", function()
 
       feedkeys("dd") -- normal delete operator should work
       lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      assert.same({ " bar baz " }, lines, "Buffer should only have one line")
+      assert.same({ "no matches on this line" }, lines, "Buffer should only have one line")
     end)
   end)
 

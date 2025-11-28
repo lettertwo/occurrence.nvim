@@ -59,10 +59,11 @@ local _set_opfunc = vim.fn[vim.api.nvim_exec2(
 ---@param marks [integer, occurrence.Range][] The marks to operate on.
 ---@param ctx occurrence.OpfuncContext The opfunc context.
 local function apply_operator(occurrence, operator, marks, ctx)
+  local original_cursor = Cursor.save()
+  -- String operator: use feedkeys
   if type(operator) == "string" then
-    -- String operator: use feedkeys
-    local original_cursor = Cursor.save()
     local edited = 0
+    local last_edited = nil
 
     -- Visually select and feedkeys for each mark in reverse order
     for i = #marks, 1, -1 do
@@ -73,21 +74,25 @@ local function apply_operator(occurrence, operator, marks, ctx)
       end
 
       Cursor.move(mark.start)
-      -- Clear any visual selection before (re-)entering visual mode
       feedkeys.change_mode("v", { force = true, silent = true })
       Cursor.move(mark.stop)
       occurrence.extmarks:unmark(id)
       feedkeys(operator, { noremap = true })
 
       edited = edited + 1
+      last_edited = mark
     end
-
-    original_cursor:restore()
 
     if edited == 0 then
       log.debug("No marks to execute", operator)
     else
       log.debug("Executed", operator, "on", edited, "marks")
+    end
+
+    if last_edited then
+      original_cursor:move(last_edited.start)
+    else
+      original_cursor:restore()
     end
   else
     -- Callback operator: Collect edits in traversal order,
@@ -182,6 +187,10 @@ local function apply_operator(occurrence, operator, marks, ctx)
 
     if #edits > 0 then
       log.debug("Replaced", #edits, "marks")
+      local _, first_edit = unpack(edits[1])
+      original_cursor:move(first_edit.start)
+    else
+      original_cursor:restore()
     end
   end
 end
@@ -280,11 +289,6 @@ local function create_opfunc(occurrence, operator, ctx)
       if ctx.mode == "v" then
         -- Clear visual selection
         feedkeys.change_mode("n", { noflush = true, silent = true })
-        if cursor and range then
-          -- Move the cursor back to the start of the selection.
-          -- This seems to be what nvim does after a visual operation?
-          cursor:move(range.start)
-        end
       end
 
       cursor = nil
