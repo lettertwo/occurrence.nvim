@@ -134,7 +134,8 @@ require("occurrence").setup({
   --
   -- Additionally, when `false`, only keymaps explicitly defined in `keymaps`
   -- will be automatically set when activating occurrence mode. Keymaps for
-  -- occurrence mode can also be set manually using the `on_activate` callback.
+  -- occurrence mode can also be set manually in an `OccurrenceActivate`
+  -- autocmd using `occurrence.keymap:set(...)`.
   --
   -- Default `operators` will still be set unless `default_operators` is also `false`.
   --
@@ -189,17 +190,6 @@ require("occurrence").setup({
     ["g~"] = "swap_case",         -- Swap case
     ["g?"] = "rot13",             -- ROT13 encoding
   },
-
-  -- A callback that is invoked when occurrence mode is activated.
-  -- The callback receives a `map` function that can be used
-  -- to set additional keymaps for occurrence mode.
-  --
-  -- Any keymaps set using this `map` function will automatically be
-  -- buffer-local and will be removed when occurrence mode is deactivated.
-  --
-  -- Receives a function with the same signature as `:h vim.keymap.set`:
-  --`map(mode, lhs, rhs, opts)`
-  on_activate = nil,
 })
 ```
 
@@ -231,26 +221,15 @@ You can disable default keymaps and set up custom ones:
 
 ```lua
 require("occurrence").setup({
+  -- NOTE: If you disable default keymaps
+  -- you'll want a way to exit occurrence mode!
   default_keymaps = false,  -- Disable defaults
   keymaps = {
     -- Custom navigation
     ["<Tab>"] = "next",
     ["<S-Tab>"] = "previous",
+    ["q"] = "deactivate",  -- Exit occurrence mode
   },
-  on_activate = function(map)
-    -- Batch operations
-    map("n", "<leader>a", function()
-      assert(require("occurrence").get()):mark_all()
-    end)
-    map("n", "<leader>x", function()
-      assert(require("occurrence").get()):unmark_all()
-    end)
-
-    -- Exit
-    -- NOTE: If you disable default keymaps
-    -- you'll want a way to exit occurrence mode!
-    map("n", "q", "<Plug>(OccurrenceDeactivate)")
-  end,
 })
 
 -- Set up custom keymaps using <Plug> mappings
@@ -263,6 +242,24 @@ vim.keymap.set("v", "<C-o>", "<cmd>Occurrence toggle<CR>")
 vim.keymap.set("o", "<C-o>", function()
   require('occurrence').modify_operator()
 end)
+
+-- Set up custom keymaps on occurrence activation.
+-- These keymaps will be buffer-local and active only in occurrence mode.
+vim.api.nvim_create_autocmd("User", {
+  pattern = "OccurrenceActivate",
+  callback = function(e)
+    local occurrence = require("occurrence").get(e.buf)
+    if occurrence and not occurrence:is_disposed() then
+      -- Batch operations
+      occurrence.keymap:set("n", "<leader>a", function()
+        assert(require("occurrence").get()):mark_all()
+      end)
+      occurrence.keymap:set("n", "<leader>x", function()
+        assert(require("occurrence").get()):unmark_all()
+      end)
+    end
+  end,
+})
 ```
 
 ## Operators
@@ -668,7 +665,7 @@ require("occurrence").setup({
       desc = "Delete marked occurrences on line",
       callback = function(occ)
         local range = require("occurrence.Range").of_line()
-        occ:apply_operator("delete", range, "line")
+        occ:apply_operator("delete", { motion = range, motion_type = "line" })
       end,
     },
     -- D - Delete marked occurrences from cursor to end of line
@@ -676,23 +673,27 @@ require("occurrence").setup({
       mode = "n",
       desc = "Delete marked occurrences from cursor to end of line",
       callback = function(occ)
-        occ:apply_operator("delete", "$")
+        occ:apply_operator("delete", { motion = "$" })
       end,
     },
   },
-  -- or use the `on_activate` callback to set them up.
-  on_activate = function(map)
-    -- cc - Change marked occurrences on current line
-    map("n", "cc", function()
-      local occ = require('occurrence.Occurrence').get()
-      local range = require("occurrence.Range").of_line()
-      occ:apply_operator("change", range, "line")
-    end, { desc = "Change marked occurrences on line" })
-    -- C - Change marked occurrences from cursor to end of line
-    map("n", "C", function()
-      local occ = require("occurrence.Occurrence").get()
-      occ:apply_operator("change", "$")
-    end, { desc = "Change marked occurrences from cursor to end of line" })
+})
+-- or use the `OccurrenceActivate` autocmd to set them up.
+vim.api.nvim_create_autocmd("User", {
+  pattern = "OccurrenceActivate",
+  callback = function(e)
+    local occurrence = require("occurrence").get(e.buf)
+    if occurrence and not occurrence:is_disposed() then
+      -- cc - Change marked occurrences on current line
+      occurrence.keymap:set("n", "cc", function()
+        local range = require("occurrence.Range").of_line()
+        occurrence:apply_operator("change", { motion = range, motion_type = "line" })
+      end, { desc = "Change marked occurrences on line" })
+      -- C - Change marked occurrences from cursor to end of line
+      occurrence.keymap:set("n", "C", function()
+        occurrence:apply_operator("change", { motion = "$" })
+      end, { desc = "Change marked occurrences from cursor to end of line" })
+    end
   end,
 })
 ```

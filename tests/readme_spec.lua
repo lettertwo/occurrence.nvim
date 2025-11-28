@@ -35,17 +35,21 @@ describe("README examples", function()
         "It contains several words.",
         "This is a buffer for testing occurrence plugin.",
       })
-      plugin.setup({
-        default_keymaps = false,
-        on_activate = function(map)
-          map("n", "q", "<Plug>(OccurrenceDeactivate)")
-        end,
-      })
+      plugin.setup({ default_keymaps = false })
       vim.keymap.set("n", "<leader>o", "<Plug>(OccurrenceMark)")
       vim.keymap.set("v", "<C-o>", "<cmd>Occurrence toggle<CR>")
       vim.keymap.set("o", "<C-o>", function()
         require("occurrence").modify_operator()
       end)
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "OccurrenceActivate",
+        callback = function(e)
+          local occurrence = require("occurrence").get(e.buf)
+          if occurrence and not occurrence:is_disposed() then
+            occurrence.keymap:set("n", "q", "<Plug>(OccurrenceDeactivate)")
+          end
+        end,
+      })
 
       local mappings = vim.api.nvim_get_keymap("n")
       local has_leader_o = false
@@ -117,19 +121,8 @@ describe("README examples", function()
         keymaps = {
           ["<Tab>"] = "next",
           ["<S-Tab>"] = "previous",
+          ["q"] = "deactivate",
         },
-        on_activate = function(map)
-          -- Batch operations
-          map("n", "<leader>a", function()
-            assert(require("occurrence").get()):mark_all()
-          end)
-          map("n", "<leader>x", function()
-            assert(require("occurrence").get()):unmark_all()
-          end)
-
-          -- Exit
-          map("n", "q", "<Plug>(OccurrenceDeactivate)")
-        end,
         operators = {
           ["c"] = "change",
           ["d"] = "delete",
@@ -163,6 +156,22 @@ describe("README examples", function()
 
       -- Set up custom keymaps using <Plug> mappings
       vim.keymap.set({ "n", "v" }, "<leader>o", "<Plug>(OccurrenceMark)")
+
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "OccurrenceActivate",
+        callback = function(e)
+          local occurrence = require("occurrence").get(e.buf)
+          if occurrence and not occurrence:is_disposed() then
+            -- Batch operations
+            occurrence.keymap:set("n", "<leader>a", function()
+              assert(require("occurrence").get()):mark_all()
+            end)
+            occurrence.keymap:set("n", "<leader>x", function()
+              assert(require("occurrence").get()):unmark_all()
+            end)
+          end
+        end,
+      })
 
       -- Verify keymaps are set
       local mappings = vim.api.nvim_get_keymap("n")
@@ -589,14 +598,19 @@ describe("README examples", function()
         "change foo other foo",
       })
 
-      plugin.setup({
-        on_activate = function(map)
-          -- cc - Change marked occurrences on current line
-          map("n", "cc", function()
-            local occ = require("occurrence.Occurrence").get()
-            local range = require("occurrence.Range").of_line()
-            occ:apply_operator("change", { motion = range, motion_type = "line" })
-          end, { desc = "Change marked occurrences on line" })
+      plugin.setup({})
+
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "OccurrenceActivate",
+        callback = function(e)
+          local occurrence = require("occurrence").get(e.buf)
+          if occurrence and not occurrence:is_disposed() then
+            -- cc - Change marked occurrences on current line
+            occurrence.keymap:set("n", "cc", function()
+              local range = require("occurrence.Range").of_line()
+              occurrence:apply_operator("change", { motion = range, motion_type = "line" })
+            end, { desc = "Change marked occurrences on line" })
+          end
         end,
       })
 
@@ -650,13 +664,18 @@ describe("README examples", function()
         "change foo everywhere foo",
       })
 
-      plugin.setup({
-        on_activate = function(map)
-          -- C - Change marked occurrences from cursor to end of line
-          map("n", "C", function()
-            local occ = require("occurrence.Occurrence").get()
-            occ:apply_operator("change", { motion = "$" })
-          end, { desc = "Change marked occurrences from cursor to end of line" })
+      plugin.setup({})
+
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "OccurrenceActivate",
+        callback = function(e)
+          local occurrence = require("occurrence").get(e.buf)
+          if occurrence and not occurrence:is_disposed() then
+            -- C - Change marked occurrences from cursor to end of line
+            occurrence.keymap:set("n", "C", function()
+              occurrence:apply_operator("change", { motion = "$" })
+            end, { desc = "Change marked occurrences from cursor to end of line" })
+          end
         end,
       })
 

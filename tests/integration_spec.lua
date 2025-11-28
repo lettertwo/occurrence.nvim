@@ -823,31 +823,39 @@ describe("integration tests", function()
       feedkeys("<Esc>")
     end)
 
-    it("on_activate callback works alongside keymaps config", function()
+    it("programmatic keymap works alongside keymaps config", function()
       bufnr = util.buffer("foo bar baz foo")
 
-      local on_activate_called = false
+      local activate_called = false
       local custom_keymap_set = false
 
       plugin.setup({
         keymaps = {
           ["<Tab>"] = "next",
         },
-        on_activate = function(map)
-          on_activate_called = true
-          map("n", "z", function()
-            custom_keymap_set = true
-          end, { desc = "Custom on_activate keymap" })
-        end,
       })
       vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "OccurrenceActivate",
+        callback = function(e)
+          activate_called = true
+          local occurrence = require("occurrence").get(e.buf)
+          if occurrence and not occurrence:is_disposed() then
+            -- Set up additional custom keymap on activation
+            occurrence.keymap:set("n", "z", function()
+              custom_keymap_set = true
+            end, { desc = "Custom activate keymap" })
+          end
+        end,
+      })
 
       -- Activate occurrence on 'foo'
       feedkeys("q")
 
-      assert.is_true(on_activate_called, "on_activate callback should have been called")
+      assert.is_true(activate_called, "activate callback should have been called")
 
-      -- Check that both keymaps config and on_activate keymaps are set
+      -- Check that both keymaps config and activate keymaps are set
       local mappings = vim.api.nvim_buf_get_keymap(bufnr, "n")
 
       local tab_found = false
@@ -855,17 +863,17 @@ describe("integration tests", function()
       for _, map in ipairs(mappings) do
         if map.lhs == "<Tab>" then
           tab_found = true
-        elseif map.lhs == "z" and map.desc == "Custom on_activate keymap" then
+        elseif map.lhs == "z" and map.desc == "Custom activate keymap" then
           z_found = true
         end
       end
 
       assert.is_true(tab_found, "<Tab> from keymaps config should be mapped")
-      assert.is_true(z_found, "'z' from on_activate should be mapped")
+      assert.is_true(z_found, "'z' from activate should be mapped")
 
-      -- Test custom on_activate keymap
+      -- Test custom activate keymap
       feedkeys("z")
-      assert.is_true(custom_keymap_set, "Custom on_activate keymap should work")
+      assert.is_true(custom_keymap_set, "Custom activate keymap should work")
 
       -- Clean up
       feedkeys("<Esc>")

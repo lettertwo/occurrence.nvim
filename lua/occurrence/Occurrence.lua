@@ -881,11 +881,7 @@ function Occurrence:activate_occurrence_mode(config)
     end
   end
 
-  if callable(config.on_activate) then
-    config.on_activate(function(mode, lhs, rhs, opts)
-      self.keymap:set(mode, lhs, rhs, opts)
-    end)
-  end
+  vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceActivate" })
 end
 
 -- Apply the given `action` and `config` to this occurrence.

@@ -25,7 +25,8 @@ local config = {}
 --
 -- Additionally, when `false`, only keymaps explicitly defined in `keymaps`
 -- will be automatically set when activating occurrence mode. Keymaps for
--- occurrence mode can also be set manually using the `on_activate` callback.
+-- occurrence mode can also be set manually in an `OccurrenceActivate`
+-- autocmd using `occurrence.keymap:set(...)`.
 --
 -- Default `operators` will still be set unless `default_operators` is also `false`.
 --
@@ -52,16 +53,6 @@ local config = {}
 --   - a table defining a custom operator configuration,
 --   - or `false` to disable the operator.
 ---@field operators? occurrence.OperatorKeymapConfig
--- A callback that is invoked when occurrence mode is activated.
--- The callback receives a `map` function that can be used
--- to set additional keymaps for occurrence mode.
---
--- Any keymaps set using this `map` function will automatically be
--- buffer-local and will be removed when occurrence mode is deactivated.
---
--- Receives a function with the same signature as `:h vim.keymap.set`:
---`map(mode, lhs, rhs, opts)`
----@field on_activate? fun(map: occurrence.KeymapSetFn): nil
 
 ---@type { [string]: occurrence.KeymapAction }
 local DEFAULT_OCCURRENCE_KEYMAPS = {
@@ -100,7 +91,6 @@ local DEFAULT_CONFIG = {
   operators = DEFAULT_OPERATORS,
   default_keymaps = true,
   default_operators = true,
-  on_activate = nil,
 }
 
 ---@param value occurrence.OperatorConfig
@@ -129,7 +119,6 @@ end
 ---@field default_operators boolean
 ---@field keymaps occurrence.OccurrenceModeKeymapConfig
 ---@field operators occurrence.OperatorKeymapConfig
----@field on_activate? fun(map: occurrence.KeymapSetFn): nil
 local Config = {}
 
 ---@param name string
@@ -271,7 +260,6 @@ function config.validate(opts)
       operators = { "table", true },
       default_keymaps = { "boolean", true },
       default_operators = { "boolean", true },
-      on_activate = { "callable", true },
     }
 
     for key, validator in pairs(valid_keys) do
