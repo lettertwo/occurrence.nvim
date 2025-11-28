@@ -31,6 +31,7 @@ describe("dot repeat functionality", function()
       default_operators = false,
       operators = {
         d = {
+          inner = false,
           operator = function()
             return ""
           end,
@@ -49,7 +50,7 @@ describe("dot repeat functionality", function()
     feedkeys("d$")
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", "foo test foo end" }, lines, "First line 'foo' occurrences should be deleted")
+    assert.same({ "bar baz", "foo test foo end" }, lines, "First line 'foo' occurrences should be deleted")
 
     marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.equals(2, #marks, "Two 'foo' marks should remain on second line")
@@ -59,7 +60,7 @@ describe("dot repeat functionality", function()
     feedkeys(".")
 
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", " test  end" }, lines, "Second line 'foo' occurrences should be deleted by dot-repeat")
+    assert.same({ "bar baz", "test end" }, lines, "Second line 'foo' occurrences should be deleted by dot-repeat")
 
     marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.same({}, marks, "All marks should be cleared after second operation")
@@ -122,6 +123,7 @@ describe("dot repeat functionality", function()
       operators = {
         d = {
           mode = "o",
+          inner = false,
           operator = function()
             return ""
           end,
@@ -135,22 +137,22 @@ describe("dot repeat functionality", function()
     vim.wait(0) -- operator-modifier is async
     feedkeys("$")
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz foo bar end foo bar" }, lines, "First 2 'foo' occurrences should be deleted")
+    assert.same({ "bar baz foo bar end foo bar" }, lines, "First 2 'foo' occurrences should be deleted")
 
     -- Repeat: delete <count> occurrences of word under cursor ('bar')
     feedkeys(".")
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "   baz foo  end foo bar" }, lines, "2 'bar' occurrences should be deleted by dot-repeat")
+    assert.same({ "baz foo end foo bar" }, lines, "2 'bar' occurrences should be deleted by dot-repeat")
 
     -- Repeat: delete <count> occurrences of word under cursor ('baz')
     feedkeys(".")
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "    foo  end foo bar" }, lines, "'baz' occurrence should be deleted by dot-repeat")
+    assert.same({ "foo end foo bar" }, lines, "'baz' occurrence should be deleted by dot-repeat")
 
     -- Repeat: delete <count> occurrences of word under cursor ('baz')
     feedkeys(".")
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "      end  bar" }, lines, "Last 2 'foo' occurrence should be deleted by dot-repeat")
+    assert.same({ "end bar" }, lines, "Last 2 'foo' occurrence should be deleted by dot-repeat")
   end)
 
   it("repeats operator-modifier with motion, preserving the original word pattern", function()
@@ -283,6 +285,7 @@ describe("dot repeat functionality", function()
       default_operators = false,
       operators = {
         d = {
+          inner = false,
           operator = function()
             return ""
           end,
@@ -297,19 +300,19 @@ describe("dot repeat functionality", function()
     feedkeys("$")
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz foo bar end foo bar" }, lines, "First 2 'foo' occurrences should be deleted")
-    assert.same("foo\nfoo", vim.fn.getreg("a"), "Register should contain 'foo\nfoo'")
+    assert.same({ "bar baz foo bar end foo bar" }, lines, "First 2 'foo' occurrences should be deleted")
+    assert.same("foo \nfoo ", vim.fn.getreg("a"), "Register should contain 'foo\nfoo'")
 
     -- Repeat: delete <count> occurrences of word under cursor ('bar') into same register
     feedkeys(".")
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "   baz foo  end foo bar" }, lines, "2 'bar' occurrences should be deleted by dot-repeat")
-    assert.same("bar\nbar", vim.fn.getreg("a"), "Register should contain 'bar\nbar'")
+    assert.same({ "baz foo end foo bar" }, lines, "2 'bar' occurrences should be deleted by dot-repeat")
+    assert.same("bar \nbar ", vim.fn.getreg("a"), "Register should contain 'bar\nbar'")
 
     feedkeys('"b.') -- register cannot be changed.
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "    foo  end foo bar" }, lines, "'baz' occurrence should be deleted by dot-repeat")
-    assert.same("baz", vim.fn.getreg("a"), "Register should still contain 'baz'")
+    assert.same({ "foo end foo bar" }, lines, "'baz' occurrence should be deleted by dot-repeat")
+    assert.same("baz ", vim.fn.getreg("a"), "Register should still contain 'baz'")
     assert.same("", vim.fn.getreg("b"), "Register 'b' should be unchanged")
   end)
 
@@ -320,6 +323,7 @@ describe("dot repeat functionality", function()
       default_operators = false,
       operators = {
         d = {
+          inner = false,
           operator = function()
             return ""
           end,
@@ -334,22 +338,22 @@ describe("dot repeat functionality", function()
     feedkeys("$")
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz foo bar end foo bar" }, lines, "First 2 'foo' occurrences should be deleted")
+    assert.same({ "bar baz foo bar end foo bar" }, lines, "First 2 'foo' occurrences should be deleted")
 
     -- Repeat: delete 1 occurrence of word under cursor ('bar')
     feedkeys("1.")
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "   baz foo bar end foo bar" }, lines, "1 'bar' occurrence should be deleted by dot-repeat")
+    assert.same({ "baz foo bar end foo bar" }, lines, "1 'bar' occurrence should be deleted by dot-repeat")
 
     -- Repeat: delete 1 occurrence of word under cursor ('baz')
     feedkeys(".")
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "    foo bar end foo bar" }, lines, "1 'baz' occurrence should be deleted by dot-repeat")
+    assert.same({ "foo bar end foo bar" }, lines, "1 'baz' occurrence should be deleted by dot-repeat")
 
     -- Repeat: delete 1 occurrence of word under cursor ('foo')
     feedkeys(".")
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ "     bar end foo bar" }, lines, "1 of remaining 'foo' occurrences should be deleted by dot-repeat")
+    assert.same({ "bar end foo bar" }, lines, "1 of remaining 'foo' occurrences should be deleted by dot-repeat")
   end)
 
   it("repeats operator within visual selection", function()
@@ -359,6 +363,7 @@ describe("dot repeat functionality", function()
       default_operators = false,
       operators = {
         d = {
+          inner = false,
           operator = function()
             return ""
           end,
@@ -378,7 +383,7 @@ describe("dot repeat functionality", function()
     feedkeys("d")
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", "foo test foo end", "foo start foo mid foo end" }, lines)
+    assert.same({ "bar baz", "foo test foo end", "foo start foo mid foo end" }, lines)
 
     marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.equals(5, #marks, "Five 'foo' marks should remain")
@@ -388,7 +393,7 @@ describe("dot repeat functionality", function()
     feedkeys(".")
 
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", " test  end", "foo start foo mid foo end" }, lines)
+    assert.same({ "bar baz", "test end", "foo start foo mid foo end" }, lines)
 
     marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
     assert.equals(3, #marks, "Three 'foo' marks should remain on third line")
@@ -401,6 +406,7 @@ describe("dot repeat functionality", function()
       default_operators = false,
       operators = {
         delete = {
+          inner = false,
           operator = function()
             return ""
           end,
@@ -418,14 +424,14 @@ describe("dot repeat functionality", function()
     occ:apply_operator("delete", { motion = range, motion_type = "line" })
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", "foo test foo end" }, lines, "'foo' occurrences on the first line should be deleted")
+    assert.same({ "bar baz", "foo test foo end" }, lines, "'foo' occurrences on the first line should be deleted")
 
     -- Move to second line, second 'foo' and repeat using dot-repeat
     feedkeys("j3w")
     feedkeys(".")
 
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", " test  end" }, lines, "All 'foo' occurrences should be deleted")
+    assert.same({ "bar baz", "test end" }, lines, "All 'foo' occurrences should be deleted")
   end)
 
   it("repeats operator after deactivation", function()
@@ -435,6 +441,7 @@ describe("dot repeat functionality", function()
       default_operators = false,
       operators = {
         d = {
+          inner = false,
           operator = function()
             return ""
           end,
@@ -450,7 +457,7 @@ describe("dot repeat functionality", function()
     feedkeys("d$")
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", "foo test foo end" }, lines, "'foo' occurrences on the first line should be deleted")
+    assert.same({ "bar baz", "foo test foo end" }, lines, "'foo' occurrences on the first line should be deleted")
 
     -- Clear occurrence marks
     feedkeys("<Esc>")
@@ -462,7 +469,7 @@ describe("dot repeat functionality", function()
     feedkeys(".")
 
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", " test  end" }, lines, "All 'foo' occurrences should be deleted")
+    assert.same({ "bar baz", "test end" }, lines, "All 'foo' occurrences should be deleted")
   end)
 
   it("caches cursor position before dot-repeat", function()
@@ -472,6 +479,7 @@ describe("dot repeat functionality", function()
       default_operators = false,
       operators = {
         d = {
+          inner = false,
           operator = function()
             return ""
           end,
@@ -487,7 +495,7 @@ describe("dot repeat functionality", function()
     feedkeys("d$")
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", "test foo test end" }, lines)
+    assert.same({ "bar baz", "test foo test end" }, lines)
 
     -- Move to second line, move to middle of 'foo'
     feedkeys("jw")
@@ -497,7 +505,7 @@ describe("dot repeat functionality", function()
     feedkeys(".")
 
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    assert.same({ " bar  baz", "test  test end" }, lines, "'foo' should be deleted")
+    assert.same({ "bar baz", "test test end" }, lines, "'foo' should be deleted")
 
     -- Cursor should be restored to cached position
     local cursor_after = vim.api.nvim_win_get_cursor(0)

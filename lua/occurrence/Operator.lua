@@ -1,4 +1,5 @@
 local Cursor = require("occurrence.Cursor")
+local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 local Register = require("occurrence.Register")
 
@@ -53,6 +54,7 @@ local _set_opfunc = vim.fn[vim.api.nvim_exec2(
 ---@field mode "n" | "v" | "o" The mode from which the opfunc is being executed
 ---@field count integer The count provided for the operation
 ---@field register string The register to use for the operation
+---@field inner boolean Whether to operate on inner text only (no surrounding whitespace)
 
 ---@param occurrence occurrence.Occurrence The occurrence to operate on.
 ---@param operator string | occurrence.OperatorFn The operator to apply (e.g. "d", "y", etc), or a callback function that performs the operation.
@@ -60,6 +62,36 @@ local _set_opfunc = vim.fn[vim.api.nvim_exec2(
 ---@param ctx occurrence.OpfuncContext The opfunc context.
 local function apply_operator(occurrence, operator, marks, ctx)
   local original_cursor = Cursor.save()
+
+  if ctx.inner ~= true then
+    -- expand all marks to include surrounding whitespace
+    for i = 1, #marks do
+      local id, mark = unpack(marks[i])
+
+      -- search forward for next non-whitespace char
+      original_cursor:move(mark.stop)
+      local new_stop = Location.from_pos(vim.fn.searchpos([[\V\C\S]], "nWc"))
+      if new_stop and new_stop > mark.stop then
+        local new_mark = Range.new(mark.start, new_stop)
+        log.debug("Expanded mark", id, "from", mark, "to", new_mark)
+        marks[i] = { id, new_mark }
+      else
+        -- if no forward non-whitespace char was found,
+        -- we must be at the end of a line,
+        -- so search backward for previous non-whitespace char.
+        original_cursor:move(mark.start)
+        local new_start = Location.from_pos(vim.fn.searchpos([[\V\C\S\s]], "bnWe"))
+        if new_start and new_start < mark.start then
+          local new_mark = Range.new(new_start, mark.stop)
+          log.debug("Expanded mark", id, "from", mark, "to", new_mark)
+          marks[i] = { id, new_mark }
+        end
+      end
+    end
+
+    original_cursor:restore()
+  end
+
   -- String operator: use feedkeys
   if type(operator) == "string" then
     local edited = 0

@@ -44,7 +44,7 @@ describe("operators", function()
 
       -- Check that 'foo' occurrences were deleted
       local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      assert.same({ " bar ", "baz  bar" }, final_lines)
+      assert.same({ "bar", "baz bar" }, final_lines)
     end)
 
     it("saves deleted text to register", function()
@@ -62,7 +62,7 @@ describe("operators", function()
 
       -- Check register content
       local register_content = vim.fn.getreg('"')
-      assert.equals("foo", register_content)
+      assert.equals("foo ", register_content)
     end)
 
     it("saves deleted text to specified register", function()
@@ -80,7 +80,7 @@ describe("operators", function()
 
       -- Check register content
       local register_content = vim.fn.getreg("a")
-      assert.equals("bar", register_content)
+      assert.equals("bar ", register_content)
     end)
   end)
 

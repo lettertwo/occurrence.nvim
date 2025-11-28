@@ -344,7 +344,7 @@ describe("integration tests", function()
 
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals("no matches on this line", lines[1], "First line should be unchanged")
-      assert.equals(" bar baz ", lines[2], "Both 'foo' occurrences should be deleted from second line")
+      assert.equals("bar baz", lines[2], "Both 'foo' occurrences should be deleted from second line")
       local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
 
@@ -459,6 +459,7 @@ describe("integration tests", function()
         default_operators = false,
         operators = {
           d = {
+            inner = false,
             operator = function()
               return ""
             end,
@@ -484,7 +485,7 @@ describe("integration tests", function()
       feedkeys("$")
 
       lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      assert.equals(" bar baz ", lines[1], "Both 'foo' occurrences should be deleted")
+      assert.equals("bar baz", lines[1], "Both 'foo' occurrences should be deleted")
 
       marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")
@@ -533,6 +534,7 @@ describe("integration tests", function()
         default_operators = false,
         operators = {
           d = {
+            inner = false,
             operator = function()
               return ""
             end,
@@ -594,6 +596,7 @@ describe("integration tests", function()
         default_operators = false,
         operators = {
           d = {
+            inner = false,
             operator = function()
               return ""
             end,
@@ -890,6 +893,7 @@ describe("integration tests", function()
         operators = {
           d = {
             desc = "Delete",
+            inner = false,
             operator = function()
               return ""
             end,
@@ -921,7 +925,7 @@ describe("integration tests", function()
       feedkeys("d$")
 
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      assert.equals(" bar baz ", lines[1], "Both 'foo' occurrences should be deleted")
+      assert.equals("bar baz", lines[1], "Both 'foo' occurrences should be deleted")
 
       marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
       assert.same({}, marks, "No marks should remain after applying operator")

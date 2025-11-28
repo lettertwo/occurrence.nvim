@@ -103,7 +103,7 @@ describe("README examples", function()
       assert.equals(0, #marks, "All marks should be cleared after operator usage")
 
       assert.same({
-        "This is a  buffer.",
+        "This is a buffer.",
         "It contains several words.",
         "This is a buffer for testing occurrence plugin.",
       }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "'This' occurrences should be deleted correctly")
@@ -489,7 +489,7 @@ describe("README examples", function()
       assert.equals(4, #marks, "4 'foo' occurrences should be marked")
 
       assert.same({
-        "line  one ",
+        "line one",
         "line foo two foo",
         "line foo three foo",
       }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "'foo' occurrences on line 1 should be deleted")
@@ -499,8 +499,8 @@ describe("README examples", function()
       feedkeys("dd")
 
       assert.same({
-        "line  one ",
-        "line  two ",
+        "line one",
+        "line two",
         "line foo three foo",
       }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "'foo' occurrences on line 2 should be deleted")
 
@@ -513,9 +513,9 @@ describe("README examples", function()
       feedkeys(".")
 
       assert.same({
-        "line  one ",
-        "line  two ",
-        "line  three ",
+        "line one",
+        "line two",
+        "line three",
       }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "'foo' occurrences on line 3 should be deleted by repeat")
     end)
 
@@ -549,7 +549,7 @@ describe("README examples", function()
 
       assert.same(
         {
-          "delete foo here ",
+          "delete foo here",
           "delete foo there foo",
           "delete foo everywhere foo",
         },
@@ -563,8 +563,8 @@ describe("README examples", function()
 
       assert.same(
         {
-          "delete foo here ",
-          "delete  there ",
+          "delete foo here",
+          "delete there",
           "delete foo everywhere foo",
         },
         vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
@@ -582,9 +582,9 @@ describe("README examples", function()
 
       assert.same(
         {
-          "delete foo here ",
-          "delete  there ",
-          "delete foo everywhere ",
+          "delete foo here",
+          "delete there",
+          "delete foo everywhere",
         },
         vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
         "'foo' occurrence from cursor to EOL on line 3 should be deleted by repeat"

@@ -111,6 +111,11 @@ local OCCURRENCE_CACHE = {}
 -- An optional description for the keymap.
 -- Similar to the `desc` field in `:h vim.keymap.set` options.
 ---@field desc? string
+-- Whether to operate on the inner range of the occurrence only.
+-- Setting this to `false` will include surrounding whitespace,
+-- similar to the difference between `iw` and `aw` text objects.
+-- Default is `true`.
+---@field inner? boolean
 
 -- Internal descriptor for actions
 ---@alias occurrence.ApiConfig
@@ -762,6 +767,7 @@ end
 ---@field operator? string The operator to modify (e.g. "d", "y", etc). If `nil`, modifies the pending operator.
 ---@field count? number The count to use for the operator
 ---@field register? string The register to use for the operator
+---@field inner? boolean Whether to operate on inner text only (no surrounding whitespace)
 
 ---@param options? occurrence.ModifyOperatorOptions
 ---@param config? occurrence.Config
@@ -781,6 +787,15 @@ function Occurrence:modify_operator(options, config)
     -- to use the occurrence, we should dispose of it.
     self:dispose()
     return
+  end
+
+  local inner = true -- defaults to `true`
+  if options and type(options.inner) == "boolean" then
+    ---@type boolean
+    inner = options.inner
+  elseif type(operator_config.inner) == "boolean" then
+    ---@type boolean
+    inner = operator_config.inner
   end
 
   -- cancel the pending op.
@@ -815,6 +830,7 @@ function Occurrence:modify_operator(options, config)
       mode = "o",
       count = count,
       register = register,
+      inner = inner,
     })
     -- re-enter operator-pending mode
     feedkeys.change_mode("o", { silent = true })
@@ -866,11 +882,17 @@ function Occurrence:activate_occurrence_mode(config)
             return m ~= "o"
           end, mode)
         end
+        local inner = true -- defaults to `true`
+        if type(operator_config.inner) == "boolean" then
+          ---@type boolean
+          inner = operator_config.inner
+        end
         self.keymap:set(mode or { "n", "v" }, operator_key, function()
           require("occurrence.Operator").create_opfunc(self, operator_config.operator, {
             mode = vim.fn.mode():match("[vV]") and "v" or "n",
             count = vim.v.count,
             register = vim.v.register,
+            inner = inner,
           })
           -- send g@ to trigger custom opfunc
           return "g@"
@@ -980,6 +1002,7 @@ end
 ---@field register? string The register to use for the operator
 ---@field motion? string | occurrence.Range The range of motion (e.g. "aw", "$", etc), or a defined range. If `nil`, the full buffer range will be used.
 ---@field motion_type? 'char' | 'line' | 'block' The type of motion, if `motion` is a `Range`. Defaults to 'char'.
+---@field inner? boolean Whether to operate on inner text only (no surrounding whitespace)
 
 -- Apply an operator to marked occurrences.
 --
@@ -1025,6 +1048,7 @@ function Occurrence:apply_operator(operator, options, config)
   local count = options and options.count or (mode == "o" and vim.v.count or 0)
   -- Resolve the motion (if not in visual mode)
   local motion = (mode ~= "v" and options and options.motion) or nil
+  local inner = true -- defaults to `true`
 
   -- Force visual mode if motion is a Range
   if motion ~= nil and type(motion) ~= "string" then
@@ -1036,9 +1060,20 @@ function Occurrence:apply_operator(operator, options, config)
   if type(operator) == "string" then
     config = require("occurrence").resolve_config(config)
     local operator_config = config:get_operator_config(operator)
-    if operator_config and operator_config.operator then
-      operator = operator_config.operator
+    if operator_config then
+      if operator_config.operator then
+        operator = operator_config.operator
+      end
+      if type(operator_config.inner) == "boolean" then
+        ---@type boolean
+        inner = operator_config.inner
+      end
     end
+  end
+
+  if options and type(options.inner) == "boolean" then
+    ---@type boolean
+    inner = options.inner
   end
 
   -- Create the opfunc that will be called with the motion type
@@ -1046,6 +1081,7 @@ function Occurrence:apply_operator(operator, options, config)
     mode = mode,
     count = count,
     register = register,
+    inner = inner,
   })
 
   if type(motion) == "string" then

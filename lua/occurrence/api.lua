@@ -345,6 +345,7 @@ local change = {
 ---@type occurrence.OperatorConfig
 local delete = {
   desc = "Delete marked occurrences",
+  inner = false,
   operator = function()
     return {}
   end,
