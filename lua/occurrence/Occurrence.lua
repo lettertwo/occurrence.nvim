@@ -1144,6 +1144,15 @@ local function get_or_create_occurrence(buffer, text, pattern_type)
   return self
 end
 
+-- Whether an Occurrence exists for the given buffer.
+-- If no `buffer` is provided, the current buffer will be used.
+---@param buffer? integer
+---@return boolean exists
+local function has_occurrence(buffer)
+  buffer = resolve_buffer(buffer, true)
+  return OCCURRENCE_CACHE[buffer] ~= nil
+end
+
 -- Delete the Occurrence for the given buffer, disposing of its resources.
 -- If no `buffer` is provided, the current buffer will be used.
 ---@param buffer? integer
@@ -1170,5 +1179,6 @@ vim.api.nvim_create_autocmd({ "BufDelete" }, {
 
 return {
   get = get_or_create_occurrence,
+  has = has_occurrence,
   del = delete_occurrence,
 }

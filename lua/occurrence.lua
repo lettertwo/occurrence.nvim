@@ -220,7 +220,8 @@ end
 ---@param buffer? integer
 ---@return occurrence.Occurrence | nil `nil` if there is no active occurrence for the buffer.
 function occurrence.get(buffer)
-  return require("occurrence.Occurrence").get(buffer)
+  local Occurrence = require("occurrence.Occurrence")
+  return Occurrence.has(buffer) and Occurrence.get(buffer) or nil
 end
 
 -- Get occurrence count information for the current buffer.
