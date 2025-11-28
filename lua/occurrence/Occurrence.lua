@@ -1131,8 +1131,10 @@ local function get_or_create_occurrence(buffer, text, pattern_type)
 
     self:add(function()
       OCCURRENCE_CACHE[buffer] = nil
+      vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceDispose" })
     end)
     OCCURRENCE_CACHE[buffer] = self
+    vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceCreate" })
   end
   if text then
     self:add_pattern(text, pattern_type)
