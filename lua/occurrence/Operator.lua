@@ -286,7 +286,8 @@ local function create_opfunc(occurrence, operator, ctx)
       if word == "" then
         log.warn("No word under cursor")
       else
-        occurrence:add_pattern(word, "word")
+        -- Use of_word with mark=false, then mark the range manually
+        occurrence:of_word(false, word)
         for match_range in occurrence:matches(range) do
           occurrence:mark(match_range)
         end

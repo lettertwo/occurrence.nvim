@@ -37,7 +37,8 @@ describe("api", function()
       it("should mark additional cursor word occurrences", function()
         bufnr = util.buffer("foo bar baz foo, bar")
 
-        local occurrence = Occurrence.get(bufnr, "foo", "word")
+        local occurrence = Occurrence.get(bufnr)
+        occurrence:of_word(false, "foo")
         assert.is_true(occurrence:has_matches(), "Should have matches initially")
 
         local match_count = #vim.iter(occurrence:matches()):totable()
@@ -160,7 +161,8 @@ describe("api", function()
   describe("mark", function()
     it("marks occurrence at cursor position", function()
       bufnr = util.buffer("foo bar baz foo")
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr)
+      occurrence:of_word(false, "foo")
 
       api.mark.callback(occurrence, Config.new())
 
@@ -225,7 +227,8 @@ describe("api", function()
       bufnr = util.buffer("foo bar baz foo")
 
       -- Create occurrence with pattern already set
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr)
+      occurrence:of_word(false, "foo")
 
       -- First call should toggle mark (mark the current occurrence)
       api.toggle.callback(occurrence, Config.new())

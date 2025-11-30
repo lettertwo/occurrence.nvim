@@ -15,7 +15,7 @@ describe("status", function()
     it("returns count for all matches", function()
       bufnr = util.buffer({ "foo bar foo", "baz foo bar" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       -- Position cursor at the beginning
       vim.api.nvim_win_set_cursor(0, { 1, 0 })
@@ -30,7 +30,7 @@ describe("status", function()
     it("returns count for marked matches only", function()
       bufnr = util.buffer({ "foo bar foo", "baz foo bar" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       -- Mark first and third occurrence
       local match_count = 0
@@ -54,7 +54,7 @@ describe("status", function()
     it("tracks current position correctly", function()
       bufnr = util.buffer({ "foo bar foo", "baz foo bar" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       -- Position cursor on second "foo" (line 1, col 8)
       vim.api.nvim_win_set_cursor(0, { 1, 8 })
@@ -68,7 +68,7 @@ describe("status", function()
     it("sets exact_match to 0 when not on a match", function()
       bufnr = util.buffer({ "foo bar foo", "baz foo bar" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       -- Position cursor on "bar" (not a match)
       vim.api.nvim_win_set_cursor(0, { 1, 4 })
@@ -82,7 +82,7 @@ describe("status", function()
     it("handles cursor after last match", function()
       bufnr = util.buffer({ "foo bar foo", "baz foo bar", "end" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       -- Position cursor on last line (after all matches)
       vim.api.nvim_win_set_cursor(0, { 3, 0 })
@@ -96,7 +96,7 @@ describe("status", function()
     it("handles no matches", function()
       bufnr = util.buffer({ "bar baz qux" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       local count = occurrence:status()
       assert.equals(0, count.total)
@@ -127,7 +127,7 @@ describe("status", function()
     it("uses custom position", function()
       bufnr = util.buffer({ "foo bar foo", "baz foo bar" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
       local Location = require("occurrence.Location")
 
       -- Count from a specific position (line 2, col 0)
@@ -142,8 +142,9 @@ describe("status", function()
     it("works with multiple patterns", function()
       bufnr = util.buffer({ "foo bar baz", "qux foo baz" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
-      occurrence:add_pattern("baz", "word")
+      local occurrence = Occurrence.get(bufnr)
+      occurrence:of_word(false, "foo")
+      occurrence:of_word(false, "baz")
 
       vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
@@ -157,7 +158,7 @@ describe("status", function()
     it("returns count for current buffer", function()
       bufnr = util.buffer({ "foo bar foo", "baz foo bar" })
       vim.api.nvim_set_current_buf(bufnr)
-      Occurrence.get(bufnr, "foo", "word")
+      Occurrence.get(bufnr, "foo")
 
       vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
@@ -184,7 +185,7 @@ describe("status", function()
     it("returns nil when occurrence is disposed", function()
       bufnr = util.buffer({ "foo bar foo" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
       occurrence:dispose()
 
       local global_api = require("occurrence")
@@ -207,10 +208,10 @@ describe("status", function()
     it("accepts marked option", function()
       bufnr = util.buffer({ "foo bar foo", "baz foo bar" })
       vim.api.nvim_set_current_buf(bufnr)
-      local occurrence = Occurrence.get(bufnr, "foo", "word")
+      local occurrence = Occurrence.get(bufnr, "foo")
 
       -- Mark only first occurrence
-      local first_match = occurrence:matches()()
+      local first_match = assert(occurrence:matches()())
       occurrence.extmarks:mark(first_match)
 
       local global_api = require("occurrence")
@@ -227,7 +228,7 @@ describe("status", function()
 
       -- Create occurrence for buf1
       vim.api.nvim_set_current_buf(buf1)
-      Occurrence.get(buf1, "foo", "word")
+      Occurrence.get(buf1, "foo")
       vim.api.nvim_win_set_cursor(0, { 1, 0 }) -- Set cursor to start
       local global_api = require("occurrence")
       local count_buf1 = assert(global_api.status({ buffer = buf1 }))
@@ -235,7 +236,7 @@ describe("status", function()
 
       -- Create occurrence for buf2
       vim.api.nvim_set_current_buf(buf2)
-      Occurrence.get(buf2, "foo", "word")
+      Occurrence.get(buf2, "foo")
       vim.api.nvim_win_set_cursor(0, { 1, 0 }) -- Set cursor to start
       local count_buf2 = assert(global_api.status({ buffer = buf2 }))
       assert.equals(4, count_buf2.total)

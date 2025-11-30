@@ -65,10 +65,10 @@ describe("Performance Tests", function()
       local start_time = vim.loop.hrtime()
 
       local occurrence = Occurrence.get(bufnr)
-      occurrence:add_pattern("content", "word")
-      occurrence:add_pattern("pattern", "word")
-      occurrence:add_pattern("line", "word")
-      occurrence:add_pattern("text", "word")
+      occurrence:of_word(false, "content")
+      occurrence:of_word(false, "pattern")
+      occurrence:of_word(false, "line")
+      occurrence:of_word(false, "text")
 
       assert.is_true(occurrence:has_matches())
 
@@ -175,7 +175,7 @@ describe("Performance Tests", function()
       local navigation_count = 0
       local max_navigations = 200 -- Realistic: user navigating through ~200 matches in a session
 
-      for i = 1, max_navigations do
+      for _ = 1, max_navigations do
         local match = occurrence:match_cursor({ direction = "forward", wrap = true })
         if not match then
           break
@@ -204,7 +204,7 @@ describe("Performance Tests", function()
       local navigation_count = 0
       local max_navigations = 200 -- Realistic: user navigating backward through ~200 matches
 
-      for i = 1, max_navigations do
+      for _ = 1, max_navigations do
         local match = occurrence:match_cursor({ direction = "backward", wrap = true })
         if not match then
           break
@@ -242,7 +242,7 @@ describe("Performance Tests", function()
       local navigation_count = 0
       local max_navigations = 100 -- Realistic: navigating through ~100 marked occurrences
 
-      for i = 1, max_navigations do
+      for _ = 1, max_navigations do
         local match = occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
         if not match then
           break
@@ -335,7 +335,7 @@ describe("Performance Tests", function()
       bufnr = util.buffer(large_content)
       local start_time = vim.loop.hrtime()
 
-      for i = 1, 10 do
+      for _ = 1, 10 do
         local occurrence = Occurrence.get(bufnr, "content")
         occurrence:mark()
         occurrence:dispose()
@@ -396,13 +396,13 @@ describe("Performance Tests", function()
     it("maintains reasonable memory usage with many patterns", function()
       bufnr = util.buffer(large_content)
 
-      local occurrence, count
+      local occurrence
       local memory_delta = measure_memory(function()
         occurrence = Occurrence.get(bufnr)
 
         -- Add many patterns
         for i = 1, 10 do
-          occurrence:add_pattern("pattern_" .. i, "word")
+          occurrence:of_word(false, "pattern_" .. i)
         end
 
         -- Mark occurrences for all patterns
@@ -442,7 +442,7 @@ describe("Performance Tests", function()
 
       local memory_delta = measure_memory(function()
         -- Create and dispose many occurrences with marking
-        for i = 1, 10 do
+        for _ = 1, 10 do
           local occurrence = Occurrence.get(bufnr, "content")
           occurrence:mark()
           occurrence:dispose()
@@ -451,7 +451,7 @@ describe("Performance Tests", function()
 
       local memory_delta2 = measure_memory(function()
         -- Create and dispose many occurrences with marking
-        for i = 1, 10 do
+        for _ = 1, 10 do
           local occurrence = Occurrence.get(bufnr, "content")
           occurrence:mark()
           occurrence:dispose()
@@ -516,7 +516,7 @@ describe("Performance Tests", function()
           local buf = util.buffer({ "test line " .. i })
           table.insert(buffers, buf)
           local state = Occurrence.get(buf)
-          state:add_pattern("test_" .. i, "word")
+          state:of_word(false, "test_" .. i)
         end
 
         -- Clean up explicitly

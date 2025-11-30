@@ -13,8 +13,6 @@ local function callable(fn)
   return type(fn) == "function" or (type(fn) == "table" and getmetatable(fn) and getmetatable(fn).__call)
 end
 
----@alias occurrence.PatternType 'pattern' | 'selection' | 'word'
-
 -- A map of Buffer ids to their Occurrence instances.
 ---@type table<integer, occurrence.Occurrence>
 local OCCURRENCE_CACHE = {}
@@ -616,33 +614,6 @@ function Occurrence:marks(range)
   return next_mark
 end
 
--- Add an additional text pattern to search for.
--- If the pattern was already added, this is a no-op.
----@param text string
----@param pattern_type? occurrence.PatternType The type of occurrence matching to use. Default is 'pattern'.
----@return string pattern The added pattern
-function Occurrence:add_pattern(text, pattern_type)
-  assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
-  local pattern = text:gsub("\n", "\\n")
-  if pattern_type == "selection" then
-    pattern = string.format([[\V\C%s]], pattern)
-  elseif pattern_type == "word" then
-    pattern = string.format([[\V\C\<%s\>]], pattern)
-  end
-
-  for _, existing in ipairs(self.patterns) do
-    if existing == pattern then
-      return pattern
-    end
-  end
-
-  table.insert(self.patterns, pattern)
-  for match in self:matches(nil, nil, pattern) do
-    self.extmarks:add(match)
-  end
-  return pattern
-end
-
 -- Add a pattern for the current visual selection.
 -- If `mark` is `true`, all occurrences of the selection will be marked.
 -- Returns `true` if a new pattern was added, `false` otherwise.
@@ -672,27 +643,22 @@ function Occurrence:of_selection(mark, range)
     return false
   end
 
-  local pattern = self:add_pattern(text, "selection")
+  -- Format as literal/very-nomagic pattern and delegate to of_pattern
+  local pattern = string.format([[\V\C%s]], text)
 
   -- Clear visual selection
   feedkeys.change_mode("n", { noflush = true, silent = true })
 
-  if mark then
-    -- mark all occurrences of the newest pattern
-    for match in self:matches(nil, nil, pattern) do
-      self:mark(match)
-    end
-  end
-
-  return true
+  return self:of_pattern(mark, pattern)
 end
 
--- Add the last search pattern.
+-- Add a pattern directly.
 -- If `mark` is `true`, all occurrences of the pattern will be marked.
 -- Returns `true` if a new pattern was added, `false` otherwise.
--- If no last search pattern exists, logs a warning and returns `false`.
+-- If `search_pattern` is not provided, uses the last search pattern from the `/` register.
+-- If no pattern exists, logs a warning and returns `false`.
 --
--- Clears the search highlight after adding the pattern.
+-- Clears the search highlight only when using the last search pattern (no explicit pattern provided).
 --
 ---@param mark? boolean Whether to mark all occurrences of the pattern.
 ---@param search_pattern? string The search pattern to add. If not provided, uses the last search pattern.
@@ -700,20 +666,47 @@ end
 function Occurrence:of_pattern(mark, search_pattern)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
 
-  search_pattern = search_pattern or vim.fn.getreg("/")
+  local clear_search_hl = false
+
+  -- If no pattern provided, use last search pattern
+  if not search_pattern then
+    search_pattern = vim.fn.getreg("/")
+    clear_search_hl = true -- Only clear if we used the search register
+  end
 
   if search_pattern == "" then
     log.warn("No search pattern available")
     return false
   end
 
-  local pattern = self:add_pattern(search_pattern, "pattern")
+  -- Escape newlines
+  local pattern = search_pattern:gsub("\n", "\\n")
 
-  -- Clear search highlight
-  vim.cmd.nohlsearch()
+  -- Duplicate check
+  for _, existing in ipairs(self.patterns) do
+    if existing == pattern then
+      if mark then
+        for match in self:matches(nil, nil, pattern) do
+          self:mark(match)
+        end
+      end
+      return true
+    end
+  end
 
+  -- Add to patterns table
+  table.insert(self.patterns, pattern)
+  for match in self:matches(nil, nil, pattern) do
+    self.extmarks:add(match)
+  end
+
+  -- Clear search highlight only if we pulled from search register
+  if clear_search_hl then
+    vim.cmd.nohlsearch()
+  end
+
+  -- Optionally mark
   if mark then
-    -- mark all occurrences of the newest pattern
     for match in self:matches(nil, nil, pattern) do
       self:mark(match)
     end
@@ -739,16 +732,9 @@ function Occurrence:of_word(mark, word)
     return false
   end
 
-  local pattern = self:add_pattern(word, "word")
-
-  if mark then
-    -- mark all occurrences of the newest pattern
-    for match in self:matches(nil, nil, pattern) do
-      self:mark(match)
-    end
-  end
-
-  return true
+  -- Format as word boundary pattern and delegate to of_pattern
+  local pattern = string.format([[\V\C\<%s\>]], word)
+  return self:of_pattern(mark, pattern)
 end
 
 -- Whether occurrence mode is currently active for this occurrence.
@@ -1113,13 +1099,11 @@ end
 
 -- Get or create an Occurrence for the given buffer and text.
 -- If no `buffer` is provided, the current buffer will be used.
--- If a `text` pattern is provided, it will be added to the active occurrence patterns.
--- Optional `pattern_type` is the same as for `Occurrence:add`.
+-- If a `pattern` is provided, it will be added as a pattern to the active occurrence patterns.
 ---@param buffer? integer
----@param text? string
----@param pattern_type? occurrence.PatternType
+---@param pattern? string A pattern to add
 ---@return occurrence.Occurrence
-local function get_or_create_occurrence(buffer, text, pattern_type)
+local function get_or_create_occurrence(buffer, pattern)
   buffer = resolve_buffer(buffer, true)
   local self = OCCURRENCE_CACHE[buffer]
   if not self then
@@ -1172,8 +1156,8 @@ local function get_or_create_occurrence(buffer, text, pattern_type)
     OCCURRENCE_CACHE[buffer] = self
     vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceCreate" })
   end
-  if text then
-    self:add_pattern(text, pattern_type)
+  if pattern then
+    self:of_pattern(false, pattern)
   end
   return self
 end
