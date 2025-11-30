@@ -40,12 +40,15 @@ function ExtmarkMap:add(range)
   assert(not self:is_disposed(), "Cannot use a disposed ExtmarkMap")
   local key = range:serialize()
   if key and self[key] == nil then
-    local id = vim.api.nvim_buf_set_extmark(self.buffer, self.ns, range.start.line, range.start.col, {
+    local ok, id = pcall(vim.api.nvim_buf_set_extmark, self.buffer, self.ns, range.start.line, range.start.col, {
       end_row = range.stop.line,
       end_col = range.stop.col,
       hl_group = self.hlgroup,
       hl_mode = "combine",
     })
+    if not ok then
+      return false
+    end
     assert(self[id] == nil, "Duplicate extmark id")
     self[key] = id
     self[id] = key
