@@ -461,6 +461,69 @@ jVgp                         " Move to line2 and Distribute - cycles through yan
 - `p` (put): Replicates the same text at each occurrence
 - `gp` (distribute): Cycles through lines in the register, giving each occurrence a different line
 
+# Command Usage
+
+The `:Occurrence` command provides access to all builtin actions and operators. It features basic completion for subcommands, count and range modifiers for fine-grained control, and arguments for specific actions.
+
+Actions can be invoked via the `:Occurrence` command:
+
+```vim
+:Occurrence mark          " Mark occurrences of word under cursor
+:Occurrence toggle        " Toggle mark at cursor position
+:Occurrence next          " Navigate to next marked occurrence
+:Occurrence deactivate    " Clear all marks
+```
+
+And some can take arguments:
+
+```vim
+:Occurrence mark \w\s\s    " Mark occurrences of a pattern
+:Occurrence toggle foo     " Toggle the next occurrence of 'foo'
+:Occurrence next 2         " Move to the 2nd next marked occurrence
+```
+
+Operators will trigger operator-pending mode and then operate on marked occurrences:
+
+```vim
+:Occurrence delete        " Delete all marked occurrences
+:Occurrence change        " Change all marked occurrences (prompts for input)
+:Occurrence yank          " Yank all marked occurrences to register
+:Occurrence uppercase     " Convert all marked to uppercase
+```
+
+And any that use a register can specify which register to use:
+
+```vim
+:Occurrence delete b      " Delete all marked occurrences to register 'b'
+:Occurrence put b         " Put register 'b' content at all marked occurrences
+```
+
+### Count Modifier
+
+Prefix the command with a count to limit operations to the first N marked occurrences:
+
+```vim
+:3Occurrence delete       " Delete only the first 3 marked occurrences
+:5Occurrence yank         " Yank only the first 5 marked occurrences
+:2Occurrence uppercase    " Uppercase only the first 2 marked occurrences
+```
+
+Or to limit the number of marked occurrences:
+
+```vim
+:4Occurrence mark       " Mark only the first 4 occurrences
+:3Occurrence next       " Navigate to the 3rd marked occurrence
+```
+
+### Range Modifier
+
+Use a range to operate only on marked occurrences within specific lines:
+
+```vim
+:2,5Occurrence delete     " Delete marks only in lines 2-5
+:'<,'>Occurrence change   " Change marks only in visual selection
+```
+
 # API Reference
 
 ## Lua API

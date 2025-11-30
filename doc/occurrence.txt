@@ -1,4 +1,4 @@
-*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 November 28
+*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 November 30
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
@@ -15,11 +15,12 @@ Table of Contents                               *occurrence-table-of-contents*
   - Highlights                           |occurrence-configuration-highlights|
   - Statusline Integration   |occurrence-configuration-statusline-integration|
 5. Usage Examples                                  |occurrence-usage-examples|
-6. API Reference                                    |occurrence-api-reference|
+6. Command Usage                                    |occurrence-command-usage|
+7. API Reference                                    |occurrence-api-reference|
   - Lua API                                 |occurrence-api-reference-lua-api|
   - Actions                                 |occurrence-api-reference-actions|
-7. Builtin Operators                            |occurrence-builtin-operators|
-8. Custom Operators                              |occurrence-custom-operators|
+8. Builtin Operators                            |occurrence-builtin-operators|
+9. Custom Operators                              |occurrence-custom-operators|
   - Custom Line-Based Operators|occurrence-custom-operators-custom-line-based-operators|
 
 ==============================================================================
@@ -485,7 +486,78 @@ refactoring or batch renaming with distinct values.
 
 
 ==============================================================================
-6. API Reference                                    *occurrence-api-reference*
+6. Command Usage                                    *occurrence-command-usage*
+
+The `:Occurrence` command provides access to all builtin actions and operators.
+It features basic completion for subcommands, count and range modifiers for
+fine-grained control, and arguments for specific actions.
+
+Actions can be invoked via the `:Occurrence` command:
+
+>vim
+    :Occurrence mark          " Mark occurrences of word under cursor
+    :Occurrence toggle        " Toggle mark at cursor position
+    :Occurrence next          " Navigate to next marked occurrence
+    :Occurrence deactivate    " Clear all marks
+<
+
+And some can take arguments:
+
+>vim
+    :Occurrence mark \w\s\s    " Mark occurrences of a pattern
+    :Occurrence toggle foo     " Toggle the next occurrence of 'foo'
+    :Occurrence next 2         " Move to the 2nd next marked occurrence
+<
+
+Operators will trigger operator-pending mode and then operate on marked
+occurrences:
+
+>vim
+    :Occurrence delete        " Delete all marked occurrences
+    :Occurrence change        " Change all marked occurrences (prompts for input)
+    :Occurrence yank          " Yank all marked occurrences to register
+    :Occurrence uppercase     " Convert all marked to uppercase
+<
+
+And any that use a register can specify which register to use:
+
+>vim
+    :Occurrence delete b      " Delete all marked occurrences to register 'b'
+    :Occurrence put b         " Put register 'b' content at all marked occurrences
+<
+
+
+COUNT MODIFIER ~
+
+Prefix the command with a count to limit operations to the first N marked
+occurrences:
+
+>vim
+    :3Occurrence delete       " Delete only the first 3 marked occurrences
+    :5Occurrence yank         " Yank only the first 5 marked occurrences
+    :2Occurrence uppercase    " Uppercase only the first 2 marked occurrences
+<
+
+Or to limit the number of marked occurrences:
+
+>vim
+    :4Occurrence mark       " Mark only the first 4 occurrences
+    :3Occurrence next       " Navigate to the 3rd marked occurrence
+<
+
+
+RANGE MODIFIER ~
+
+Use a range to operate only on marked occurrences within specific lines:
+
+>vim
+    :2,5Occurrence delete     " Delete marks only in lines 2-5
+    :'<,'>Occurrence change   " Change marks only in visual selection
+<
+
+
+==============================================================================
+7. API Reference                                    *occurrence-api-reference*
 
 
 LUA API                                     *occurrence-api-reference-lua-api*
@@ -708,7 +780,7 @@ Clear all marks and patterns, and deactivate occurrence mode.
 
 
 ==============================================================================
-7. Builtin Operators                            *occurrence-builtin-operators*
+8. Builtin Operators                            *occurrence-builtin-operators*
 
 The following operators are supported via `modify_operator` or with marked
 occurrences (configured via `operators` table):
@@ -744,7 +816,7 @@ occurrences (configured via `operators` table):
   ----------------------------------------------------------------------------
 
 ==============================================================================
-8. Custom Operators                              *occurrence-custom-operators*
+9. Custom Operators                              *occurrence-custom-operators*
 
 
 CUSTOM LINE-BASED OPERATORS*occurrence-custom-operators-custom-line-based-operators*
