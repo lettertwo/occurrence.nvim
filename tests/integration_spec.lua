@@ -435,7 +435,7 @@ describe("integration tests", function()
 
       -- Move to 'foo' and add new pattern
       feedkeys("0") -- Move to start of line
-      vim.cmd([[silent! /foo]]) -- Search for 'ba'
+      vim.cmd([[silent! /foo]]) -- Search for 'foo'
       feedkeys("q")
 
       -- Verify marks for 'bar', 'baz', and both 'foo'

@@ -67,6 +67,10 @@ local mark = {
             new_pattern = occurrence.patterns[#occurrence.patterns]
           end
         end
+      elseif hlsearch then
+        if occurrence:of_pattern(count == nil, args and args[1] or nil) then
+          new_pattern = occurrence.patterns[#occurrence.patterns]
+        end
       else
         local match = occurrence:match_cursor()
         if match and match:contains(cursor.location) then
@@ -75,11 +79,7 @@ local mark = {
           end
         else
           cursor:restore()
-          if hlsearch then
-            if occurrence:of_pattern(count == nil, args and args[1] or nil) then
-              new_pattern = occurrence.patterns[#occurrence.patterns]
-            end
-          elseif occurrence:of_word(count == nil) then
+          if occurrence:of_word(count == nil) then
             new_pattern = occurrence.patterns[#occurrence.patterns]
           end
         end
@@ -172,6 +172,10 @@ local toggle = {
             end
           end
         end
+      elseif hlsearch then
+        if occurrence:of_pattern(false, args and args[1] or nil) then
+          new_pattern = occurrence.patterns[#occurrence.patterns]
+        end
       else
         local match = occurrence:match_cursor()
         if match and match:contains(cursor.location) then
@@ -182,11 +186,7 @@ local toggle = {
           end
         else
           cursor:restore()
-          if hlsearch then
-            if occurrence:of_pattern(false, args and args[1] or nil) then
-              new_pattern = occurrence.patterns[#occurrence.patterns]
-            end
-          elseif occurrence:of_word() then
+          if occurrence:of_word() then
             new_pattern = occurrence.patterns[#occurrence.patterns]
           end
         end
