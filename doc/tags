@@ -10,6 +10,10 @@ occurrence-configuration-operators	occurrence.txt	/*occurrence-configuration-ope
 occurrence-configuration-statusline-integration	occurrence.txt	/*occurrence-configuration-statusline-integration*
 occurrence-custom-operators	occurrence.txt	/*occurrence-custom-operators*
 occurrence-deactivate	occurrence.txt	/*occurrence-deactivate*
+occurrence-events	occurrence.txt	/*occurrence-events*
+occurrence-events-occurrenceactivate	occurrence.txt	/*occurrence-events-occurrenceactivate*
+occurrence-events-occurrencecreate	occurrence.txt	/*occurrence-events-occurrencecreate*
+occurrence-events-occurrencedispose	occurrence.txt	/*occurrence-events-occurrencedispose*
 occurrence-installation	occurrence.txt	/*occurrence-installation*
 occurrence-mark	occurrence.txt	/*occurrence-mark*
 occurrence-match_next	occurrence.txt	/*occurrence-match_next*

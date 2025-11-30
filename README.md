@@ -761,6 +761,113 @@ vim.api.nvim_create_autocmd("User", {
 })
 ```
 
+# Events
+
+occurrence.nvim triggers custom User events that you can listen to with autocommands. These events allow you to react to occurrence lifecycle changes and integrate with other plugins or workflows.
+
+## OccurrenceCreate
+
+Triggered when an occurrence instance is first created for a buffer.
+
+**When it fires:**
+
+- First time an occurrence action is used in a buffer
+- When `Occurrence.get(bufnr)` creates a new instance
+
+**Does NOT fire:**
+
+- When occurrence mode is activated (use `OccurrenceActivate` instead)
+- When patterns or marks are added to an existing occurrence
+
+**Event data:**
+
+- `buf` (integer): Buffer number where occurrence was created
+
+**Example:**
+
+```lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = "OccurrenceCreate",
+  callback = function(event)
+    -- get the occurrence instance
+    local occurrence = require("occurrence").get(event.buf)
+    print("Occurrence created in buffer " .. event.buf)
+    print("Initial pattern: " .. vim.inspect(occurrence.patterns))
+  end,
+})
+```
+
+## OccurrenceActivate
+
+Triggered when occurrence mode is activated in a buffer.
+
+**When it fires:**
+
+- When occurrence mode keymaps are activated
+- After an occurrence-mode action completes successfully (e.g., `mark`, `toggle`)
+
+**Does NOT fire:**
+
+- When occurrence instance is created without activating mode
+- When already in occurrence mode
+- When using operator-modifier mode (`doip`)
+
+**Event data:**
+
+- `buf` (integer): Buffer number where occurrence mode was activated
+
+**Example:**
+
+```lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = "OccurrenceActivate",
+  callback = function(event)
+    local occurrence = require("occurrence").get(event.buf)
+    if occurrence and not occurrence:is_disposed() then
+      -- Set up buffer-local keymaps that are only active in occurrence mode
+      occurrence.keymap:set("n", "<leader>a", function()
+        assert(require("occurrence").get()):mark_all()
+      end, { desc = "Mark all occurrences" })
+
+      occurrence.keymap:set("n", "<leader>x", function()
+        assert(require("occurrence").get()):unmark_all()
+      end, { desc = "Unmark all occurrences" })
+    end
+  end,
+})
+```
+
+## OccurrenceDispose
+
+Triggered when an occurrence instance is disposed and its resources are cleaned up.
+
+**When it fires:**
+
+- When exiting occurrence mode (e.g., pressing `<Esc>` or `q`)
+- When `Occurrence.del(bufnr)` is called
+- When the buffer is deleted
+- When all marks are cleared and occurrence is no longer needed
+
+**Does NOT fire:**
+
+- When marks are cleared but occurrence mode remains active
+
+**Event data:**
+
+- `buf` (integer): Buffer number where occurrence was disposed
+
+**Example:**
+
+```lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = "OccurrenceDispose",
+  callback = function(event)
+    print("Occurrence disposed in buffer " .. event.buf)
+    -- Clean up any custom state associated with this occurrence
+  end,
+})
+```
+
 <!-- panvimdoc-ignore-start -->
 
 # Development
