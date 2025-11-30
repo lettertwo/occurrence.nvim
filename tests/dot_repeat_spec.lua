@@ -309,11 +309,12 @@ describe("dot repeat functionality", function()
     assert.same({ "baz foo end foo bar" }, lines, "2 'bar' occurrences should be deleted by dot-repeat")
     assert.same("bar \nbar ", vim.fn.getreg("a"), "Register should contain 'bar\nbar'")
 
+    local reg_b = vim.fn.getreg("b")
     feedkeys('"b.') -- register cannot be changed.
     lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ "foo end foo bar" }, lines, "'baz' occurrence should be deleted by dot-repeat")
     assert.same("baz ", vim.fn.getreg("a"), "Register should still contain 'baz'")
-    assert.same("", vim.fn.getreg("b"), "Register 'b' should be unchanged")
+    assert.same(reg_b, vim.fn.getreg("b"), "Register 'b' should be unchanged")
   end)
 
   it("repeats modified operator with different counts", function()
