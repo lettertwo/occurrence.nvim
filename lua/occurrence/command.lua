@@ -47,7 +47,7 @@ function command.execute(opts)
     args.count = opts.count
   elseif range == 2 then
     local Range = require("occurrence.Range")
-    args.range = Range.new(Range.of_line(opts.line1).start, Range.of_line(opts.line2).stop)
+    args.range = Range.new(Range.of_line(opts.line1 - 1).start, Range.of_line(opts.line2 - 1).stop)
   end
   subcommand.impl(args)
 end

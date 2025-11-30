@@ -226,6 +226,10 @@ local next = {
       mark.callback(occurrence)
     end
     local count = args and args.count or vim.v.count1
+    -- if count is given as an argument, use that instead.
+    if args and args[1] ~= nil then
+      count = tonumber(args[1], 10) or count
+    end
     for _ = 1, count do
       occurrence:match_cursor({ direction = "forward", marked = true, wrap = true })
     end
@@ -247,6 +251,10 @@ local previous = {
       mark.callback(occurrence)
     end
     local count = args and args.count or vim.v.count1
+    -- if count is given as an argument, use that instead.
+    if args and args[1] ~= nil then
+      count = tonumber(args[1], 10) or count
+    end
     for _ = 1, count do
       occurrence:match_cursor({ direction = "backward", marked = true, wrap = true })
     end
@@ -269,6 +277,10 @@ local match_next = {
       mark.callback(occurrence)
     end
     local count = args and args.count or vim.v.count1
+    -- if count is given as an argument, use that instead.
+    if args and args[1] ~= nil then
+      count = tonumber(args[1], 10) or count
+    end
     for _ = 1, count do
       occurrence:match_cursor({ direction = "forward", wrap = true })
     end
@@ -291,6 +303,10 @@ local match_previous = {
       mark.callback(occurrence)
     end
     local count = args and args.count or vim.v.count1
+    -- if count is given as an argument, use that instead.
+    if args and args[1] ~= nil then
+      count = tonumber(args[1], 10) or count
+    end
     for _ = 1, count do
       occurrence:match_cursor({ direction = "backward", wrap = true })
     end
