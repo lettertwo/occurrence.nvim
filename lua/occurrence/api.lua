@@ -1,9 +1,3 @@
-local Cursor = require("occurrence.Cursor")
-local Location = require("occurrence.Location")
-local Range = require("occurrence.Range")
-
-local log = require("occurrence.log")
-
 ---@module 'occurrence.api'
 
 -- Modify a pending operator to operate on occurrences within a motion.
@@ -18,6 +12,7 @@ local log = require("occurrence.log")
 local modify_operator = {
   mode = "o",
   expr = true,
+  default_global_key = "o",
   plug = "<Plug>(OccurrenceModifyOperator)",
   desc = "Occurrences",
   type = "operator-modifier",
@@ -45,6 +40,7 @@ local modify_operator = {
 ---@type occurrence.OccurrenceModeConfig
 local mark = {
   mode = { "n", "v" },
+  default_global_key = "go",
   type = "occurrence-mode",
   plug = "<Plug>(OccurrenceMark)",
   desc = "Mark occurrence",
@@ -52,12 +48,12 @@ local mark = {
     local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
     local hlsearch = (args and args[1] ~= nil) or (vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "")
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
-    local cursor = Cursor.save()
+    local cursor = require("occurrence.Cursor").save()
     local new_pattern = nil
 
     if occurrence:has_matches() then
       if visual then
-        local selection_range = args and args.range or Range.of_selection()
+        local selection_range = args and args.range or require("occurrence.Range").of_selection()
         if selection_range and occurrence:has_matches(selection_range) then
           for range in occurrence:matches(selection_range, count) do
             occurrence:mark(range)
@@ -123,14 +119,14 @@ local unmark = {
 
     if occurrence:has_matches() then
       if visual then
-        local selection_range = args and args.range or Range.of_selection()
+        local selection_range = args and args.range or require("occurrence.Range").of_selection()
         if selection_range then
           for range in occurrence:matches(selection_range, count) do
             occurrence:unmark(range)
           end
         end
       else
-        for range in occurrence:matches(Location.of_cursor(), count or 1) do
+        for range in occurrence:matches(require("occurrence.Location").of_cursor(), count or 1) do
           occurrence:unmark(range)
         end
       end
@@ -159,12 +155,12 @@ local toggle = {
     local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
     local hlsearch = (args and args[1] ~= nil) or (vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "")
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
-    local cursor = Cursor.save()
+    local cursor = require("occurrence.Cursor").save()
     local new_pattern = nil
 
     if occurrence:has_matches() then
       if visual then
-        local selection_range = args and args.range or Range.of_selection()
+        local selection_range = args and args.range or require("occurrence.Range").of_selection()
         if selection_range and occurrence:has_matches(selection_range) then
           for range in occurrence:matches(selection_range, count) do
             if not occurrence:mark(range) then
@@ -321,9 +317,6 @@ local deactivate = {
   plug = "<Plug>(OccurrenceDeactivate)",
   type = "occurrence-mode",
   callback = function(occurrence)
-    if occurrence.extmarks:has_any_marks() then
-      log.debug("Occurrence still has marks during deactivate")
-    end
     occurrence:dispose()
     return false
   end,

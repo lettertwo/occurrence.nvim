@@ -1,21 +1,4 @@
 local api = require("occurrence.api")
-local command = require("occurrence.command")
-local resolve_buffer = require("occurrence.resolve_buffer")
-
--- Global config set by setup(), can be nil
----@type occurrence.Config?
-local _global_config = nil
-
----@type [string|string[], string, string, table][]
-local DEFAULT_GLOBAL_KEYMAPS = {
-  -- Normal and visual mode default
-  { { "n", "v" }, "go", api.mark.plug, { desc = api.mark.desc } },
-  -- Operator-pending mode default
-  { "o", "o", api.modify_operator.plug, { desc = api.modify_operator.desc } },
-  -- TODO: support inner and around occurrence operator modifiers
-  -- { "o", io", api.modify_operator_inner.plug, { desc = api.modify_operator_inner.desc } },
-  -- { "o","ao", api.modify_operator_around.plug, { desc = api.modify_operator_around.desc } },
-}
 
 ---@class occurrence
 --
@@ -96,45 +79,77 @@ local DEFAULT_GLOBAL_KEYMAPS = {
 ---@field deactivate fun(opts?: occurrence.Options): nil
 local occurrence = {}
 
--- Generate public API functions and commands for all api functions and
--- register <Plug> mappings for all commands using CapCase convention.
+-- Create stubs for `occurrence.<name>` API functions
+setmetatable(occurrence, {
+  __index = function(_, name)
+    local api_config = assert(api[name], "Missing occurrence API function: " .. name)
+    ---@param args? occurrence.SubcommandArgs
+    local impl = function(args)
+      ---@diagnostic disable-next-line: redefined-local
+      local args, config = occurrence.parse_args(args)
+      require("occurrence.Occurrence").get():apply(api_config, args, config)
+    end
+    -- replace the stub with the actual implementation
+    rawset(occurrence, name, impl)
+    return impl
+  end,
+})
+
+-- Create stubs to lazily initialize <Plug> keymaps.
 for name, api_config in pairs(api) do
-  -- Create `occurrence.<name>` API function
-  ---@param args? occurrence.Options | occurrence.Config | occurrence.SubcommandArgs
-  occurrence[name] = function(args)
-    ---@diagnostic disable-next-line: redefined-local
-    local args, config = occurrence.parse_args(args)
-    require("occurrence.Occurrence").get():apply(api_config, args, config)
-  end
-
-  -- Register `Occurrence <name>` subcommand
-  command.add(name, { impl = occurrence[name] })
-
   if api_config.plug ~= nil then
-    -- Register `<Plug>(OccurrenceName)` keymap
-    vim.keymap.set(api_config.mode or { "n", "v" }, api_config.plug, occurrence[name], {
-      desc = api_config.desc or ("Occurrence: " .. name),
-      expr = api_config.expr or false,
+    local mode = api_config.mode or { "n", "v" }
+    local opts = {
+      desc = api_config.desc,
+      expr = api_config.expr,
       silent = true,
-    })
+    }
+
+    vim.keymap.set(mode, api_config.plug, function(...)
+      local impl = occurrence[name]
+      -- replace the stub with the actual implementation
+      vim.keymap.set(mode, api_config.plug, impl, opts)
+      return occurrence[name](...)
+    end, opts)
+
+    if vim.g.occurrence_auto_setup ~= false then
+      -- Set any default global keymaps
+      if api_config.default_global_key ~= nil then
+        vim.keymap.set(mode, api_config.default_global_key, api_config.plug, { desc = api_config.desc })
+      end
+    end
   end
 end
 
----Resolve config with priority: config param > setup(config) > default
----Note that options passed in as a param are not merged with config
----defined previously via `setup()`.
----@param config? occurrence.Options | occurrence.Config
----@return occurrence.Config
-function occurrence.resolve_config(config)
-  local Config = require("occurrence.Config")
-  if config then
-    return Config.new(config)
+-- Create the main `:Occurrence` command with subcommands
+local function init_command()
+  local command = require("occurrence.command")
+  -- Generate subcommands for all api functions
+  for name in pairs(api) do
+    command.add(name, { impl = occurrence[name] })
   end
-  if _global_config then
-    return _global_config
-  end
-  return Config.new()
+  vim.api.nvim_create_user_command("Occurrence", command.execute, {
+    nargs = "+",
+    range = 0,
+    force = true,
+    desc = "Occurrence command",
+    complete = command.complete,
+  })
+  return command
 end
+
+-- Create a stub to lazily initialize the command on first use.
+vim.api.nvim_create_user_command("Occurrence", function(...)
+  return init_command().execute(...)
+end, {
+  nargs = "+",
+  range = 0,
+  force = true,
+  desc = "Occurrence command",
+  complete = function(...)
+    return init_command().complete(...)
+  end,
+})
 
 -- Parse args table for API functions.
 -- Note that `args` may be string args coming from the command line.
@@ -150,69 +165,10 @@ function occurrence.parse_args(args)
     or args.range ~= nil
   then
     ---@cast args -occurrence.Options, -occurrence.Config
-    return args, occurrence.resolve_config()
+    return args, require("occurrence.Config").get()
   end
   ---@cast args -occurrence.SubcommandArgs
-  return nil, occurrence.resolve_config(args)
-end
-
--- Reset the occurrence plugin by removing keymaps
--- and cancelling active occurrences.
--- Automatically called by `setup({})`.
-function occurrence.reset()
-  local prev_config = _global_config
-  _global_config = nil
-  for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
-    require("occurrence.Occurrence").del(resolve_buffer(buffer))
-  end
-  -- Remove default keymaps if they exist
-  if prev_config and prev_config.default_keymaps then
-    for _, keymap in ipairs(DEFAULT_GLOBAL_KEYMAPS) do
-      local mode, lhs, _, opts = unpack(keymap)
-      vim.keymap.del(mode, lhs, opts)
-    end
-  end
-end
-
--- Sets up `occurrence.nvim` using the given `opts`.
---
--- It is only necessary to call `setup()` if you intend
--- to customize the default configuration.
---
--- Any `opts` will be merged with the default config.
---
--- `setup()` may be called multiple times to reset the plugin
--- with a new configuration. Note that calling setup with no `opts`
--- is only effective the first time; Subsequent calls
--- do nothing unless called with new `opts`.
----@param opts? occurrence.Options
-function occurrence.setup(opts)
-  if _global_config and (opts == nil or vim.tbl_isempty(opts)) then
-    return -- No-op if already configured and no new opts provided
-  end
-  local config = require("occurrence.Config").new(opts)
-  if _global_config ~= config then
-    if _global_config ~= nil then
-      occurrence.reset()
-    end
-    _global_config = config
-    -- Set up default keymaps if enabled
-    if config.default_keymaps then
-      for _, keymap in ipairs(DEFAULT_GLOBAL_KEYMAPS) do
-        vim.keymap.set(unpack(keymap))
-      end
-    end
-
-    -- Create the main Occurrence command with subcommands
-    vim.api.nvim_create_user_command("Occurrence", command.execute, {
-      nargs = "+",
-      range = 0,
-      force = true,
-      desc = "Occurrence command",
-      complete = command.complete,
-      preview = command.preview,
-    })
-  end
+  return nil, require("occurrence.Config").get(args)
 end
 
 -- Get the Occurrence instance for the given buffer.
@@ -240,6 +196,29 @@ function occurrence.status(opts)
   end
 
   return occ:status({ marked = opts.marked })
+end
+
+-- Sets up `occurrence.nvim` using the given `opts`.
+--
+-- It is only necessary to call `setup()` if you intend
+-- to customize the default configuration.
+--
+-- Any `opts` will be merged with the default config.
+--
+-- `setup()` may be called multiple times to reset the plugin
+-- with a new configuration. Note that calling setup with no `opts`
+-- is only effective the first time; Subsequent calls
+-- do nothing unless called with new `opts`.
+---@param opts? occurrence.Options
+function occurrence.setup(opts)
+  require("occurrence.Config").setup(opts)
+end
+
+-- Reset `occurrence.nvim` by removing keymaps
+-- and cancelling active occurrences.
+-- Automatically called by `setup({})`.
+function occurrence.reset()
+  require("occurrence.Config").reset()
 end
 
 return occurrence

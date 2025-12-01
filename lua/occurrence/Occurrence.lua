@@ -19,108 +19,6 @@ local OCCURRENCE_CACHE = {}
 
 ---@module 'occurrence.Occurrence'
 
--- Function to be used as a callback for a keymap
--- The first argument will always be the `Occurrence` for the current buffer.
--- The second argument will be the current `Config`.
--- If the function returns `false`, the occurrence will be disposed.
----@alias occurrence.KeymapCallback fun(occurrence: occurrence.Occurrence, args?: occurrence.SubcommandArgs): false?
-
--- A configuration for an occurrence mode keymap.
--- A keymap defined this way will be buffer-local and
--- active only when occurrence mode is active.
----@class (exact) occurrence.KeymapConfig
--- The callback function to invoke when the keymap is triggered.
----@field callback occurrence.KeymapCallback
--- The mode(s) in which the keymap is active.
--- Note that, regardless of these modes, the keymap will
--- only be active when occurrence mode is active.
----@field mode? "n" | "v" | ("n" | "v")[]
--- An optional description for the keymap.
--- Similar to the `desc` field in `:h vim.keymap.set` options.
----@field desc? string
-
--- A configuration for a global keymap that will exit operator_pending mode,
--- set occurrences of the current word and then re-enter operator-pending mode
--- with `:h opfunc`.
----@class (exact) occurrence.OperatorModifierConfig: occurrence.KeymapConfig
----@field type "operator-modifier"
----@field mode "o"
----@field expr true
----@field plug string
-
--- A configuration for a global keymap that will run and then
--- activate occurrence mode keymaps, if not already active.
----@class (exact) occurrence.OccurrenceModeConfig: occurrence.KeymapConfig
----@field type "occurrence-mode"
----@field plug string
-
----@class (exact) occurrence.OperatorCurrent
----@field id number The extmark id for the occurrence
----@field index number 1-based index of the occurrence
----@field range occurrence.Range The range of the occurrence
----@field text string[] The text of the occurrence as a list of lines
-
----@class (exact) occurrence.OperatorContext: { [string]: any }
----@field occurrence occurrence.Occurrence
----@field marks [number, occurrence.Range][]
----@field mode 'n' | 'v' | 'o' The mode from which the operator is being triggered.
----@field register? occurrence.Register The register being used for the operation.
-
--- A function to be used as an operator on marked occurrences.
--- The function will be called for each marked occurrence with the following arguments:
---  - `current`: a table representing the occurrence currently being processed:
---    - `id`: the extmark id for the occurrence
---    - `index`: the index of the occurrence among all marked occurrences to be processed
---    - `range`: a table representing the range of the occurrence (see `occurrence.OccurrenceRange`)
---    - `text`: the text of the occurrence as a list of lines
---  - `ctx`: a table containing context for the operation:
---    - `occurrence`: the active occurrence state for the buffer (see `occurrence.Occurrence`)
---    - `marks`: a list of all marked occurrences as `[id, range]` tuples
---    - `mode`: the mode from which the operator is being triggered ('n', 'v', or 'o')
---    - `register`: the register being used for the operation (see `occurrence.Register`)
--- The `ctx` may also be used to store state between calls for each occurrence.
---
--- The function should return either:
---   - `string | string[]` to replace the occurrence text
---   - `nil | true` to leave the occurrence unchanged and proceed to the next occurrence
---   - `false` to cancel the operation on this and all remaining occurrences
---
---  If the return value is truthy (not `nil | false`), the original text
---  of the occurrence will be yanked to the register specified in `ctx.register`.
---  To prevent this, set `ctx.register` to `nil`.
----@alias occurrence.OperatorFn fun(mark: occurrence.OperatorCurrent, ctx: occurrence.OperatorContext): string | string[] | boolean | nil
-
--- A configuration for a keymap that will run an operation
--- on occurrences either as part of modifying a pending operator,
--- or when occurrence mode is active.
----@class (exact) occurrence.OperatorConfig
--- The operatation to perform on each marked occcurence. Either:
---   - a key sequence (e.g., `"gU"`) to be applied to the visual selection of each marked occurrence,
---   - or a function that will be called for each marked occurrence.
----@field operator string | occurrence.OperatorFn
--- The mode(s) in which the operator keymap is active.
--- Note that:
---  - if "n" or "v" are included, the keymap will
---    only be active when occurrence mode is active.
---  - if "o" is included, a pending operator matching this keymap
---    can be modified to operate on occurrences.
--- Defaults to `{ "n", "v", "o" }`.
----@field mode? "n" | "v" | "o" | ("n" | "v" | "o")[]
--- An optional description for the keymap.
--- Similar to the `desc` field in `:h vim.keymap.set` options.
----@field desc? string
--- Whether to operate on the inner range of the occurrence only.
--- Setting this to `false` will include surrounding whitespace,
--- similar to the difference between `iw` and `aw` text objects.
--- Default is `true`.
----@field inner? boolean
-
--- Internal descriptor for actions
----@alias occurrence.ApiConfig
----   | occurrence.OccurrenceModeConfig
----   | occurrence.OperatorModifierConfig
----   | occurrence.OperatorConfig
-
 ---@class occurrence.SearchFlags
 ---@field cursor? boolean Whether to accept a match at the cursor position.
 ---@field backward? boolean Whether to search backward.
@@ -764,7 +662,7 @@ function Occurrence:modify_operator(options, config)
   local register = (options and options.register) or vim.v.register
   local operator_key = (options and options.operator) or vim.v.operator
 
-  config = require("occurrence").resolve_config(config)
+  config = require("occurrence.Config").get(config)
   local operator_config = config:get_operator_config(operator_key, "o")
 
   if not operator_config then
@@ -825,7 +723,7 @@ end
 
 ---@param config? occurrence.Config
 function Occurrence:activate_occurrence_mode(config)
-  config = require("occurrence").resolve_config(config)
+  config = require("occurrence.Config").get(config)
   if config.default_keymaps then
     -- Disable the default operator-pending mapping.
     -- Note that this isn't strictly necessary, since the modify operator
@@ -1044,7 +942,7 @@ function Occurrence:apply_operator(operator, options, config)
   -- Try to resolve a string operator to an operator config
   -- before treating it as a key sequence.
   if type(operator) == "string" then
-    config = require("occurrence").resolve_config(config)
+    config = require("occurrence.Config").get(config)
     local operator_config = config:get_operator_config(operator)
     if operator_config then
       if operator_config.operator then
