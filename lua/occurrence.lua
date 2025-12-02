@@ -12,7 +12,7 @@ local api = require("occurrence.api")
 -- Note that this action does not activate occurrence mode,
 -- and it does not have any effect when occurrence mode is active,
 -- as operators already act on occurrences in that mode.
----@field modify_operator fun(opts?: occurrence.Options): nil
+---@field modify_operator fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Mark one or more occurrences and activate occurrence mode.
 --
@@ -25,7 +25,7 @@ local api = require("occurrence.api")
 --   - In visual mode, mark occurrences of the visual selection.
 --   - If `:h hlsearch` is active, mark occurrences of the search pattern.
 --   - Otherwise, mark occurrences of the word under the cursor.
----@field mark fun(opts?: occurrence.Options): nil
+---@field mark fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Unmark one or more occurrences.
 --
@@ -34,7 +34,7 @@ local api = require("occurrence.api")
 -- - Otherwise, if a match exists at the cursor, unmark that match.
 --
 -- If no match exists to satisfy the above, does nothing.
----@field unmark fun(opts?: occurrence.Options): nil
+---@field unmark fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Mark or unmark one (or more) occurrence(s) and activate occurrence mode.
 --
@@ -47,36 +47,72 @@ local api = require("occurrence.api")
 --   - In visual mode, mark the closest occurrence of the visual selection.
 --   - If `:h hlsearch` is active, mark the closest occurrence of the search pattern.
 --   - Otherwise, mark the closest occurrence of the word under the cursor.
----@field toggle fun(opts?: occurrence.Options): nil
+---@field toggle fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Move to the next marked occurrence and activate occurrence mode.
 --
 -- If occurrence has no matches, acts like `mark`
 -- and then moves to the next marked occurrence.
----@field next fun(opts?: occurrence.Options): nil
+---@field next fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Move to the previous marked occurrence and activate occurrence mode.
 --
 -- If occurrence has no matches, acts like `mark`
 -- and then moves to the previous marked occurrence.
----@field previous fun(opts?: occurrence.Options): nil
+---@field previous fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Move to the next occurrence match, whether marked or unmarked,
 -- and activate occurrence mode.
 --
 -- If occurrence has no matches, acts like `mark`
 -- and then moves to the next occurrence match.
----@field match_next fun(opts?: occurrence.Options): nil
+---@field match_next fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Move to the previous occurrence match, whether marked or unmarked,
 -- and activate occurrence mode.
 --
 -- If occurrence has no matches, acts like `mark`
 -- and then moves to the previous occurrence match.
----@field match_previous fun(opts?: occurrence.Options): nil
+---@field match_previous fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Clear all marks and patterns, and deactivate occurrence mode.
----@field deactivate fun(opts?: occurrence.Options): nil
+---@field deactivate fun(args?: occurrence.SubcommandArgs): nil
+--
+-- Change marked occurrences (may prompt for replacement)
+---@field change fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Delete marked occurrence
+---@field delete fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Distribute lines from register cyclically across marked occurrences.
+-- If no register is specified, use the unnamed register.
+---@field distribute fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Format marked occurrences through `:h equalprg`
+---@field indent_format fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Indent marked occurrences to the left
+---@field indent_left fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Indent marked occurrences to the right
+---@field indent_right fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Convert marked occurrences to lowercase
+---@field lowercase fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Put text from register at each marked occurrence.
+-- If no register is specified, use the unnamed register.
+---@field put fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Swap case of marked occurrences
+---@field swap_case fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Convert marked occurrences to uppercase
+---@field uppercase fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Yank marked occurrences into register.
+-- If no register is specified, use the unnamed register.
+---@field yank fun(args?: occurrence.SubcommandArgs):nil
 local occurrence = {}
 
 -- Create stubs for `occurrence.<name>` API functions

@@ -703,10 +703,24 @@ The following operators are supported via `modify_operator` or with marked occur
 | `distribute`    | `gp` | Distribute lines from register cyclically across occurrences      |
 | `indent_left`   | `<`  | Indent left                                                       |
 | `indent_right`  | `>`  | Indent right                                                      |
-| `indent_format` | `=`  | Indent/format                                                     |
+| `indent_format` | `=`  | Format through `:h equalprg`                                      |
 | `uppercase`     | `gU` | Convert to uppercase                                              |
 | `lowercase`     | `gu` | Convert to lowercase                                              |
 | `swap_case`     | `g~` | Swap case                                                         |
+
+These operators are also available as API methods, e.g.,:
+
+```lua
+require("occurrence").change()
+require("occurrence").delete()
+```
+
+And as subcommands, e.g.,:
+
+```vim
+:Occurrence change
+:Occurrence delete
+```
 
 # Custom Operators
 

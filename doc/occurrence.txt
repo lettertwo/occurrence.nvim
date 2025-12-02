@@ -808,7 +808,7 @@ occurrences (configured via `operators` table):
 
   indent_right    >     Indent right
 
-  indent_format   =     Indent/format
+  indent_format   =     Format through :h equalprg
 
   uppercase       gU    Convert to uppercase
 
@@ -816,6 +816,20 @@ occurrences (configured via `operators` table):
 
   swap_case       g~    Swap case
   ----------------------------------------------------------------------------
+These operators are also available as API methods, e.g.,:
+
+>lua
+    require("occurrence").change()
+    require("occurrence").delete()
+<
+
+And as subcommands, e.g.,:
+
+>vim
+    :Occurrence change
+    :Occurrence delete
+<
+
 
 ==============================================================================
 9. Custom Operators                              *occurrence-custom-operators*
