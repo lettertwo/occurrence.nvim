@@ -127,7 +127,6 @@ describe("README examples", function()
           ["c"] = "change",
           ["d"] = "delete",
           ["y"] = "yank",
-          ["g?"] = false, -- Disable ROT13
           ["g~"] = false, -- Disable swap case
           -- Define a custom operator:
           ["upper_first"] = {
@@ -198,7 +197,6 @@ describe("README examples", function()
       local has_change = false
       local has_delete = false
       local has_yank = false
-      local has_rot13 = false
       local has_swapcase = false
       local has_upper_first = false
       local has_lower_first = false
@@ -227,9 +225,6 @@ describe("README examples", function()
         if map.lhs == "y" then
           has_yank = true
         end
-        if map.lhs == "g?" then
-          has_rot13 = true
-        end
         if map.lhs == "g~" then
           has_swapcase = true
         end
@@ -248,7 +243,6 @@ describe("README examples", function()
       assert.is_true(has_change, "'c' operator should be enabled for change")
       assert.is_true(has_delete, "'d' operator should be enabled for delete")
       assert.is_true(has_yank, "'y' operator should be enabled for yank")
-      assert.is_false(has_rot13, "'g?' operator should be disabled for ROT13")
       assert.is_false(has_swapcase, "'g~' operator should be disabled for swap case")
       assert.is_true(has_upper_first, "'gU' operator should be enabled for upper first")
       assert.is_true(has_lower_first, "'gu' operator should be enabled for lower first")
@@ -290,7 +284,6 @@ describe("README examples", function()
       has_change = false
       has_delete = false
       has_yank = false
-      has_rot13 = false
       has_swapcase = false
       has_upper_first = false
       has_lower_first = false
@@ -319,9 +312,6 @@ describe("README examples", function()
         if map.lhs == "y" then
           has_yank = true
         end
-        if map.lhs == "g?" then
-          has_rot13 = true
-        end
         if map.lhs == "g~" then
           has_swapcase = true
         end
@@ -340,7 +330,6 @@ describe("README examples", function()
       assert.is_false(has_change, "'c' operator should be removed for change")
       assert.is_false(has_delete, "'d' operator should be removed for delete")
       assert.is_false(has_yank, "'y' operator should be enabled for yank")
-      assert.is_false(has_rot13, "'g?' operator should be disabled for ROT13")
       assert.is_false(has_swapcase, "'g~' operator should be disabled for swap case")
       assert.is_false(has_upper_first, "'gU' operator should be removed for upper first")
       assert.is_false(has_lower_first, "'gu' operator should be removed for lower first")

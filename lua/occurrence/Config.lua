@@ -136,7 +136,7 @@ local _global_config = nil
 -- Defaults to `true`.
 ---@field default_keymaps? boolean
 -- Whether to include default operator support.
--- (c, d, y, p, gp, <, >, =, gu, gU, g~, g?)
+-- (c, d, y, p, gp, <, >, =, gu, gU, g~)
 --
 -- If `false`, only operators explicitly defined in `operators`
 -- will be supported.
@@ -181,12 +181,9 @@ local DEFAULT_OPERATORS = {
   ["<"] = "indent_left",
   [">"] = "indent_right",
   ["="] = "indent_format",
-
   ["gu"] = "lowercase",
   ["gU"] = "uppercase",
-
   ["g~"] = "swap_case",
-  ["g?"] = "rot13",
 }
 
 local DEFAULT_CONFIG = {

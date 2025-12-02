@@ -155,7 +155,7 @@ The plugin works with zero configuration but can be customized through
       default_keymaps = true,
     
       -- Whether to include default operator support.
-      -- (c, d, y, p, gp, <, >, =, gu, gU, g~, g?)
+      -- (c, d, y, p, gp, <, >, =, gu, gU, g~)
       --
       -- If `false`, only operators explicitly defined in `operators`
       -- will be supported.
@@ -200,7 +200,6 @@ The plugin works with zero configuration but can be customized through
         ["gu"] = "lowercase",         -- Convert to lowercase
         ["gU"] = "uppercase",         -- Convert to uppercase
         ["g~"] = "swap_case",         -- Swap case
-        ["g?"] = "rot13",             -- ROT13 encoding
       },
     })
 <
@@ -226,7 +225,7 @@ Occurrence mode (after marking occurrences from normal/visual mode):
 - `ga` - Mark current occurrence
 - `gx` - Unmark current occurrence
 - `<Esc>`, `<C-c>`, `<C-[>` - Exit occurrence mode
-- All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`)
+- All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`)
 
 
 KEYMAPS                                     *occurrence-configuration-keymaps*
@@ -816,8 +815,6 @@ occurrences (configured via `operators` table):
   lowercase       gu    Convert to lowercase
 
   swap_case       g~    Swap case
-
-  rot13           g?    ROT13 encoding
   ----------------------------------------------------------------------------
 
 ==============================================================================

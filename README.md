@@ -17,7 +17,7 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 
 ### ⚡ Native and Custom Operator Integration
 
-- Use standard Vim operators: `c`, `d`, `y`, `p`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`
+- Use standard Vim operators: `c`, `d`, `y`, `p`, `<`, `>`, `=`, `gu`, `gU`, `g~`
 - Define custom operators to work with occurrences
 - Two interaction modes: mark-then-operate or operator-pending modifier
 - Works with motions and text objects (`ip`, `$`, `G`, etc.)
@@ -143,7 +143,7 @@ require("occurrence").setup({
   default_keymaps = true,
 
   -- Whether to include default operator support.
-  -- (c, d, y, p, gp, <, >, =, gu, gU, g~, g?)
+  -- (c, d, y, p, gp, <, >, =, gu, gU, g~)
   --
   -- If `false`, only operators explicitly defined in `operators`
   -- will be supported.
@@ -188,7 +188,6 @@ require("occurrence").setup({
     ["gu"] = "lowercase",         -- Convert to lowercase
     ["gU"] = "uppercase",         -- Convert to uppercase
     ["g~"] = "swap_case",         -- Swap case
-    ["g?"] = "rot13",             -- ROT13 encoding
   },
 })
 ```
@@ -213,7 +212,7 @@ Occurrence mode (after marking occurrences from normal/visual mode):
 - `ga` - Mark current occurrence
 - `gx` - Unmark current occurrence
 - `<Esc>`, `<C-c>`, `<C-[>` - Exit occurrence mode
-- All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`, `g?`)
+- All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`)
 
 ## Keymaps
 
@@ -708,7 +707,6 @@ The following operators are supported via `modify_operator` or with marked occur
 | `uppercase`     | `gU` | Convert to uppercase                                              |
 | `lowercase`     | `gu` | Convert to lowercase                                              |
 | `swap_case`     | `g~` | Swap case                                                         |
-| `rot13`         | `g?` | ROT13 encoding                                                    |
 
 # Custom Operators
 

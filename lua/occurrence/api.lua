@@ -447,12 +447,6 @@ local swap_case = {
   operator = "~",
 }
 
----@type occurrence.OperatorConfig
-local rot13 = {
-  desc = "Rot13 encode marked occurrences",
-  operator = "g?",
-}
-
 -- Supported operators
 ---@enum (key) occurrence.BuiltinOperator
 local operators = {
@@ -467,7 +461,6 @@ local operators = {
   uppercase = uppercase,
   lowercase = lowercase,
   swap_case = swap_case,
-  rot13 = rot13,
 }
 
 return vim.tbl_extend("error", api, operators)
