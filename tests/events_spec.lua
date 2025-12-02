@@ -129,6 +129,107 @@ describe("User event tests", function()
     end)
   end)
 
+  describe("OccurrenceUpdate", function()
+    it("should execute when an occurrence pattern is added", function()
+      bufnr = util.buffer("foo bar baz foo")
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+
+      local callback = spy.new()
+
+      local listener_id = vim.api.nvim_create_autocmd("User", {
+        pattern = "OccurrenceUpdate",
+        callback = function(...)
+          callback(...)
+        end,
+      })
+
+      feedkeys("q")
+      assert.is_not_nil(require("occurrence").get(bufnr), "Occurrence instance should be created")
+      assert.spy(callback).was_called(1)
+      assert.spy(callback).was_called_with(match.same({
+        event = "User",
+        match = "OccurrenceUpdate",
+        file = "OccurrenceUpdate",
+        buf = bufnr,
+        id = listener_id,
+      }))
+
+      feedkeys("q")
+      assert.spy(callback).was_called(1)
+      assert.spy(callback).was_called_with(match.same({
+        event = "User",
+        match = "OccurrenceUpdate",
+        file = "OccurrenceUpdate",
+        buf = bufnr,
+        id = listener_id,
+      }))
+
+      feedkeys("<Esc>")
+      assert.is_nil(require("occurrence").get(bufnr), "Occurrence instance should be removed after escaping")
+      assert.spy(callback).was_called(1)
+    end)
+
+    it("should execute when a mark is toggled", function()
+      bufnr = util.buffer("foo bar baz foo")
+      plugin.setup({})
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+      vim.keymap.set("n", "n", "<Plug>(OccurrenceNext)", { buffer = bufnr })
+      vim.keymap.set("n", "t", "<Plug>(OccurrenceToggle)", { buffer = bufnr })
+      vim.keymap.set("n", "Q", "<Plug>(OccurrenceUnmark)", { buffer = bufnr })
+
+      local callback = spy.new()
+
+      local listener_id = vim.api.nvim_create_autocmd("User", {
+        pattern = "OccurrenceUpdate",
+        callback = function(...)
+          callback(...)
+        end,
+      })
+
+      feedkeys("q")
+      assert.is_not_nil(require("occurrence").get(bufnr), "Occurrence instance should be created")
+      assert.spy(callback).was_called(1)
+      assert.spy(callback).was_called_with(match.same({
+        event = "User",
+        match = "OccurrenceUpdate",
+        file = "OccurrenceUpdate",
+        buf = bufnr,
+        id = listener_id,
+      }))
+
+      feedkeys("n") -- move to next occurrence
+      assert.spy(callback).was_called(1)
+
+      feedkeys("Q") -- unmark
+      assert.spy(callback).was_called(2)
+      assert.spy(callback).was_called_with(match.same({
+        event = "User",
+        match = "OccurrenceUpdate",
+        file = "OccurrenceUpdate",
+        buf = bufnr,
+        id = listener_id,
+      }))
+
+      feedkeys("t") -- toggle (should mark again)
+      assert.spy(callback).was_called(3)
+      assert.spy(callback).was_called_with(match.same({
+        event = "User",
+        match = "OccurrenceUpdate",
+        file = "OccurrenceUpdate",
+        buf = bufnr,
+        id = listener_id,
+      }))
+
+      feedkeys("q") -- should not add a new mark (already marked)
+      assert.spy(callback).was_called(3)
+
+      feedkeys("<Esc>")
+      assert.is_nil(require("occurrence").get(bufnr), "Occurrence instance should be removed after escaping")
+      assert.spy(callback).was_called(3)
+    end)
+  end)
+
   describe("OccurrenceDispose", function()
     it("should execute when an occurrence instance is disposed", function()
       bufnr = util.buffer("foo bar baz foo")

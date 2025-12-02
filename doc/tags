@@ -14,6 +14,7 @@ occurrence-events	occurrence.txt	/*occurrence-events*
 occurrence-events-occurrenceactivate	occurrence.txt	/*occurrence-events-occurrenceactivate*
 occurrence-events-occurrencecreate	occurrence.txt	/*occurrence-events-occurrencecreate*
 occurrence-events-occurrencedispose	occurrence.txt	/*occurrence-events-occurrencedispose*
+occurrence-events-occurrenceupdate	occurrence.txt	/*occurrence-events-occurrenceupdate*
 occurrence-installation	occurrence.txt	/*occurrence-installation*
 occurrence-mark	occurrence.txt	/*occurrence-mark*
 occurrence-match_next	occurrence.txt	/*occurrence-match_next*

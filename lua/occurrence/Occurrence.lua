@@ -323,14 +323,16 @@ end
 ---@return boolean marked Whether occurrences were marked.
 function Occurrence:mark(range)
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
-  local extmarks = self.extmarks
   local success = false
   for match in self:matches(range) do
-    if extmarks:mark(match) then
+    if self.extmarks:mark(match) then
       success = true
     end
   end
-  extmarks:update_current()
+  if success then
+    self.extmarks:update_current()
+    vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceUpdate" })
+  end
   return success
 end
 
@@ -346,7 +348,10 @@ function Occurrence:unmark(range)
       success = true
     end
   end
-  self.extmarks:update_current()
+  if success then
+    self.extmarks:update_current()
+    vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceUpdate" })
+  end
   return success
 end
 
@@ -360,7 +365,10 @@ function Occurrence:mark_all()
       success = true
     end
   end
-  self.extmarks:update_current()
+  if success then
+    self.extmarks:update_current()
+    vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceUpdate" })
+  end
   return success
 end
 
@@ -373,6 +381,10 @@ function Occurrence:unmark_all()
     if self.extmarks:unmark(match) then
       success = true
     end
+  end
+  if success then
+    self.extmarks:update_current()
+    vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceUpdate" })
   end
   return success
 end
@@ -584,8 +596,15 @@ function Occurrence:of_pattern(mark, search_pattern)
   for _, existing in ipairs(self.patterns) do
     if existing == pattern then
       if mark then
+        local success = false
         for match in self:matches(nil, nil, pattern) do
-          self:mark(match)
+          if self.extmarks:mark(match) then
+            success = true
+          end
+        end
+        if success then
+          self.extmarks:update_current()
+          vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceUpdate" })
         end
       end
       return true
@@ -605,11 +624,18 @@ function Occurrence:of_pattern(mark, search_pattern)
 
   -- Optionally mark
   if mark then
+    local success = false
     for match in self:matches(nil, nil, pattern) do
-      self:mark(match)
+      if self.extmarks:mark(match) then
+        success = true
+      end
+    end
+    if success then
+      self.extmarks:update_current()
     end
   end
 
+  vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceUpdate" })
   return true
 end
 
@@ -643,8 +669,19 @@ end
 
 function Occurrence:clear()
   assert(not self:is_disposed(), "Cannot use a disposed Occurrence")
-  self.extmarks:clear()
-  self.patterns = {}
+  local success = false
+  if self.extmarks:has_any_marks() then
+    self.extmarks:clear()
+    success = true
+  end
+  if #self.patterns > 0 then
+    self.patterns = {}
+    success = true
+  end
+  if success then
+    vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceUpdate" })
+  end
+  return success
 end
 
 ---@class occurrence.ModifyOperatorOptions

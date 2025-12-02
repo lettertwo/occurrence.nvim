@@ -837,6 +837,36 @@ vim.api.nvim_create_autocmd("User", {
 })
 ```
 
+## OccurrenceUpdate
+
+Triggered when an occurrence instance is updated with new patterns or marks.
+
+**When it fires:**
+
+- When new patterns are added
+- When marks are added or removed
+
+**Does NOT fire:**
+
+- When occurrence instance is created without patterns or marks
+- When occurrence mode is activated (use `OccurrenceActivate` instead)
+- When occurrence instance is disposed (use `OccurrenceDispose` instead)
+
+**Event data:**
+
+- `buf` (integer): Buffer number where occurrence was updated
+
+**Example:**
+
+```lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = "OccurrenceUpdate",
+  callback = function(event)
+    print(vim.inspect(require("occurrence").status({ buffer = event.buf })))
+  end,
+})
+```
+
 ## OccurrenceDispose
 
 Triggered when an occurrence instance is disposed and its resources are cleaned up.

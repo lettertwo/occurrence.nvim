@@ -1,4 +1,4 @@
-*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 November 30
+*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 December 02
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
@@ -25,6 +25,7 @@ Table of Contents                               *occurrence-table-of-contents*
 10. Events                                                 |occurrence-events|
   - OccurrenceCreate                      |occurrence-events-occurrencecreate|
   - OccurrenceActivate                  |occurrence-events-occurrenceactivate|
+  - OccurrenceUpdate                      |occurrence-events-occurrenceupdate|
   - OccurrenceDispose                    |occurrence-events-occurrencedispose|
 
 ==============================================================================
@@ -951,6 +952,37 @@ Triggered when occurrence mode is activated in a buffer.
             assert(require("occurrence").get()):unmark_all()
           end, { desc = "Unmark all occurrences" })
         end
+      end,
+    })
+<
+
+
+OCCURRENCEUPDATE                          *occurrence-events-occurrenceupdate*
+
+Triggered when an occurrence instance is updated with new patterns or marks.
+
+**When it fires:**
+
+- When new patterns are added
+- When marks are added or removed
+
+**Does NOT fire:**
+
+- When occurrence instance is created without patterns or marks
+- When occurrence mode is activated (use `OccurrenceActivate` instead)
+- When occurrence instance is disposed (use `OccurrenceDispose` instead)
+
+**Event data:**
+
+- `buf` (integer): Buffer number where occurrence was updated
+
+**Example:**
+
+>lua
+    vim.api.nvim_create_autocmd("User", {
+      pattern = "OccurrenceUpdate",
+      callback = function(event)
+        print(vim.inspect(require("occurrence").status({ buffer = event.buf })))
       end,
     })
 <
