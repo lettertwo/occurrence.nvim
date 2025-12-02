@@ -50,10 +50,29 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 ```lua
 {
   "lettertwo/occurrence.nvim",
-  event = "BufReadPost", -- If you want to lazy load
   ---@module "occurrence"
   ---@type occurrence.Options
   -- opts = {} -- setup is optional; the defaults will work out of the box.
+}
+```
+
+### Note on lazy loading:
+
+`occurrence.nvim` is designed to progressively load by default, so it is not necessary to configure the plugin manager for lazy loading.
+However, if you wish to explicitly control loading, you can disable the auto setup behavior:
+
+```lua
+{
+  "lettertwo/occurrence.nvim",
+  init = function()
+    -- Prevents automatic setup on load
+    vim.g.occurrence_auto_setup = false
+  end,
+  -- Explicitly load on specific keys.
+  keys = {
+    { "go", "<Plug>(OccurrenceMark)", mode = { "n", "v" }, desc = "Mark occurrences" },
+    { "o", "<Plug>(OccurrenceModifyOperator)", mode = "o", desc = "Modify operator for occurrences" },
+  },
 }
 ```
 
@@ -61,6 +80,7 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 
 ```lua
 vim.pack.add("lettertwo/occurrence.nvim")
+-- require("occurrence").setup({}) -- setup is optional; the defaults will work out of the box.
 ```
 
 # Quick Start
@@ -323,13 +343,19 @@ Display occurrence count in your statusline similar to Neovim's search count usi
 
 ```lua
 -- Example: lualine component
-local function occurrence_status()
-  local count = require('occurrence').status()
-  if not count then
-    return ""
-  end
-  return string.format("[%d/%d]", count.current, count.total)
-end
+local occurrence_status = {
+  function()
+    local count = require('occurrence').status()
+    if not count then
+      return ""
+    end
+    return string.format("[%d/%d]", count.current, count.total)
+  end,
+  cond = function()
+    -- Only show if occurrence.nvim is loaded
+    return package.loaded["occurrence"] ~= nil
+  end,
+}
 
 require('lualine').setup({
   sections = {
