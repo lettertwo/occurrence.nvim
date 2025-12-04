@@ -77,7 +77,7 @@ describe(":Occurrence command", function()
       feedkeys("G")
 
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-      assert.same({ " bar ", "baz foo end", "foo test foo" }, lines)
+      assert.same({ "bar", "baz foo end", "foo test foo" }, lines)
     end)
 
     it("yanks first N marked occurrences with count", function()
@@ -141,8 +141,8 @@ describe(":Occurrence command", function()
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.same({
         "foo bar foo", -- line 1: untouched
-        "baz  end", -- line 2: 'foo' deleted
-        " test ", -- line 3: both 'foo' deleted
+        "baz end", -- line 2: 'foo' deleted
+        "test", -- line 3: both 'foo' deleted
       }, lines)
 
       -- Should still have 2 marks on line 1

@@ -71,11 +71,33 @@ local _global_config = nil
 --   - `string | string[]` to replace the occurrence text
 --   - `nil | true` to leave the occurrence unchanged and proceed to the next occurrence
 --   - `false` to cancel the operation on this and all remaining occurrences
+--   - `occurrence.AsyncOperator` to perform an asynchronous operation
 --
 --  If the return value is truthy (not `nil | false`), the original text
 --  of the occurrence will be yanked to the register specified in `ctx.register`.
 --  To prevent this, set `ctx.register` to `nil`.
----@alias occurrence.OperatorFn fun(mark: occurrence.OperatorCurrent, ctx: occurrence.OperatorContext): string | string[] | boolean | nil
+---@alias occurrence.OperatorFn fun(mark: occurrence.OperatorCurrent, ctx: occurrence.OperatorContext): string | string[] | boolean | nil | occurrence.AsyncOperatorFn
+
+-- An async operator initiator function.
+-- Call `done(result)` with the a value representing the operation result.
+-- The `result` should be either:
+--  - `string | string[]` to replace the occurrence text
+--  - `nil | true` to leave the occurrence unchanged
+--  - `false` to cancel the operation on this and all remaining occurrences
+-- Resolved with `nil` to leave the occurrence unchanged.
+---@alias occurrence.AsyncOperatorFn fun(done: fun(result: string | string[] | boolean | nil))
+
+---@alias occurrence.AsyncBeforeHook fun(done: fun(ok: boolean?))
+
+-- Function called before operator execution.
+-- Use this for setup like user input or initialization.
+-- Any changes to `ctx` will be propagated to the operator.
+-- To cancel the operation, return `false`.
+--
+-- Alternatively, return a function that accepts a `done` callback,
+-- which must be called when setup is complete in order for the operator to proceed.
+-- If called with `done(false)`, the operation will be cancelled.
+---@alias occurrence.OperatorBeforeHook fun(marks: [number, occurrence.Range][], ctx: occurrence.OperatorContext): boolean | nil | fun(done: fun(cancel: boolean?))
 
 -- A configuration for a keymap that will run an operation
 -- on occurrences either as part of modifying a pending operator,
@@ -84,7 +106,19 @@ local _global_config = nil
 -- The operatation to perform on each marked occcurence. Either:
 --   - a key sequence (e.g., `"gU"`) to be applied to the visual selection of each marked occurrence,
 --   - or a function that will be called for each marked occurrence.
+-- If a function is provided, it may return either:
+--   - a string or list of strings to replace the occurrence text,
+--   - `nil` or `true` to leave the occurrence unchanged,
+--   - `false` to cancel the operation on this and all remaining occurrences,
+--   - or a function that accepts a `done` callback to perform an asynchronous operation.
+-- The async function should call `done(result)` when complete, where `result` is one of the above values.
 ---@field operator string | occurrence.OperatorFn
+-- Optional setup hook called before operator execution.
+-- Use for async setup like prompting the user.
+---@field before? occurrence.OperatorBeforeHook
+-- Maximum number of concurrent async operations.
+-- Defaults to 10 if not specified.
+---@field batch_size? number
 -- The mode(s) in which the operator keymap is active.
 -- Note that:
 --  - if "n" or "v" are included, the keymap will
@@ -477,7 +511,6 @@ end
 -- and cancelling active occurrences.
 -- Automatically called by `setup({})`.
 function config.reset()
-  local prev_config = _global_config
   _global_config = nil
   for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
     require("occurrence.Occurrence").del(require("occurrence.resolve_buffer")(buffer))

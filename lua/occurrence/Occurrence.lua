@@ -720,6 +720,7 @@ function Occurrence:modify_operator(options, config)
   end
 
   -- cancel the pending op.
+  log.debug("Cancelling original pending operator", operator_key, "for buffer", self.buffer)
   feedkeys.change_mode("n", { force = true, noflush = true, silent = true })
 
   -- Schedule sending `g@` to trigger custom opfunc on the next frame.
@@ -728,8 +729,17 @@ function Occurrence:modify_operator(options, config)
   -- other plugins (e.g. which-key) to react to the modified operator mode change.
   -- see `:h CTRL-\_CTRL-N` and `:h g@`
   vim.schedule(function()
-    log.debug("Activating operator-pending keymaps for buffer", self.buffer)
-
+    log.debug("Setting opfunc for operator:", operator_key)
+    -- Create the opfunc that will be called with the motion type
+    require("occurrence.Operator").create_opfunc(self, operator_config, {
+      mode = "o",
+      count = count,
+      register = register,
+      inner = inner,
+    })
+    -- Listen for the next change to normal mode, which indicates
+    -- that the modified operation has completed or been cancelled,
+    -- so we can dispose of the occurrence.
     local autocmd_id = nil
     autocmd_id = vim.api.nvim_create_autocmd("ModeChanged", {
       pattern = "*:n",
@@ -739,22 +749,19 @@ function Occurrence:modify_operator(options, config)
           -- if we are still in normal mode, then we assume
           -- it is safe to dispose of the occurrence.
           if vim.api.nvim_get_mode().mode == "n" then
-            log.debug("Operator-pending mode exited, clearing occurrence for buffer", self.buffer)
-            self:dispose()
+            log.debug("Operator-pending mode exited, scehduling occurrence disposal for buffer", self.buffer)
+            vim.schedule(function()
+              self:dispose()
+            end)
+            -- Clean up the autocmd
             pcall(vim.api.nvim_del_autocmd, autocmd_id)
           end
         end)
       end,
     })
-    -- Create the opfunc that will be called with the motion type
-    require("occurrence.Operator").create_opfunc(self, operator_config.operator, {
-      mode = "o",
-      count = count,
-      register = register,
-      inner = inner,
-    })
     -- re-enter operator-pending mode
-    feedkeys.change_mode("o", { silent = true })
+    log.debug("Re-entering operator-pending mode for buffer", self.buffer)
+    feedkeys.change_mode("o")
   end)
 end
 
@@ -766,7 +773,7 @@ function Occurrence:activate_occurrence_mode(config)
     -- Note that this isn't strictly necessary, since the modify operator
     -- command is a no-op when occurrence mode is active,
     -- but it gives some descriptive feedback to the user to update the binding.
-    self.keymap:set("o", "o", "<Nop>")
+    self.keymap:set("o", "o", "<Nop>", { nowait = true })
   end
 
   -- Set up buffer-local keymaps for occurrence mode actions
@@ -777,13 +784,15 @@ function Occurrence:activate_occurrence_mode(config)
       local mode = action_config.mode or { "n", "v" }
 
       if action_config.plug then
+        log.trace("Setting plug keymap for action:", action_key)
         -- Use <Plug> mapping if defined
-        self.keymap:set(mode, action_key, action_config.plug, { desc = desc })
+        self.keymap:set(mode, action_key, action_config.plug, { desc = desc, nowait = true })
       elseif action_config.callback then
+        log.trace("Setting callback keymap for action:", action_key)
         -- Fall back to direct callback
         self.keymap:set(mode, action_key, function()
           self:apply(action_config, nil, config)
-        end, { desc = desc })
+        end, { desc = desc, nowait = true })
       else
         -- No plug or callback defined
         log.warn_once(string.format("Action config for '%s' has no plug or callback defined", action_key))
@@ -808,8 +817,10 @@ function Occurrence:activate_occurrence_mode(config)
           ---@type boolean
           inner = operator_config.inner
         end
+        log.trace("Setting operator keymap for operator:", operator_key)
         self.keymap:set(mode or { "n", "v" }, operator_key, function()
-          require("occurrence.Operator").create_opfunc(self, operator_config.operator, {
+          log.trace("Setting opfunc for operator:", operator_key)
+          require("occurrence.Operator").create_opfunc(self, operator_config, {
             mode = vim.fn.mode():match("[vV]") and "v" or "n",
             count = vim.v.count,
             register = vim.v.register,
@@ -817,7 +828,7 @@ function Occurrence:activate_occurrence_mode(config)
           })
           -- send g@ to trigger custom opfunc
           return "g@"
-        end, { desc = desc, expr = true })
+        end, { desc = desc, expr = true, nowait = true })
       end
     else
       log.warn_once(string.format("Operator '%s' is not supported", operator_key))
@@ -892,7 +903,8 @@ function Occurrence:apply(action, args, config)
       } or nil, config)
       return
     elseif action_config.operator ~= nil then
-      self:apply_operator(action_config.operator, args and {
+      ---@cast action_config occurrence.OperatorConfig
+      self:apply_operator(action_config, args and {
         count = args.count,
         motion = args.range,
         motion_type = args.range and "line" or nil,
@@ -954,7 +966,7 @@ end
 --
 -- If no occurrences are marked after the operation, the occurrence will be disposed.
 --
----@param operator string | occurrence.OperatorFn
+---@param operator string | occurrence.OperatorFn | occurrence.OperatorConfig
 ---@param options? occurrence.ApplyOperatorOptions
 ---@param config? occurrence.Config
 function Occurrence:apply_operator(operator, options, config)
@@ -982,19 +994,16 @@ function Occurrence:apply_operator(operator, options, config)
     config = require("occurrence.Config").get(config)
     local operator_config = config:get_operator_config(operator)
     if operator_config then
-      if operator_config.operator then
-        operator = operator_config.operator
-      end
-      if type(operator_config.inner) == "boolean" then
-        ---@type boolean
-        inner = operator_config.inner
-      end
+      operator = operator_config
     end
   end
 
   if options and type(options.inner) == "boolean" then
     ---@type boolean
     inner = options.inner
+  elseif type(operator) == "table" and type(operator.inner) == "boolean" then
+    ---@type boolean
+    inner = operator.inner
   end
 
   -- Create the opfunc that will be called with the motion type

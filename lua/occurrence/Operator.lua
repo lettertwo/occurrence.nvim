@@ -56,175 +56,309 @@ local _set_opfunc = vim.fn[vim.api.nvim_exec2(
 ---@field register string The register to use for the operation
 ---@field inner boolean Whether to operate on inner text only (no surrounding whitespace)
 
----@param occurrence occurrence.Occurrence The occurrence to operate on.
----@param operator string | occurrence.OperatorFn The operator to apply (e.g. "d", "y", etc), or a callback function that performs the operation.
----@param marks [integer, occurrence.Range][] The marks to operate on.
----@param ctx occurrence.OpfuncContext The opfunc context.
-local function apply_operator(occurrence, operator, marks, ctx)
+-- Expand marks in-place to include surrounding whitespace.
+---@param marks [integer, occurrence.Range][] The marks to expand.
+local function expand_around(marks)
   local original_cursor = Cursor.save()
-
-  if ctx.inner ~= true then
-    -- expand all marks to include surrounding whitespace
-    for i = 1, #marks do
-      local id, mark = unpack(marks[i])
-
-      -- search forward for next non-whitespace char
-      original_cursor:move(mark.stop)
-      local new_stop = Location.from_pos(vim.fn.searchpos([[\V\C\S]], "nWc"))
-      if new_stop and new_stop > mark.stop then
-        local new_mark = Range.new(mark.start, new_stop)
-        log.debug("Expanded mark", id, "from", mark, "to", new_mark)
+  -- expand all marks to include surrounding whitespace
+  for i = 1, #marks do
+    local id, mark = unpack(marks[i])
+    -- search forward for next non-whitespace char
+    original_cursor:move(mark.stop)
+    local new_stop = Location.from_pos(vim.fn.searchpos([[\V\C\S]], "nWc"))
+    if new_stop and new_stop > mark.stop then
+      local new_mark = Range.new(mark.start, new_stop)
+      log.trace("Expanded mark", id, "from", mark, "to", new_mark)
+      marks[i] = { id, new_mark }
+    else
+      -- if no forward non-whitespace char was found,
+      -- we must be at the end of a line,
+      -- so search backward for previous non-whitespace char.
+      original_cursor:move(mark.start)
+      local new_start = Location.from_pos(vim.fn.searchpos([[\V\C\S\s]], "bnWe"))
+      if new_start and new_start < mark.start then
+        local new_mark = Range.new(new_start, mark.stop)
+        log.trace("Expanded mark", id, "from", mark, "to", new_mark)
         marks[i] = { id, new_mark }
-      else
-        -- if no forward non-whitespace char was found,
-        -- we must be at the end of a line,
-        -- so search backward for previous non-whitespace char.
-        original_cursor:move(mark.start)
-        local new_start = Location.from_pos(vim.fn.searchpos([[\V\C\S\s]], "bnWe"))
-        if new_start and new_start < mark.start then
-          local new_mark = Range.new(new_start, mark.stop)
-          log.debug("Expanded mark", id, "from", mark, "to", new_mark)
-          marks[i] = { id, new_mark }
-        end
       end
     end
+  end
+  original_cursor:restore()
+end
 
+-- A queue for managing batched operator execution.
+---@class occurrence.OperatorQueue
+---@field operator occurrence.OperatorFn
+---@field ctx occurrence.OperatorContext
+---@field register occurrence.Register?
+---@field items occurrence.OperatorCurrent[]
+---@field head integer
+---@field tail integer
+---@field first_run boolean
+local OperatorQueue = {}
+
+---@param item occurrence.OperatorCurrent
+function OperatorQueue:enqueue(item)
+  self.tail = self.tail + 1
+  self.items[self.tail] = item
+end
+
+---@param batch_size number
+---@return nil | fun(done: fun(current: occurrence.OperatorCurrent, result: string | string[] | boolean | nil))[]
+function OperatorQueue:dequeue(batch_size)
+  if self.head > self.tail then
+    return nil
+  end
+
+  local batch = {}
+
+  ---@param current occurrence.OperatorCurrent
+  ---@param result string | string[] | boolean | nil
+  ---@param done fun(current: occurrence.OperatorCurrent, result: string | string[] | boolean | nil)
+  local function on_result(current, result, done)
+    if self.first_run then
+      if result ~= nil and result ~= false and self.ctx.register ~= nil then
+        self.ctx.register:clear()
+      end
+      self.first_run = false
+    end
+
+    if result ~= nil and result ~= false and self.ctx.register ~= nil then
+      self.ctx.register:add(current.text)
+    end
+
+    if self.ctx.register == nil then
+      self.ctx.register = self.register
+    end
+
+    done(current, result)
+  end
+
+  for _ = 1, batch_size do
+    if self.head > self.tail then
+      return batch
+    end
+
+    local current = self.items[self.head]
+    self.items[self.head] = nil
+    self.head = self.head + 1
+
+    table.insert(batch, function(cb)
+      local result = self.operator(current, self.ctx)
+      if type(result) == "function" then
+        result(function(res)
+          on_result(current, res, cb)
+        end)
+      else
+        on_result(current, result, cb)
+      end
+    end)
+  end
+
+  return batch
+end
+
+---@param operator occurrence.OperatorFn
+---@param ctx occurrence.OperatorContext
+local function create_operator_queue(operator, ctx)
+  return setmetatable({
+    operator = operator,
+    register = ctx.register,
+    ctx = ctx,
+    items = {},
+    head = 1,
+    tail = 0,
+    first_run = true,
+  }, { __index = OperatorQueue })
+end
+
+-- A list of edits to apply to the occurrence buffer.
+-- Edits are applied in reverse order to avoid changing the location of subsequent edits.
+---@class occurrence.EditList
+---@field occurrence occurrence.Occurrence
+---@field ctx occurrence.OperatorContext
+---@field cursor occurrence.Cursor
+---@field edits? [integer, occurrence.Range, string[]][]
+local EditList = {}
+
+---@param current occurrence.OperatorCurrent
+---@param new_text string[]
+function EditList:add(current, new_text)
+  if not self.edits then
+    self.edits = {}
+  end
+  table.insert(self.edits, current.index, { current.id, current.range, new_text })
+  log.trace("EditList:add called for index", current.index, "total edits:", #self.edits)
+end
+
+function EditList:apply()
+  local edits = self.edits or {}
+  self.edits = nil
+
+  log.debug("EditList:apply called with", #edits, "edits")
+
+  -- Apply edits in reverse order
+  for i = #edits, 1, -1 do
+    local id, mark, new_text = unpack(edits[i])
+    -- Create single undo block for all edits
+    if i < #edits then
+      vim.cmd("silent! undojoin")
+    end
+    vim.api.nvim_buf_set_text(
+      self.occurrence.buffer,
+      mark.start.line,
+      mark.start.col,
+      mark.stop.line,
+      mark.stop.col,
+      new_text
+    )
+    self.occurrence.extmarks:unmark(id)
+  end
+
+  if self.ctx.register ~= nil then
+    self.ctx.register:save()
+  end
+
+  if #edits > 0 then
+    log.debug("Replaced", #edits, "marks")
+    local _, first_edit = unpack(edits[1])
+    self.cursor:move(first_edit.start)
+  else
+    self.cursor:restore()
+  end
+end
+
+---@param occurrence occurrence.Occurrence
+---@param ctx occurrence.OperatorContext
+local function create_edit_list(occurrence, ctx)
+  return setmetatable({
+    occurrence = occurrence,
+    ctx = ctx,
+    cursor = Cursor.save(),
+  }, { __index = EditList })
+end
+
+-- Apply an operator string (e.g. `"d"`, `"y"`, etc) to a visual selection of each mark.
+---@param operator string The operator string (e.g. "d", "y", etc).
+---@param ctx occurrence.OperatorContext The operator context.
+---@param done fun() Callback when operations are complete.
+local function apply_operator_string(operator, ctx, done)
+  local occurrence = ctx.occurrence
+  local marks = ctx.marks
+  local original_cursor = Cursor.save()
+
+  local edited = 0
+  local last_edited = nil
+
+  -- Visually select and feedkeys for each mark in reverse order
+  for i = #marks, 1, -1 do
+    local id, mark = unpack(marks[i])
+    -- Create single undo block for all edits
+    if edited > 0 then
+      vim.cmd("silent! undojoin")
+    end
+
+    Cursor.move(mark.start)
+    feedkeys.change_mode("v", { force = true, silent = true })
+    Cursor.move(mark.stop)
+    occurrence.extmarks:unmark(id)
+    feedkeys(operator, { noremap = true })
+
+    edited = edited + 1
+    last_edited = mark
+  end
+
+  if edited == 0 then
+    log.debug("No marks to execute", operator)
+  else
+    log.debug("Executed", operator, "on", edited, "marks")
+  end
+
+  if last_edited then
+    original_cursor:move(last_edited.start)
+  else
     original_cursor:restore()
   end
 
-  -- String operator: use feedkeys
-  if type(operator) == "string" then
-    local edited = 0
-    local last_edited = nil
+  done()
+end
 
-    -- Visually select and feedkeys for each mark in reverse order
-    for i = #marks, 1, -1 do
-      local id, mark = unpack(marks[i])
-      -- Create single undo block for all edits
-      if edited > 0 then
-        vim.cmd("silent! undojoin")
-      end
+---@param operator occurrence.OperatorFn
+---@param ctx occurrence.OperatorContext The operator context.
+---@param batch_size number Maximum concurrent operations.
+---@param done fun(result: boolean?) Callback when all operations are complete or cancelled.
+local function apply_operator_fn(operator, ctx, batch_size, done)
+  local occurrence = ctx.occurrence
+  local marks = ctx.marks
+  local edits = create_edit_list(occurrence, ctx)
+  local operations = create_operator_queue(operator, ctx)
 
-      Cursor.move(mark.start)
-      feedkeys.change_mode("v", { force = true, silent = true })
-      Cursor.move(mark.stop)
-      occurrence.extmarks:unmark(id)
-      feedkeys(operator, { noremap = true })
-
-      edited = edited + 1
-      last_edited = mark
-    end
-
-    if edited == 0 then
-      log.debug("No marks to execute", operator)
-    else
-      log.debug("Executed", operator, "on", edited, "marks")
-    end
-
-    if last_edited then
-      original_cursor:move(last_edited.start)
-    else
-      original_cursor:restore()
-    end
-  else
-    -- Callback operator: Collect edits in traversal order,
-    -- then apply in reverse order.
-    local edits = {}
-
-    local register = Register.new(ctx.register)
-
-    ---@type occurrence.OperatorContext
-    local operator_ctx = {
-      mode = ctx.mode,
-      occurrence = occurrence,
-      marks = marks,
-      register = register,
-    }
-
-    -- Collect edits in traversal order
-    for i = 1, #marks do
-      local id, mark = unpack(marks[i])
-      ---@type occurrence.OperatorCurrent
-      local current = {
-        index = i,
-        id = id,
-        range = mark,
-        text = vim.api.nvim_buf_get_text(
-          occurrence.buffer,
-          mark.start.line,
-          mark.start.col,
-          mark.stop.line,
-          mark.stop.col,
-          {}
-        ),
-      }
-      local result = operator(current, operator_ctx)
-
-      if result == false then
-        -- Operation cancelled
-        log.debug("Operation cancelled by callback")
-        return false
-      elseif result == nil or result == true then
-        -- If the `result` is `nil` or `true`,
-        -- assume the occurrence has been handled and unmark it
-        occurrence.extmarks:unmark(id)
-      elseif type(result) == "string" then
-        -- Split on newlines if present
-        if result:find("\n") then
-          result = vim.split(result, "\n", { plain = true })
-        else
-          result = { result }
-        end
-        table.insert(edits, { id, mark, result })
-      elseif type(result) == "table" then
-        -- Replacement operation
-        table.insert(edits, { id, mark, result })
-      else
-        error("Invalid operator result type: " .. type(result))
-      end
-
-      if result ~= nil and result ~= false and operator_ctx.register ~= nil then
-        if i == 1 then
-          operator_ctx.register:clear()
-        end
-        operator_ctx.register:add(current.text)
-      end
-
-      if operator_ctx.register == nil then
-        operator_ctx.register = register
-      end
-    end
-
-    -- Apply edits in reverse order
-    for i = #edits, 1, -1 do
-      local id, mark, new_text = unpack(edits[i])
-      -- Create single undo block for all edits
-      if i < #edits then
-        vim.cmd("silent! undojoin")
-      end
-      vim.api.nvim_buf_set_text(
+  for i = 1, #marks do
+    local id, mark = unpack(marks[i])
+    operations:enqueue({
+      index = i,
+      id = id,
+      range = mark,
+      text = vim.api.nvim_buf_get_text(
         occurrence.buffer,
         mark.start.line,
         mark.start.col,
         mark.stop.line,
         mark.stop.col,
-        new_text
-      )
-      occurrence.extmarks:unmark(id)
-    end
+        {}
+      ),
+    })
+  end
 
-    if operator_ctx.register ~= nil then
-      operator_ctx.register:save()
-    end
+  local next_batch, execute_next_batch
+  execute_next_batch = function()
+    next_batch = operations:dequeue(batch_size)
+    if next_batch and #next_batch > 0 then
+      local remaining = #next_batch
+      local cancelled = false
+      for _, operation in ipairs(next_batch) do
+        operation(function(current, result)
+          remaining = remaining - 1
+          log.trace("Operation callback called for index", current.index, "remaining:", remaining)
+          if cancelled or result == false then
+            cancelled = true
+          else
+            if result == nil or result == true then
+              -- If the `result` is `nil` or `true`,
+              -- assume the occurrence has been handled and unmark it
+              occurrence.extmarks:unmark(current.id)
+            elseif type(result) == "string" then
+              -- Split on newlines if present
+              if result:find("\n") then
+                result = vim.split(result, "\n", { plain = true })
+              else
+                result = { result }
+              end
+              edits:add(current, result)
+            elseif type(result) == "table" then
+              edits:add(current, result)
+            else
+              error("Invalid operator result type: " .. type(result))
+            end
+          end
 
-    if #edits > 0 then
-      log.debug("Replaced", #edits, "marks")
-      local _, first_edit = unpack(edits[1])
-      original_cursor:move(first_edit.start)
+          if remaining <= 0 then
+            if cancelled then
+              log.trace("Operation cancelled")
+              done(false)
+            else
+              execute_next_batch()
+            end
+          end
+        end)
+      end
     else
-      original_cursor:restore()
+      edits:apply()
+      done()
     end
   end
+
+  execute_next_batch()
 end
 
 -- Register an `:h opfunc` that will apply an operator to occurrences within a range of motion,
@@ -234,7 +368,7 @@ end
 -- then the operator will dispose of the occurrence after it is applied. Otherwise,
 -- the operator will only dispose of the occurrence if it has no remaining marks.
 ---@param occurrence occurrence.Occurrence The occurrence to operate on.
----@param operator string | occurrence.OperatorFn The operator to apply (e.g. "d", "y", etc), or a callback function that performs the operation.
+---@param operator string | occurrence.OperatorFn | occurrence.OperatorConfig The operator to apply (e.g. "d", "y", etc), or a callback function that performs the operation, or an operator config table.
 ---@param ctx occurrence.OpfuncContext The opfunc context.
 local function create_opfunc(occurrence, operator, ctx)
   ---@type occurrence.Cursor?
@@ -244,9 +378,18 @@ local function create_opfunc(occurrence, operator, ctx)
   ---@type fun(type: string)?
   local opfunc = nil
   ---@type string?
-  local type = nil
+  local motion_type = nil
   local win = vim.api.nvim_get_current_win()
   local count = ctx.count or 0
+  local before_hook = nil
+  local batch_size = 10
+
+  if type(operator) == "table" then
+    before_hook = operator.before
+    batch_size = operator.batch_size or batch_size
+    operator = operator.operator
+    ---@cast operator -occurrence.OperatorConfig
+  end
 
   log.debug("Caching cursor position for opfunc in buffer", occurrence.buffer)
   cursor = Cursor.save()
@@ -256,25 +399,25 @@ local function create_opfunc(occurrence, operator, ctx)
     -- From :h single-repeat:
     --   > Note that when repeating a command that used a Visual selection,
     --   > the same SIZE of area is used.
-    if not type then
-      type = initial_type
-      log.debug(string.format("opfunc called in mode '%s' with initial type '%s'", ctx.mode, type))
+    if not motion_type then
+      motion_type = initial_type
+      log.debug(string.format("opfunc called in mode '%s' with initial type '%s'", ctx.mode, motion_type))
     else
-      log.debug(string.format("opfunc called in mode '%s' with original type '%s'", ctx.mode, type))
+      log.debug(string.format("opfunc called in mode '%s' with original type '%s'", ctx.mode, motion_type))
     end
 
     -- For visual mode, preserve the size of the original range by moving it to the new position.
     -- For operator-pending/normal mode with motion, recalculate the range at the current position.
     if range and ctx.mode == "v" then
       cursor = cursor or CURSOR_CACHE[win] or Cursor.save()
-      if type == "line" then
+      if motion_type == "line" then
         range = Range.of_line(cursor.location.line)
       else
         range = range:move(cursor.location)
       end
     else
       -- Recalculate range at current cursor position (don't restore old cursor yet)
-      range = Range.of_motion(type)
+      range = Range.of_motion(motion_type)
       cursor = cursor or CURSOR_CACHE[win] or Cursor.save()
     end
 
@@ -318,33 +461,77 @@ local function create_opfunc(occurrence, operator, ctx)
     local marks = occurrence.extmarks:collect(range, count > 0 and count or nil)
     log.debug("marks found:" .. #marks)
 
-    if apply_operator(occurrence, operator, marks, ctx) ~= false then
-      if ctx.mode == "v" then
-        -- Clear visual selection
-        feedkeys.change_mode("n", { noflush = true, silent = true })
+    if ctx.inner ~= true then
+      expand_around(marks)
+    end
+
+    ---@param result boolean?
+    local function on_done(result)
+      if result ~= false then
+        if ctx.mode == "v" then
+          -- Clear visual selection
+          feedkeys.change_mode("n", { noflush = true, silent = true })
+        end
+
+        cursor = nil
+
+        if occurrence and not occurrence.extmarks:has_any_marks() then
+          log.debug("Occurrence has no marks after operation; deactivating")
+          occurrence:dispose()
+          occurrence = nil ---@diagnostic disable-line: cast-local-type
+        end
+
+        -- If running the edits changed `vim.v.operator`, we need to restore it.
+        -- NOTE: we do it this way because `vim.v.operator` can only be set internally by nvim.
+        if vim.v.operator ~= "g@" then
+          log.debug("Restoring operator to g@ for dot-repeat")
+          -- set opfunc to a noop so we can get `g@` back into `vim.v.operator` with no side effects.
+          _set_opfunc(function() end)
+          feedkeys("g@$", { noremap = true })
+          -- Restore our original opfunc.
+          _set_opfunc(opfunc)
+        end
+
+        -- Watch for dot-repeat to cache cursor position prior to repeating the operation.
+        watch_dot_repeat()
       end
+    end
 
-      cursor = nil
+    ---@type occurrence.OperatorContext
+    local operator_ctx = {
+      mode = ctx.mode,
+      occurrence = occurrence,
+      marks = marks,
+      register = Register.new(ctx.register),
+    }
 
-      if occurrence and not occurrence.extmarks:has_any_marks() then
-        log.debug("Occurrence has no marks after operation; deactivating")
-        occurrence:dispose()
-        occurrence = nil ---@diagnostic disable-line: cast-local-type
+    local function apply_operator()
+      if type(operator) == "string" then
+        apply_operator_string(operator, operator_ctx, on_done)
+      else
+        apply_operator_fn(operator, operator_ctx, batch_size, on_done)
       end
+    end
 
-      -- If running the edits changed `vim.v.operator`, we need to restore it.
-      -- NOTE: we do it this way because `vim.v.operator` can only be set internally by nvim.
-      if vim.v.operator ~= "g@" then
-        log.debug("Restoring operator to g@ for dot-repeat")
-        -- set opfunc to a noop so we can get `g@` back into `vim.v.operator` with no side effects.
-        _set_opfunc(function() end)
-        feedkeys("g@$", { noremap = true })
-        -- Restore our original opfunc.
-        _set_opfunc(opfunc)
+    if type(before_hook) == "function" then
+      local before_result = before_hook(marks, operator_ctx)
+      if before_result == false then
+        log.debug("Operation cancelled by before hook")
+        on_done(false)
+      elseif type(before_result) == "function" then
+        before_result(function(ok)
+          if ok == false then
+            log.debug("Operation cancelled by before hook async result")
+            on_done(false)
+          else
+            apply_operator()
+          end
+        end)
+      else
+        apply_operator()
       end
-
-      -- Watch for dot-repeat to cache cursor position prior to repeating the operation.
-      watch_dot_repeat()
+    else
+      apply_operator()
     end
   end
 

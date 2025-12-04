@@ -587,6 +587,7 @@ describe("integration tests", function()
         operators = {
           d = {
             inner = false,
+            before = function() end,
             operator = function()
               return ""
             end,
@@ -610,6 +611,58 @@ describe("integration tests", function()
 
       -- Complete a motion to apply delete operator
       feedkeys("$")
+
+      lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("bar baz", lines[1], "Both 'foo' occurrences should be deleted")
+
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.same({}, marks, "No marks should remain after applying operator")
+    end)
+
+    it("modifies custom async operator function", function()
+      bufnr = util.buffer("foo bar baz foo")
+
+      plugin.setup({
+        default_operators = false,
+        operators = {
+          d = {
+            inner = false,
+            before = function()
+              return function(done)
+                vim.schedule(function()
+                  done()
+                end)
+              end
+            end,
+            operator = function()
+              return function(done)
+                vim.schedule(function()
+                  done("")
+                end)
+              end
+            end,
+          },
+        },
+      })
+      vim.keymap.set("o", "q", "<Plug>(OccurrenceModifyOperator)", { buffer = bufnr })
+
+      -- Enter delete operator-pending mode, modify operator
+      feedkeys("dq")
+
+      vim.wait(0) -- The operator-modifier action is async.
+
+      -- Verify no changes have been made yet.
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.equals("foo bar baz foo", lines[1], "No 'foo' occurrences should be deleted yet")
+
+      -- Verify marks are created for all 'foo' occurrences
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      -- Complete a motion to apply delete operator
+      feedkeys("$")
+
+      vim.wait(0) -- operator is async
 
       lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       assert.equals("bar baz", lines[1], "Both 'foo' occurrences should be deleted")

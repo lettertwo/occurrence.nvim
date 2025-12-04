@@ -338,19 +338,18 @@ local api = {
 ---@type occurrence.OperatorConfig
 local change = {
   desc = "Change marked occurrences",
-  operator = function(_, ctx)
-    if ctx.replacement == nil then
-      local ok, input = pcall(vim.fn.input, {
-        prompt = "Change to: ",
-        cancelreturn = false,
-      })
-      if not ok then
-        -- User cancelled with Ctrl-C - return false to abort operation
-        ctx.replacement = false
-      end
-      ctx.replacement = input
+  before = function(_, ctx)
+    local ok, input = pcall(vim.fn.input, {
+      prompt = "Change to: ",
+      cancelreturn = false,
+    })
+    if not ok then
+      -- User cancelled with Ctrl-C - return false to abort operation
+      return false
     end
-
+    ctx.replacement = input
+  end,
+  operator = function(_, ctx)
     return ctx.replacement
   end,
 }
