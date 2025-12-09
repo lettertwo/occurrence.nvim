@@ -9,6 +9,8 @@ occurrence-configuration-keymaps	occurrence.txt	/*occurrence-configuration-keyma
 occurrence-configuration-operators	occurrence.txt	/*occurrence-configuration-operators*
 occurrence-configuration-statusline-integration	occurrence.txt	/*occurrence-configuration-statusline-integration*
 occurrence-custom-operators	occurrence.txt	/*occurrence-custom-operators*
+occurrence-custom-operators-feedkeys-operators	occurrence.txt	/*occurrence-custom-operators-feedkeys-operators*
+occurrence-custom-operators-function-operators	occurrence.txt	/*occurrence-custom-operators-function-operators*
 occurrence-deactivate	occurrence.txt	/*occurrence-deactivate*
 occurrence-events	occurrence.txt	/*occurrence-events*
 occurrence-events-occurrenceactivate	occurrence.txt	/*occurrence-events-occurrenceactivate*

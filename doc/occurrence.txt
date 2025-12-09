@@ -1,4 +1,4 @@
-*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 December 02
+*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 December 09
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
@@ -21,6 +21,8 @@ Table of Contents                               *occurrence-table-of-contents*
   - Actions                                 |occurrence-api-reference-actions|
 8. Builtin Operators                            |occurrence-builtin-operators|
 9. Custom Operators                              |occurrence-custom-operators|
+  - Feedkeys Operators        |occurrence-custom-operators-feedkeys-operators|
+  - Function Operators        |occurrence-custom-operators-function-operators|
   - Custom Line-Based Operators|occurrence-custom-operators-custom-line-based-operators|
 10. Events                                                 |occurrence-events|
   - OccurrenceCreate                      |occurrence-events-occurrencecreate|
@@ -861,6 +863,215 @@ And as subcommands, e.g.,:
 
 ==============================================================================
 9. Custom Operators                              *occurrence-custom-operators*
+
+
+FEEDKEYS OPERATORS            *occurrence-custom-operators-feedkeys-operators*
+
+Custom operators can be defined as strings representing key sequences to be fed
+to Neovim for a visual selection of each marked occurrence. This allows
+leveraging existing vim commands or macros as operators.
+
+If the key sequence will operate when in visual mode, it can be defined as just
+the sequence:
+
+>lua
+    require("occurrence").setup({
+      operators = {
+        ["~"] = {
+          desc = "Swap case using ~",
+          operator = "~",
+        }
+      }
+    })
+<
+
+Otherwise, you can define the full command to operate on the selection:
+
+>lua
+    require("occurrence").setup({
+      operators = {
+        ["g@q"] = {
+          desc = "Apply @q macro to each occurrence",
+          operator = ":'<'>normal @q<CR>",
+        }
+      }
+    })
+<
+
+
+FUNCTION OPERATORS            *occurrence-custom-operators-function-operators*
+
+Custom operators can be defined as Lua functions that transform the text of
+each marked occurrence. The function receives information about the current
+mark being processed and returns the replacement text.
+
+
+BASIC FUNCTION OPERATOR ~
+
+>lua
+    require("occurrence").setup({
+      operators = {
+        ["gU"] =  {
+          desc = "Convert to uppercase",
+          operator = function(mark, ctx)
+            local text = table.concat(mark.text, "\n")
+            return vim.fn.toupper(text)
+          end
+        }
+      }
+    })
+<
+
+The operator function receives two parameters:
+
+- `mark`: Information about the current occurrence being processed
+    - `mark.index`: 1-based index among all marks
+    - `mark.id`: Extmark ID
+    - `mark.range`: Range object with `start` and `stop` positions
+    - `mark.text`: Array of lines as strings
+- `ctx`: Operator Context
+    - `ctx.occurrence`: The Occurrence instance
+    - `ctx.marks`: All marks being processed
+    - `ctx.mode`: Mode the operator was triggered in (`"n"`, `"v"`, or `"o"`)
+    - `ctx.register`: Register instance (if applicable)
+
+
+RETURN VALUES ~
+
+Function operators can return different values to control behavior:
+
+>lua
+    -- Return a string to replace the mark
+    operator = function(mark, ctx)
+      return "replacement"
+    end
+    
+    -- Return array of strings for multi-line replacement
+    operator = function(mark, ctx)
+      return { "line 1", "line 2" }
+    end
+    
+    -- Return nil or true for side-effect only (mark will be unmarked)
+    operator = function(mark, ctx)
+      print("Processing mark " .. mark.index)
+      return nil -- or return true to yank without replacement
+    end
+    
+    -- Return false to cancel the remaining operations.
+    operator = function(mark, ctx)
+      if some_condition then
+        return false -- Stop processing all marks
+      end
+      return "replacement"
+    end
+<
+
+
+ASYNC OPERATORS ~
+
+For operations requiring asynchronous work (LSP requests, external commands,
+user input), return a function that accepts a `done` callback:
+
+>lua
+    require("occurrence").setup({
+      operators = {
+        format_with_prettier = {
+          desc = "Format with prettier",
+          operator = function(mark, ctx)
+            -- Return async initiator function
+            return function(done)
+              local text = table.concat(mark.text, "\n")
+              vim.system(
+                { "prettier", "--stdin-filepath", "file.js" },
+                { stdin = text },
+                function(result)
+                  if result.code == 0 then
+                    -- Call done with replacement text
+                    done(vim.split(result.stdout, "\n"))
+                  else
+                    -- Can return false to cancel
+                    done(false)
+                  end
+                end
+              )
+            end
+          end,
+          batch_size = 5, -- Optional: limit concurrent operations (default: 10)
+        },
+      }
+    })
+<
+
+
+OPERATORS WITH SETUP ~
+
+For operations that need setup before processing marks (like prompting the
+user), use the `before` hook.
+
+The `before` function receives two parameters:
+
+- `marks`: Array of all marks being processed
+- `ctx`: Operator Context (same as for `operator` function)
+
+and can return:
+
+- `nil` or `true` to proceed with the operation
+- `false` to cancel the operation
+- or a function that accepts `done` callback for async setup
+- when async, call `done()` when setup is complete, or `done(false)` to cancel
+
+A common pattern is to store setup results in the `ctx` object for access in
+the `operator` function.
+
+For example, prompting the user for a transformation choice before processing
+marks:
+
+>lua
+    require("occurrence").setup({
+      operators = {
+        ["g~"] = {
+          desc = "Transform with user choice",
+          before = function(marks, ctx)
+            -- Async setup - prompt user
+            return function(done)
+              vim.ui.select({ "uppercase", "lowercase", "reverse" }, {
+                prompt = "Choose transformation:",
+              }, function(choice)
+                if not choice then
+                  done(false) -- Cancel if user cancels
+                else
+                  ctx.user_choice = choice -- Store in context
+                  done() -- Signal setup complete
+                end
+              end)
+            end
+          end,
+          operator = function(mark, ctx)
+            -- Access user's choice from context
+            local choice = ctx.user_choice
+            local text = table.concat(mark.text, "\n")
+            if choice == "uppercase" then
+              return vim.fn.toupper(text)
+            elseif choice == "lowercase" then
+              return vim.fn.tolower(text)
+            else
+              return text:reverse()
+            end
+          end
+        },
+      }
+    
+    })
+<
+
+**Key points about async operators:**
+
+- Async operations are batched to avoid overwhelming external services
+- Default batch size is 10 concurrent operations
+- Configure per-operator via `batch_size` field
+- The `before` hook runs once before processing marks
+- The `operator` function runs for each mark
+- Both can be async by returning a function that accepts `done`
 
 
 CUSTOM LINE-BASED OPERATORS*occurrence-custom-operators-custom-line-based-operators*
