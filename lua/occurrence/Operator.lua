@@ -57,29 +57,40 @@ local _set_opfunc = vim.fn[vim.api.nvim_exec2(
 ---@field inner boolean Whether to operate on inner text only (no surrounding whitespace)
 
 -- Expand marks in-place to include surrounding whitespace.
+-- This simulates Vim's "around" text object behavior (e.g., `aw` vs `iw`).
+-- Rules:
+--   1. If there's whitespace after the word, include it (preferred)
+--   2. Otherwise, if there's whitespace before the word, include it
+--   3. This ensures we include one "side" of whitespace
 ---@param marks [integer, occurrence.Range][] The marks to expand.
 local function expand_around(marks)
   local original_cursor = Cursor.save()
   -- expand all marks to include surrounding whitespace
   for i = 1, #marks do
     local id, mark = unpack(marks[i])
-    -- search forward for next non-whitespace char
     original_cursor:move(mark.stop)
-    local new_stop = Location.from_pos(vim.fn.searchpos([[\V\C\S]], "nWc"))
-    if new_stop and new_stop > mark.stop then
-      local new_mark = Range.new(mark.start, new_stop)
-      log.trace("Expanded mark", id, "from", mark, "to", new_mark)
-      marks[i] = { id, new_mark }
-    else
-      -- if no forward non-whitespace char was found,
-      -- we must be at the end of a line,
-      -- so search backward for previous non-whitespace char.
-      original_cursor:move(mark.start)
-      local new_start = Location.from_pos(vim.fn.searchpos([[\V\C\S\s]], "bnWe"))
-      if new_start and new_start < mark.start then
-        local new_mark = Range.new(new_start, mark.stop)
+    local col = mark.stop:to_pos()[2]
+    -- check if next char is whitespace
+    if vim.fn.getline("."):sub(col, col):match("%s") then
+      -- search forward for next non-whitespace char
+      local new_stop = Location.from_pos(vim.fn.searchpos([[\S]], "nWc"))
+      if new_stop and new_stop > mark.stop then
+        local new_mark = Range.new(mark.start, new_stop)
         log.trace("Expanded mark", id, "from", mark, "to", new_mark)
         marks[i] = { id, new_mark }
+      end
+    else
+      -- if no forward whitespace, search backward for previous whitespace
+      original_cursor:move(mark.start)
+      ---@diagnostic disable-next-line: redefined-local
+      local col = mark.start:to_pos()[2] - 1
+      if col > 0 and vim.fn.getline("."):sub(col, col):match("%s") then
+        local new_start = Location.from_pos(vim.fn.searchpos([[\s]], "bnWe"))
+        if new_start and new_start < mark.start then
+          local new_mark = Range.new(new_start, mark.stop)
+          log.trace("Expanded mark", id, "from", mark, "to", new_mark)
+          marks[i] = { id, new_mark }
+        end
       end
     end
   end

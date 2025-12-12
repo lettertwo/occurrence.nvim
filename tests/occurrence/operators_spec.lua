@@ -47,6 +47,40 @@ describe("operators", function()
       assert.same({ "bar", "baz bar" }, final_lines)
     end)
 
+    it("deletes around words", function()
+      bufnr = util.buffer({ "function foo(foo)", "  return ('foo bar foo baz'):trim()", "end" })
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark all occurrences of 'foo'
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      -- Apply delete operator with around word
+      occurrence:apply_operator("delete", { motion = Range.of_buffer() })
+
+      -- Check that 'foo' occurrences and surrounding spaces were deleted
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "function()", "  return ('bar baz'):trim()", "end" }, final_lines)
+    end)
+
+    it("deletes inside words", function()
+      bufnr = util.buffer({ "function foo(foo)", "  return ('foo bar foo baz'):trim()", "end" })
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark all occurrences of 'foo'
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      -- Apply delete operator with inside word
+      occurrence:apply_operator("delete", { motion = Range.of_buffer(), inner = true })
+
+      -- Check that only 'foo' occurrences were deleted, leaving surrounding spaces
+      local final_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "function ()", "  return (' bar  baz'):trim()", "end" }, final_lines)
+    end)
+
     it("saves deleted text to register", function()
       bufnr = util.buffer("foo bar foo\nbaz foo bar")
       local occurrence = Occurrence.get(bufnr, "foo")
