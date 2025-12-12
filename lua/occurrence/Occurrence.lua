@@ -773,7 +773,7 @@ function Occurrence:activate_occurrence_mode(config)
     -- Note that this isn't strictly necessary, since the modify operator
     -- command is a no-op when occurrence mode is active,
     -- but it gives some descriptive feedback to the user to update the binding.
-    self.keymap:set("o", "o", "<Nop>", { nowait = true })
+    self.keymap:set("o", "o", "<Nop>")
   end
 
   -- Set up buffer-local keymaps for occurrence mode actions
@@ -786,13 +786,13 @@ function Occurrence:activate_occurrence_mode(config)
       if action_config.plug then
         log.trace("Setting plug keymap for action:", action_key)
         -- Use <Plug> mapping if defined
-        self.keymap:set(mode, action_key, action_config.plug, { desc = desc, nowait = true })
+        self.keymap:set(mode, action_key, action_config.plug, { desc = desc })
       elseif action_config.callback then
         log.trace("Setting callback keymap for action:", action_key)
         -- Fall back to direct callback
         self.keymap:set(mode, action_key, function()
           self:apply(action_config, nil, config)
-        end, { desc = desc, nowait = true })
+        end, { desc = desc })
       else
         -- No plug or callback defined
         log.warn_once(string.format("Action config for '%s' has no plug or callback defined", action_key))
@@ -828,7 +828,7 @@ function Occurrence:activate_occurrence_mode(config)
           })
           -- send g@ to trigger custom opfunc
           return "g@"
-        end, { desc = desc, expr = true, nowait = true })
+        end, { desc = desc, expr = true })
       end
     else
       log.warn_once(string.format("Operator '%s' is not supported", operator_key))
