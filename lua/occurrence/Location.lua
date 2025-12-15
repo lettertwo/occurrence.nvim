@@ -30,8 +30,10 @@ end
 function location.new(line, col)
   assert(type(line) == "number", "line must be a number")
   assert(type(col) == "number", "col must be a number")
-  assert(line >= 0, "line must be >= 0")
-  assert(col >= 0, "col must be >= 0")
+
+  -- Clamp to valid integer range
+  line = math.min(math.max(line, 0), vim.v.maxcol - 1)
+  col = math.min(math.max(col, 0), vim.v.maxcol - 1)
 
   local self = { line, col }
 

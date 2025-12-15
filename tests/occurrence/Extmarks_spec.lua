@@ -102,9 +102,52 @@ describe("Extmarks", function()
       extmarks:mark(range1)
       extmarks:mark(range2)
 
-      local search_range = Range.new(Location.new(0, 3), Location.new(1, 2))
+      local search_range = Range.new(Location.new(0, 3), Location.new(1, 5))
       assert.is_true(extmarks:has_any_marks()) -- extmarks exist
       assert.is_true(extmarks:has_any_marks(search_range))
+    end)
+
+    it("returns false when no extmarks are fully in the given range", function()
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 5))
+      local range2 = Range.new(Location.new(1, 0), Location.new(1, 5))
+      extmarks:mark(range1)
+      extmarks:mark(range2)
+
+      local search_range = Range.new(Location.new(0, 3), Location.new(1, 2))
+      assert.is_true(extmarks:has_any_marks()) -- extmarks exist
+      assert.is_false(extmarks:has_any_marks(search_range))
+    end)
+
+    it("returns true when at least one extmark is in the given block range", function()
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 3))
+      local range2 = Range.new(Location.new(0, 5), Location.new(0, 8))
+      local range3 = Range.new(Location.new(1, 2), Location.new(1, 4))
+      local range4 = Range.new(Location.new(1, 7), Location.new(1, 10))
+      extmarks:mark(range1)
+      extmarks:mark(range2)
+      extmarks:mark(range3)
+      extmarks:mark(range4)
+
+      local search_range = Range.new(Location.new(0, 3), Location.new(3, 9), "block")
+
+      assert.is_true(extmarks:has_any_marks())
+      assert.is_true(extmarks:has_any_marks(search_range))
+    end)
+
+    it("returns false when no exmarks are fully in the given block range", function()
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 3))
+      local range2 = Range.new(Location.new(0, 5), Location.new(0, 8))
+      local range3 = Range.new(Location.new(1, 2), Location.new(1, 4))
+      local range4 = Range.new(Location.new(1, 7), Location.new(1, 10))
+      extmarks:mark(range1)
+      extmarks:mark(range2)
+      extmarks:mark(range3)
+      extmarks:mark(range4)
+
+      local search_range = Range.new(Location.new(0, 3), Location.new(3, 6), "block")
+
+      assert.is_true(extmarks:has_any_marks())
+      assert.is_false(extmarks:has_any_marks(search_range))
     end)
   end)
 
@@ -412,6 +455,42 @@ describe("Extmarks", function()
       end
 
       assert.is_true(count >= 2) -- should include range1 and range2
+    end)
+
+    it("iterates over extmarks within a block range", function()
+      --   0123456789
+      -- 0 xxx  xxx
+      -- 1   xxx  xxx
+      -- 2  xxx xxx
+      -- 3     xxxx
+      local range1 = Range.new(Location.new(0, 0), Location.new(0, 3))
+      local range2 = Range.new(Location.new(0, 5), Location.new(0, 8))
+      local range3 = Range.new(Location.new(1, 2), Location.new(1, 4))
+      local range4 = Range.new(Location.new(1, 7), Location.new(1, 10))
+      local range5 = Range.new(Location.new(2, 1), Location.new(2, 4))
+      local range6 = Range.new(Location.new(2, 5), Location.new(2, 8))
+      local range7 = Range.new(Location.new(3, 4), Location.new(3, 8))
+
+      extmarks:mark(range1)
+      extmarks:mark(range2)
+      extmarks:mark(range3)
+      extmarks:mark(range4)
+      extmarks:mark(range5)
+      extmarks:mark(range6)
+      extmarks:mark(range7)
+
+      local search_range = Range.new(Location.new(0, 3), Location.new(3, 9), "block")
+
+      local count = 0
+      for _, original in extmarks:iter(search_range) do
+        count = count + 1
+        assert.is_true(original.start.line >= search_range.start.line)
+        assert.is_true(original.stop.line <= search_range.stop.line)
+        assert.is_true(original.start.col >= search_range.start.col)
+        assert.is_true(original.stop.col < search_range.stop.col)
+      end
+
+      assert.equals(3, count) -- should include range2, range6 and range7
     end)
 
     it("returns id and current ranges", function()

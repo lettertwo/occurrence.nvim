@@ -106,12 +106,11 @@ end
 ---@return fun(): number?, occurrence.Range? next_extmark
 function ExtmarkMap:iter(range)
   range = range or Range.of_buffer()
-  -- If `reverse` is true, invert the start and stop locations.
   local start = range.start:to_extmarkpos()
   local stop = range.stop:to_extmarkpos()
 
   --- List of (extmark_id, row, col) tuples in traversal order.
-  local marks = vim.api.nvim_buf_get_extmarks(self.buffer, self.ns, start, stop, {})
+  local marks = vim.api.nvim_buf_get_extmarks(self.buffer, self.ns, start, stop, { overlap = true })
   local index = 1
 
   local function next_extmark()
@@ -120,6 +119,9 @@ function ExtmarkMap:iter(range)
     if mark then
       local id = mark[1]
       local original_range = Range.deserialize(self[id])
+      if not range:contains(original_range) then
+        return next_extmark()
+      end
       local current_location =
         Location.from_extmarkpos(vim.api.nvim_buf_get_extmark_by_id(self.buffer, self.ns, id, {}))
       if original_range ~= nil and current_location ~= nil then

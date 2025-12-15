@@ -69,7 +69,7 @@ describe("Range", function()
       local start = Location.new(0, 0)
       local stop = Location.new(0, 5)
       local range = Range.new(start, stop)
-      assert.equals("Range(start: Location(0, 0), stop: Location(0, 5))", tostring(range))
+      assert.equals("Range(start: Location(0, 0), stop: Location(0, 5), type: char)", tostring(range))
     end)
   end)
 
@@ -91,7 +91,7 @@ describe("Range", function()
       local stop = Location.new(7, 15)
       local range = Range.new(start, stop)
       local serialized = range:serialize()
-      assert.equals("5:10::7:15", serialized)
+      assert.equals("5:10::7:15::char", serialized)
 
       local deserialized = Range.deserialize(serialized)
       assert.equals(5, deserialized.start.line)
@@ -108,6 +108,16 @@ describe("Range", function()
       local original2 = Range.new(Location.new(100, 50), Location.new(100, 75))
       local roundtrip2 = Range.deserialize(original2:serialize())
       assert.is_true(original2 == roundtrip2)
+    end)
+
+    it("deserializes as 'char' without explicit type", function()
+      local serialized = "3:5::6:10"
+      local range = Range.deserialize(serialized)
+      assert.equals(3, range.start.line)
+      assert.equals(5, range.start.col)
+      assert.equals(6, range.stop.line)
+      assert.equals(10, range.stop.col)
+      assert.equals("char", range.type)
     end)
   end)
 
@@ -154,58 +164,169 @@ describe("Range", function()
   end)
 
   describe("contains", function()
-    local range
-
-    before_each(function()
-      range = Range.new(Location.new(5, 10), Location.new(8, 20))
-    end)
-
     describe("with Location argument", function()
-      it("returns true for location within range", function()
+      it("returns true for location within char range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
         local loc = Location.new(6, 15)
         assert.is_true(range:contains(loc))
       end)
 
       it("returns true for location at start (inclusive)", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
         local loc = Location.new(5, 10)
         assert.is_true(range:contains(loc))
       end)
 
       it("returns false for location at stop (exclusive)", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
         local loc = Location.new(8, 20)
         assert.is_false(range:contains(loc))
       end)
 
       it("returns false for location before range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
         local loc = Location.new(3, 5)
         assert.is_false(range:contains(loc))
       end)
 
       it("returns false for location after range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
         local loc = Location.new(10, 25)
         assert.is_false(range:contains(loc))
+      end)
+
+      it("returns true for location within line range", function()
+        local line_range = Range.new(Location.new(5, 0), Location.new(8, 30), "line")
+        local loc = Location.new(6, 15)
+        assert.is_true(line_range:contains(loc))
+      end)
+
+      it("returns false for location outside line range", function()
+        local line_range = Range.new(Location.new(5, 0), Location.new(8, 30), "line")
+        local loc = Location.new(9, 1)
+        assert.is_false(line_range:contains(loc))
+      end)
+
+      it("returns true for location within block range", function()
+        local block_range = Range.new(Location.new(5, 5), Location.new(8, 25), "block")
+        local loc = Location.new(6, 15)
+        assert.is_true(block_range:contains(loc))
+      end)
+
+      it("returns true for location at start of block range (inclusive)", function()
+        local block_range = Range.new(Location.new(5, 5), Location.new(8, 25), "block")
+        local loc = Location.new(5, 5)
+        assert.is_true(block_range:contains(loc))
+      end)
+
+      it("returns false for location outside block range", function()
+        local block_range = Range.new(Location.new(5, 5), Location.new(8, 25), "block")
+        local loc = Location.new(4, 10)
+        assert.is_false(block_range:contains(loc))
+      end)
+
+      it("returns fals for location at stop of block range (exclusive)", function()
+        local block_range = Range.new(Location.new(5, 5), Location.new(8, 25), "block")
+        local loc = Location.new(8, 25)
+        assert.is_false(block_range:contains(loc))
       end)
     end)
 
     describe("with Range argument", function()
-      it("returns true for range entirely within", function()
-        local inner = Range.new(Location.new(6, 12), Location.new(7, 18))
-        assert.is_true(range:contains(inner))
-      end)
-
       it("returns true for same range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
         local same = Range.new(Location.new(5, 10), Location.new(8, 20))
         assert.is_true(range:contains(same))
       end)
 
-      it("returns false for range extending before", function()
+      it("returns true for char range containing char range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
+        local inner = Range.new(Location.new(6, 12), Location.new(7, 18))
+        assert.is_true(range:contains(inner))
+      end)
+
+      it("returns false for char range extending before", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
         local extending = Range.new(Location.new(3, 5), Location.new(6, 15))
         assert.is_false(range:contains(extending))
       end)
 
-      it("returns false for range extending after", function()
+      it("returns false for char range extending after", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
         local extending = Range.new(Location.new(6, 15), Location.new(10, 25))
         assert.is_false(range:contains(extending))
+      end)
+
+      it("returns true for line range containing char range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
+        local line_range = Range.new(Location.new(4, 0), Location.new(9, 1), "line")
+        assert.is_true(line_range:contains(range))
+      end)
+
+      it("returns false for line range not containing char range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
+        local line_range = Range.new(Location.new(5, 0), Location.new(8, 10), "line")
+        assert.is_false(line_range:contains(range))
+      end)
+
+      it("returns true for line range containing a block range", function()
+        local line_range = Range.new(Location.new(5, 0), Location.new(8, 30), "line")
+        local block_range = Range.new(Location.new(6, 5), Location.new(7, 25), "block")
+        assert.is_true(line_range:contains(block_range))
+      end)
+
+      it("returns false for line range not containing a block range", function()
+        local line_range = Range.new(Location.new(5, 0), Location.new(8, 30), "line")
+        local block_range = Range.new(Location.new(4, 5), Location.new(9, 25), "block")
+        assert.is_false(line_range:contains(block_range))
+      end)
+
+      it("returns true for block range containing char range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
+        local block_range = Range.new(Location.new(4, 5), Location.new(9, 25), "block")
+        assert.is_true(block_range:contains(range))
+      end)
+
+      it("returns false for block range not containing char range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
+        local block_range = Range.new(Location.new(6, 5), Location.new(9, 25), "block")
+        assert.is_false(block_range:contains(range))
+      end)
+
+      it("returns true for block range containing a line range", function()
+        local line_range = Range.new(Location.new(6, 0), Location.new(7, 30), "line")
+        local block_range = Range.new(Location.new(5, 5), Location.new(8, 35), "block")
+        assert.is_true(block_range:contains(line_range))
+      end)
+
+      it("returns false for block range not containing a line range", function()
+        local line_range = Range.new(Location.new(4, 0), Location.new(9, 1), "line")
+        local block_range = Range.new(Location.new(5, 5), Location.new(8, 35), "block")
+        assert.is_false(block_range:contains(line_range))
+      end)
+
+      it("returns true char range containing a line range", function()
+        local range = Range.new(Location.new(5, 0), Location.new(8, 30))
+        local line_range = Range.new(Location.new(6, 0), Location.new(7, 30), "line")
+        assert.is_true(range:contains(line_range))
+      end)
+
+      it("returns false char range not containing a line range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
+        local line_range = Range.new(Location.new(4, 0), Location.new(9, 1), "line")
+        assert.is_false(range:contains(line_range))
+      end)
+
+      it("returns true for char range containing a block range", function()
+        local range = Range.new(Location.new(5, 0), Location.new(8, 30))
+        local block_range = Range.new(Location.new(6, 5), Location.new(7, 25), "block")
+        assert.is_true(range:contains(block_range))
+      end)
+
+      it("returns false for char range not containing a block range", function()
+        local range = Range.new(Location.new(5, 10), Location.new(8, 20))
+        local block_range = Range.new(Location.new(4, 5), Location.new(9, 25), "block")
+        assert.is_false(range:contains(block_range))
       end)
     end)
   end)
@@ -227,6 +348,15 @@ describe("Range", function()
       local r1 = Range.new(Location.new(5, 10), Location.new(8, 20))
       local r2 = Range.new(Location.new(5, 10), Location.new(8, 21))
       assert.is_false(r1:eq(r2))
+    end)
+
+    it("returns false for ranges with different types", function()
+      local r1 = Range.new(Location.new(5, 10), Location.new(8, 20))
+      local r2 = Range.new(Location.new(5, 10), Location.new(8, 20), "line")
+      local r3 = Range.new(Location.new(5, 10), Location.new(8, 20), "block")
+      assert.is_false(r1:eq(r2))
+      assert.is_false(r1:eq(r3))
+      assert.is_false(r2:eq(r3))
     end)
   end)
 
@@ -329,6 +459,7 @@ describe("Range", function()
         assert.equals(0, range.stop.line)
         -- Stop should be cursor + 1 (end-exclusive)
         assert.equals(11, range.stop.col)
+        assert.equals("char", range.type)
       end)
 
       it("returns range for line-wise visual selection", function()
@@ -344,6 +475,7 @@ describe("Range", function()
         assert.equals(1, range.stop.line)
         -- Should be end of line for line-wise selection
         assert.equals(30, range.stop.col) -- length of "second line with more content" + 1
+        assert.equals("line", range.type)
       end)
 
       it("handles multi-line character-wise selection", function()
@@ -359,6 +491,7 @@ describe("Range", function()
         assert.equals(6, range.start.col)
         assert.equals(3, range.stop.line)
         assert.equals(11, range.stop.col)
+        assert.equals("char", range.type)
       end)
 
       it("handles reversed selections correctly", function()
@@ -372,17 +505,24 @@ describe("Range", function()
         assert.is_true(range.start.col <= range.stop.col)
       end)
 
-      it("errors for blockwise visual selection", function()
+      it("returns range for blockwise visual selection", function()
         vim.api.nvim_win_set_cursor(0, { 1, 5 })
 
         -- Try to enter blockwise visual mode (Ctrl-V)
         feedkeys.change_mode("^V") -- visual block mode
 
+        -- End selection on line 4, col 10
+        vim.api.nvim_win_set_cursor(0, { 4, 10 })
+
         -- Should error for blockwise mode
         assert.is_true(vim.api.nvim_get_mode().mode == "") -- visual block mode
-        assert.error(function()
-          Range.of_selection()
-        end)
+
+        local range = assert(Range.of_selection())
+        assert.equals(0, range.start.line)
+        assert.equals(5, range.start.col)
+        assert.equals(3, range.stop.line)
+        assert.equals(11, range.stop.col) -- end-exclusive
+        assert.equals("block", range.type)
       end)
     end)
 
@@ -391,12 +531,6 @@ describe("Range", function()
         -- In a fresh buffer with no motion, should return nil
         local range = Range.of_motion()
         assert.is_nil(range)
-      end)
-
-      it("errors for blockwise motion type", function()
-        assert.error(function()
-          Range.of_motion("block")
-        end)
       end)
 
       it("handles char motion type after yank operation", function()
@@ -417,7 +551,6 @@ describe("Range", function()
 
         -- Yank line to set marks
         feedkeys("yy")
-        vim.wait(10)
 
         local range = assert(Range.of_motion("line"))
         -- Should span full lines
@@ -425,6 +558,20 @@ describe("Range", function()
         assert.equals(0, range.start.col) -- start of line
         assert.equals(1, range.stop.line)
         assert.equals(30, range.stop.col) -- length of "second line with more content" + 1
+      end)
+
+      it("handles block motion type after yank operation", function()
+        -- Position cursor and yank a block (simulate with visual block mode)
+        vim.api.nvim_win_set_cursor(0, { 1, 5 })
+        feedkeys.change_mode("^V") -- visual block mode
+        vim.api.nvim_win_set_cursor(0, { 4, 10 }) -- select block to line 4, col 10
+        vim.cmd("silent normal y") -- yank block
+
+        local range = assert(Range.of_motion("block"))
+        assert.equals(0, range.start.line)
+        assert.equals(5, range.start.col)
+        assert.equals(3, range.stop.line)
+        assert.equals(11, range.stop.col) -- end-exclusive
       end)
 
       it("handles multi-line yank operations", function()
@@ -513,7 +660,60 @@ describe("Range", function()
         assert.equals(char_range.start.line, line_range.start.line)
         assert.equals(char_range.stop.line, line_range.stop.line)
         -- Line range should extend to end of line
-        assert.is_true(line_range.stop.col >= char_range.stop.col)
+        assert.is_true(line_range.stop.col > char_range.stop.col)
+      end)
+
+      it("converts char motion to block motion correctly", function()
+        -- Set up a character range
+        vim.api.nvim_win_set_cursor(0, { 1, 5 })
+        feedkeys("yw")
+
+        -- Get both char and block versions of the same motion
+        local char_range = assert(Range.of_motion("char"))
+        local block_range = assert(Range.of_motion("block"))
+
+        -- Block range should start at same position as char range
+        assert.equals(char_range.start.line, block_range.start.line)
+        assert.equals(char_range.start.col, block_range.start.col)
+        -- Block range should end at same position as char range
+        assert.equals(char_range.stop.line, block_range.stop.line)
+        assert.equals(char_range.stop.col, block_range.stop.col)
+      end)
+
+      it("converts line motion to char motion correctly", function()
+        -- Set up a line range
+        vim.api.nvim_win_set_cursor(0, { 2, 0 })
+        feedkeys("yy")
+
+        -- Get both line and char versions of the same motion
+        local line_range = assert(Range.of_motion("line"))
+        local char_range = assert(Range.of_motion("char"))
+
+        -- Char range should start at beginning of line
+        assert.equals(line_range.start.line, char_range.start.line)
+        assert.equals(0, char_range.start.col)
+        -- Char range should end at end of line
+        assert.equals(line_range.stop.line, char_range.stop.line)
+        -- Char range should end at max col (-1 for 0-indexed)
+        assert.equals(char_range.stop.col, vim.v.maxcol - 1)
+        assert.is_true(line_range.stop.col < char_range.stop.col)
+      end)
+
+      it("converts line motion to block motion correctly", function()
+        -- Set up a line range
+        vim.api.nvim_win_set_cursor(0, { 2, 0 })
+        feedkeys("yy")
+
+        -- Get both line and block versions of the same motion
+        local line_range = assert(Range.of_motion("line"))
+        local block_range = assert(Range.of_motion("block"))
+
+        -- Block range should start at same position as line range
+        assert.equals(line_range.start.line, block_range.start.line)
+        assert.equals(line_range.start.col, block_range.start.col)
+        -- Block range should end at max col (-1 for 0-indexed)
+        assert.equals(block_range.stop.col, vim.v.maxcol - 1)
+        assert.is_true(line_range.stop.col < block_range.stop.col)
       end)
     end)
   end)

@@ -544,6 +544,11 @@ function Occurrence:of_selection(mark, range)
     return false
   end
 
+  if range.type == "block" then
+    log.warn("Blockwise visual selection is not supported")
+    return false
+  end
+
   local text = table.concat(
     vim.api.nvim_buf_get_text(self.buffer, range.start.line, range.start.col, range.stop.line, range.stop.col, {}),
     "\n"

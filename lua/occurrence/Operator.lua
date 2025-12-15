@@ -469,6 +469,7 @@ local function create_opfunc(occurrence, operator, ctx)
 
     cursor:restore()
 
+    log.debug("Collecting marks for operation in range", range, "with count", count)
     local marks = occurrence.extmarks:collect(range, count > 0 and count or nil)
     log.debug("marks found:" .. #marks)
 
