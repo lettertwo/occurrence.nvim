@@ -8,6 +8,8 @@ occurrence-configuration-highlights	occurrence.txt	/*occurrence-configuration-hi
 occurrence-configuration-keymaps	occurrence.txt	/*occurrence-configuration-keymaps*
 occurrence-configuration-operators	occurrence.txt	/*occurrence-configuration-operators*
 occurrence-configuration-statusline-integration	occurrence.txt	/*occurrence-configuration-statusline-integration*
+occurrence-custom-integrations	occurrence.txt	/*occurrence-custom-integrations*
+occurrence-custom-integrations-building-your-own	occurrence.txt	/*occurrence-custom-integrations-building-your-own*
 occurrence-custom-operators	occurrence.txt	/*occurrence-custom-operators*
 occurrence-custom-operators-feedkeys-operators	occurrence.txt	/*occurrence-custom-operators-feedkeys-operators*
 occurrence-custom-operators-fixed-operators	occurrence.txt	/*occurrence-custom-operators-fixed-operators*

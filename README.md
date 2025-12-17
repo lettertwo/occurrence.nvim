@@ -1129,6 +1129,30 @@ Use a range to operate only on marked occurrences within specific lines:
 :2,5Occurrence delete     " Delete marks only in lines 2-5
 :'<,'>Occurrence change   " Change marks only in visual selection
 ```
+
+# Custom Integrations
+
+occurrence.nvim can be integrated with other plugins to create powerful workflows through flexible action, operator, and event systems that provide easy access to the occurrence API.
+
+See the [wiki](https://github.com/lettertwo/occurrence.nvim/wiki) for detailed examples, including:
+
+- **[Multicursor](https://github.com/lettertwo/occurrence.nvim/wiki/Integration:-Multicursor-nvim)** - Spawn multiple cursors at marked occurrences using [multicursor.nvim](https://github.com/jake-stewart/multicursor.nvim)
+- **[Surround](https://github.com/lettertwo/occurrence.nvim/wiki/Integration:-Mini-surround)** - Surround marked occurrences with quotes, brackets, or tags using [mini.surround](https://github.com/echasnovski/mini.surround)
+- **[Snacks.picker](https://github.com/lettertwo/occurrence.nvim/wiki/Integration:-Snacks-picker)** - Select and manipulate marked occurrences using [snacks.nvim picker](https://github.com/folke/snacks.nvim/blob/main/docs/picker.md)
+
+## Building Your Own
+
+Integrations leverage:
+
+- **Custom operators** - Call into other plugins from occurrence operators
+- **Before hooks** - Setup phase for user prompts or state initialization
+- **Async operators** - Handle async plugin APIs
+- **Events** - React to occurrence lifecycle changes
+
+See [Custom Operators](#custom-operators) and [Events](#events) for the building blocks, or check the wiki for complete examples.
+
+Have an integration to share? Please contribute to the [wiki](https://github.com/lettertwo/occurrence.nvim/wiki)!
+
 <!-- panvimdoc-ignore-start -->
 
 # Development
