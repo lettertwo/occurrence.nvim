@@ -60,27 +60,6 @@ describe("plugin occurrence", function()
       end, "Missing occurrence API function: non_existent_method")
     end)
 
-    it("lazy loads config", function()
-      local plugin = require("occurrence")
-
-      -- occurrence.Config should not be loaded yet
-      assert.is_nil(package.loaded["occurrence.Config"])
-
-      -- Accessing setup should return a function that loads occurrence.Config
-      assert.is_function(plugin.setup)
-      assert.is_function(plugin.reset)
-
-      -- accessing still should not load occurrence.Config yet
-      assert.is_nil(package.loaded["occurrence.Config"])
-
-      assert.has_no.errors(function()
-        plugin.setup({})
-      end)
-
-      -- Now occurrence.Config should be loaded
-      assert.is_not_nil(package.loaded["occurrence.Config"])
-    end)
-
     it("lazy loads occurrence module methods", function()
       local plugin = require("occurrence")
 
@@ -211,7 +190,7 @@ describe("plugin occurrence", function()
         vim.g.occurrence_auto_setup = nil
       end)
 
-      it("sets up default keymaps", function()
+      it("sets up default keymaps and config", function()
         assert.is_true(vim.g.occurrence_auto_setup)
         require("plugin.occurrence")
         assert.is_not_nil(package.loaded["plugin.occurrence"])
@@ -232,6 +211,20 @@ describe("plugin occurrence", function()
           found,
           string.format("Keymap %s should be set after loading the plugin when auto setup is enabled", api.mark.plug)
         )
+
+        local plugin = require("occurrence")
+
+        -- occurrence.Config should be loaded
+        assert.is_not_nil(package.loaded["occurrence.Config"])
+
+        -- Accessing setup should return a function that loads occurrence.Config
+        assert.is_function(plugin.setup)
+        assert.is_function(plugin.reset)
+
+        -- Calling setup again should not error
+        assert.has_no.errors(function()
+          plugin.setup({})
+        end)
       end)
     end)
 
@@ -244,7 +237,7 @@ describe("plugin occurrence", function()
         vim.g.occurrence_auto_setup = nil
       end)
 
-      it("does not set up default keymaps when false", function()
+      it("does not set up default keymaps and defers config", function()
         assert.is_false(vim.g.occurrence_auto_setup)
         require("plugin.occurrence")
         assert.is_not_nil(package.loaded["plugin.occurrence"])
@@ -268,6 +261,25 @@ describe("plugin occurrence", function()
             api.mark.plug
           )
         )
+
+        local plugin = require("occurrence")
+
+        -- occurrence.Config should not be loaded yet
+        assert.is_nil(package.loaded["occurrence.Config"])
+
+        -- Accessing setup should return a function that loads occurrence.Config
+        assert.is_function(plugin.setup)
+        assert.is_function(plugin.reset)
+
+        -- accessing still should not load occurrence.Config yet
+        assert.is_nil(package.loaded["occurrence.Config"])
+
+        assert.has_no.errors(function()
+          plugin.setup({})
+        end)
+
+        -- Now occurrence.Config should be loaded
+        assert.is_not_nil(package.loaded["occurrence.Config"])
       end)
     end)
   end)

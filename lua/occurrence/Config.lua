@@ -565,7 +565,9 @@ function config.setup(opts)
   end
   local new_config = require("occurrence.Config").new(opts)
   if _global_config ~= new_config then
-    config.reset()
+    if _global_config then
+      config.reset()
+    end
     _global_config = new_config
     -- Set up default keymaps if enabled
     if new_config.default_keymaps then
