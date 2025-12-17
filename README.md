@@ -13,7 +13,6 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 - Word under cursor with boundary matching
 - Visual selections (character, line, or block)
 - Last search pattern from `/` or `?`
-- Automatic pattern escaping and vim regex support
 
 ### ⚡ Native and Custom Operator Integration
 
@@ -27,14 +26,13 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 
 - Real-time highlighting of all matches and marked occurrences
 - Current occurrence highlighting during navigation
-- Statusline integration showing current/total counts
-- Customizable highlight groups
+- Status API for showing current/total counts
 
 ### 🛠️ Highly Configurable
 
 - Enable/disable default keymaps or define custom ones
 - Choose which operators to enable or disable, or add custom ones
-- Customize highlight appearance
+- Customizable highlight groups
 - Lua API for advanced usage and integration
 
 <!-- panvimdoc-ignore-end -->
@@ -50,6 +48,7 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 ```lua
 {
   "lettertwo/occurrence.nvim",
+  lazy = false,
   ---@module "occurrence"
   ---@type occurrence.Options
   -- opts = {} -- setup is optional; the defaults will work out of the box.
@@ -228,8 +227,8 @@ Occurrence mode (after marking occurrences from normal/visual mode):
 
 - `n` / `N` - Next/previous marked occurrence
 - `gn` / `gN` - Next/previous occurrence (all matches)
-- `go` - Toggle mark on current occurrence or mark new word
-- `ga` - Mark current occurrence
+- `go` - Toggle mark on current occurrence or word
+- `ga` - Mark or current occurrence or add word
 - `gx` - Unmark current occurrence
 - `<Esc>`, `<C-c>`, `<C-[>` - Exit occurrence mode
 - All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`)
@@ -364,7 +363,7 @@ require('lualine').setup({
 })
 ```
 
-The `status()` function returns `nil` if there is no active occurrence, otherwise returns:
+The `status()` function returns `nil` if there is no active occurrence. Otherwise, it returns:
 
 - `current`: Current match index
 - `total`: Total number of matches
@@ -486,69 +485,6 @@ jVgp                         " Move to line2 and Distribute - cycles through yan
 - `p` (put): Replicates the same text at each occurrence
 - `gp` (distribute): Cycles through lines in the register, giving each occurrence a different line
 
-# Command Usage
-
-The `:Occurrence` command provides access to all builtin actions and operators. It features basic completion for subcommands, count and range modifiers for fine-grained control, and arguments for specific actions.
-
-Actions can be invoked via the `:Occurrence` command:
-
-```vim
-:Occurrence mark          " Mark occurrences of word under cursor
-:Occurrence toggle        " Toggle mark at cursor position
-:Occurrence next          " Navigate to next marked occurrence
-:Occurrence deactivate    " Clear all marks
-```
-
-And some can take arguments:
-
-```vim
-:Occurrence mark \w\s\s    " Mark occurrences of a pattern
-:Occurrence toggle foo     " Toggle the next occurrence of 'foo'
-:Occurrence next 2         " Move to the 2nd next marked occurrence
-```
-
-Operators will trigger operator-pending mode and then operate on marked occurrences:
-
-```vim
-:Occurrence delete        " Delete all marked occurrences
-:Occurrence change        " Change all marked occurrences (prompts for input)
-:Occurrence yank          " Yank all marked occurrences to register
-:Occurrence uppercase     " Convert all marked to uppercase
-```
-
-And any that use a register can specify which register to use:
-
-```vim
-:Occurrence delete b      " Delete all marked occurrences to register 'b'
-:Occurrence put b         " Put register 'b' content at all marked occurrences
-```
-
-### Count Modifier
-
-Prefix the command with a count to limit operations to the first N marked occurrences:
-
-```vim
-:3Occurrence delete       " Delete only the first 3 marked occurrences
-:5Occurrence yank         " Yank only the first 5 marked occurrences
-:2Occurrence uppercase    " Uppercase only the first 2 marked occurrences
-```
-
-Or to limit the number of marked occurrences:
-
-```vim
-:4Occurrence mark       " Mark only the first 4 occurrences
-:3Occurrence next       " Navigate to the 3rd marked occurrence
-```
-
-### Range Modifier
-
-Use a range to operate only on marked occurrences within specific lines:
-
-```vim
-:2,5Occurrence delete     " Delete marks only in lines 2-5
-:'<,'>Occurrence change   " Change marks only in visual selection
-```
-
 # API Reference
 
 ## Lua API
@@ -603,7 +539,7 @@ All actions are available in three ways:
   <Plug>(OccurrenceMark)
   ```
 
-modify_operator
+**modify_operator**
 
 : `require('occurrence').modify_operator()`  
 `:Occurrence modify_operator`  
@@ -615,7 +551,7 @@ Once a pending operator is modified, the operator will act on occurrences within
 
 Note that this action does not activate occurrence mode, and it does not have any effect when occurrence mode is active, as operators already act on occurrences in that mode.
 
-mark
+**mark**
 
 : `require('occurrence').mark()`  
 `:Occurrence mark`  
@@ -634,7 +570,7 @@ If no occurrence match exists to satisfy the above, add a new pattern based on:
 - If `:h hlsearch` is active, mark occurrences of the search pattern.
 - Otherwise, mark occurrences of the word under the cursor.
 
-unmark
+**unmark**
 
 : `require('occurrence').unmark()`  
 `:Occurrence unmark`  
@@ -649,7 +585,7 @@ If occurrence has matches, unmark matches based on:
 
 If no match exists to satisfy the above, does nothing.
 
-toggle
+**toggle**
 
 : `require('occurrence').toggle()`  
 `:Occurrence toggle`  
@@ -668,7 +604,7 @@ If no occurrence match exists to satisfy the above, add a new pattern based on:
 - If `:h hlsearch` is active, mark the closest occurrence of the search pattern.
 - Otherwise, mark the closest occurrence of the word under the cursor.
 
-next
+**next**
 
 : `require('occurrence').next()`  
 `:Occurrence next`  
@@ -678,7 +614,7 @@ Move to the next marked occurrence and activate occurrence mode.
 
 If occurrence has no matches, acts like `mark` and then moves to the next marked occurrence.
 
-previous
+**previous**
 
 : `require('occurrence').previous()`  
 `:Occurrence previous`  
@@ -688,7 +624,7 @@ Move to the previous marked occurrence and activate occurrence mode.
 
 If occurrence has no matches, acts like `mark` and then moves to the previous marked occurrence.
 
-match_next
+**match_next**
 
 : `require('occurrence').match_next()`  
 `:Occurrence match_next`  
@@ -698,7 +634,7 @@ Move to the next occurrence match, whether marked or unmarked, and activate occu
 
 If occurrence has no matches, acts like `mark` and then moves to the next occurrence match.
 
-match_previous
+**match_previous**
 
 : `require('occurrence').match_previous()`  
 `:Occurrence match_previous`  
@@ -708,7 +644,7 @@ Move to the previous occurrence match, whether marked or unmarked, and activate 
 
 If occurrence has no matches, acts like `mark` and then moves to the previous occurrence match.
 
-deactivate
+**deactivate**
 
 : `require('occurrence').deactivate()`  
 `:Occurrence deactivate`  
@@ -750,6 +686,8 @@ And as subcommands, e.g.,:
 
 # Custom Operators
 
+You can define custom operators to work with occurrences by configuring the `operators` table in `require("occurrence").setup({...})`.
+
 ## Feedkeys Operators
 
 Custom operators can be defined as strings representing key sequences to be fed to Neovim for a visual selection of each marked occurrence. This allows leveraging existing vim commands or macros as operators.
@@ -782,7 +720,7 @@ require("occurrence").setup({
 
 ## Function Operators
 
-Custom operators can be defined as Lua functions that transform the text of each marked occurrence. The function receives information about the current mark being processed and returns the replacement text.
+Custom operators can be defined as Lua functions that process each marked occurrence. The function receives information about the current mark being processed and can return replacement text or perform side effects, and can optionally execute asynchronously.
 
 ### Basic Function Operator
 
@@ -805,16 +743,16 @@ The operator function receives two parameters:
 - `mark`: Information about the current occurrence being processed
   - `mark.index`: 1-based index among all marks
   - `mark.id`: Extmark ID
-  - `mark.range`: Range object with `start` and `stop` positions
+  - `mark.range`: Range of the mark with `start` and `stop` positions
   - `mark.text`: Array of lines as strings
 
 - `ctx`: Operator Context
   - `ctx.occurrence`: The Occurrence instance
   - `ctx.marks`: All marks being processed
   - `ctx.mode`: Mode the operator was triggered in (`"n"`, `"v"`, or `"o"`)
-  - `ctx.register`: Register instance (if applicable)
+  - `ctx.register`: Register available for the operation (if applicable)
 
-### Return Values
+### Operator Return Values
 
 Function operators can return different values to control behavior:
 
@@ -832,7 +770,7 @@ end
 -- Return nil or true for side-effect only (mark will be unmarked)
 operator = function(mark, ctx)
   print("Processing mark " .. mark.index)
-  return nil -- or return true to yank without replacement
+  return nil -- or return true to also yank to register
 end
 
 -- Return false to cancel the remaining operations.
@@ -854,7 +792,7 @@ require("occurrence").setup({
     format_with_prettier = {
       desc = "Format with prettier",
       operator = function(mark, ctx)
-        -- Return async initiator function
+        -- Return async operator function
         return function(done)
           local text = table.concat(mark.text, "\n")
           vim.system(
@@ -878,7 +816,7 @@ require("occurrence").setup({
 })
 ```
 
-### Operators with Setup
+### Operator Before Hook
 
 For operations that need setup before processing marks (like prompting the user), use the `before` hook.
 
@@ -936,16 +874,14 @@ require("occurrence").setup({
 })
 ```
 
-**Key points about async operators:**
+**Key points about operators:**
 
-- Async operations are batched to avoid overwhelming external services
-- Default batch size is 10 concurrent operations
-- Configure per-operator via `batch_size` field
+- Async operations are sized to 10 concurrent operations by default (configurable via `batch_size`)
 - The `before` hook runs once before processing marks
 - The `operator` function runs for each mark
 - Both can be async by returning a function that accepts `done`
 
-## Custom Line-Based Operators
+## Fixed Operators
 
 A custom operator defined via `operators` will always expect a motion or visual selection.
 To define a custom operator that operates on a fixed motion, define it as a keymap instead.
@@ -1131,6 +1067,68 @@ vim.api.nvim_create_autocmd("User", {
 })
 ```
 
+# Command Usage
+
+The `:Occurrence` command provides access to all builtin actions and operators. It features basic completion for subcommands, count and range modifiers for fine-grained control, and arguments for specific actions.
+
+Actions can be invoked via the `:Occurrence` command:
+
+```vim
+:Occurrence mark          " Mark occurrences of word under cursor
+:Occurrence toggle        " Toggle mark at cursor position
+:Occurrence next          " Navigate to next marked occurrence
+:Occurrence deactivate    " Clear all marks
+```
+
+And some can take arguments:
+
+```vim
+:Occurrence mark \w\s\s    " Mark occurrences of a pattern
+:Occurrence toggle foo     " Toggle the next occurrence of 'foo'
+:Occurrence next 2         " Move to the 2nd next marked occurrence
+```
+
+Operators will trigger operator-pending mode and then operate on marked occurrences:
+
+```vim
+:Occurrence delete        " Delete all marked occurrences
+:Occurrence change        " Change all marked occurrences (prompts for input)
+:Occurrence yank          " Yank all marked occurrences to register
+:Occurrence uppercase     " Convert all marked to uppercase
+```
+
+And any that use a register can specify which register to use:
+
+```vim
+:Occurrence delete b      " Delete all marked occurrences to register 'b'
+:Occurrence put b         " Put register 'b' content at all marked occurrences
+```
+
+### Count Modifier
+
+Prefix the command with a count to limit operations to the first N marked occurrences:
+
+```vim
+:3Occurrence delete       " Delete only the first 3 marked occurrences
+:5Occurrence yank         " Yank only the first 5 marked occurrences
+:2Occurrence uppercase    " Uppercase only the first 2 marked occurrences
+```
+
+Or to limit the number of marked occurrences:
+
+```vim
+:4Occurrence mark       " Mark only the first 4 occurrences
+:3Occurrence next       " Navigate to the 3rd marked occurrence
+```
+
+### Range Modifier
+
+Use a range to operate only on marked occurrences within specific lines:
+
+```vim
+:2,5Occurrence delete     " Delete marks only in lines 2-5
+:'<,'>Occurrence change   " Change marks only in visual selection
+```
 <!-- panvimdoc-ignore-start -->
 
 # Development

@@ -1,4 +1,4 @@
-*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 December 09
+*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2025 December 17
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
@@ -15,20 +15,20 @@ Table of Contents                               *occurrence-table-of-contents*
   - Highlights                           |occurrence-configuration-highlights|
   - Statusline Integration   |occurrence-configuration-statusline-integration|
 5. Usage Examples                                  |occurrence-usage-examples|
-6. Command Usage                                    |occurrence-command-usage|
-7. API Reference                                    |occurrence-api-reference|
+6. API Reference                                    |occurrence-api-reference|
   - Lua API                                 |occurrence-api-reference-lua-api|
   - Actions                                 |occurrence-api-reference-actions|
-8. Builtin Operators                            |occurrence-builtin-operators|
-9. Custom Operators                              |occurrence-custom-operators|
+7. Builtin Operators                            |occurrence-builtin-operators|
+8. Custom Operators                              |occurrence-custom-operators|
   - Feedkeys Operators        |occurrence-custom-operators-feedkeys-operators|
   - Function Operators        |occurrence-custom-operators-function-operators|
-  - Custom Line-Based Operators|occurrence-custom-operators-custom-line-based-operators|
-10. Events                                                 |occurrence-events|
+  - Fixed Operators              |occurrence-custom-operators-fixed-operators|
+9. Events                                                  |occurrence-events|
   - OccurrenceCreate                      |occurrence-events-occurrencecreate|
   - OccurrenceActivate                  |occurrence-events-occurrenceactivate|
   - OccurrenceUpdate                      |occurrence-events-occurrenceupdate|
   - OccurrenceDispose                    |occurrence-events-occurrencedispose|
+10. Command Usage                                   |occurrence-command-usage|
 
 ==============================================================================
 1. occurrence.nvim                                *occurrence-occurrence.nvim*
@@ -51,6 +51,7 @@ USING LAZY.NVIM ~
 >lua
     {
       "lettertwo/occurrence.nvim",
+      lazy = false,
       ---@module "occurrence"
       ---@type occurrence.Options
       -- opts = {} -- setup is optional; the defaults will work out of the box.
@@ -245,8 +246,8 @@ Occurrence mode (after marking occurrences from normal/visual mode):
 
 - `n` / `N` - Next/previous marked occurrence
 - `gn` / `gN` - Next/previous occurrence (all matches)
-- `go` - Toggle mark on current occurrence or mark new word
-- `ga` - Mark current occurrence
+- `go` - Toggle mark on current occurrence or word
+- `ga` - Mark or current occurrence or add word
 - `gx` - Unmark current occurrence
 - `<Esc>`, `<C-c>`, `<C-[>` - Exit occurrence mode
 - All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`)
@@ -386,8 +387,8 @@ using the `status()` API:
     })
 <
 
-The `status()` function returns `nil` if there is no active occurrence,
-otherwise returns:
+The `status()` function returns `nil` if there is no active occurrence.
+Otherwise, it returns:
 
 - `current`: Current match index
 - `total`: Total number of matches
@@ -520,78 +521,7 @@ refactoring or batch renaming with distinct values.
 
 
 ==============================================================================
-6. Command Usage                                    *occurrence-command-usage*
-
-The `:Occurrence` command provides access to all builtin actions and operators.
-It features basic completion for subcommands, count and range modifiers for
-fine-grained control, and arguments for specific actions.
-
-Actions can be invoked via the `:Occurrence` command:
-
->vim
-    :Occurrence mark          " Mark occurrences of word under cursor
-    :Occurrence toggle        " Toggle mark at cursor position
-    :Occurrence next          " Navigate to next marked occurrence
-    :Occurrence deactivate    " Clear all marks
-<
-
-And some can take arguments:
-
->vim
-    :Occurrence mark \w\s\s    " Mark occurrences of a pattern
-    :Occurrence toggle foo     " Toggle the next occurrence of 'foo'
-    :Occurrence next 2         " Move to the 2nd next marked occurrence
-<
-
-Operators will trigger operator-pending mode and then operate on marked
-occurrences:
-
->vim
-    :Occurrence delete        " Delete all marked occurrences
-    :Occurrence change        " Change all marked occurrences (prompts for input)
-    :Occurrence yank          " Yank all marked occurrences to register
-    :Occurrence uppercase     " Convert all marked to uppercase
-<
-
-And any that use a register can specify which register to use:
-
->vim
-    :Occurrence delete b      " Delete all marked occurrences to register 'b'
-    :Occurrence put b         " Put register 'b' content at all marked occurrences
-<
-
-
-COUNT MODIFIER ~
-
-Prefix the command with a count to limit operations to the first N marked
-occurrences:
-
->vim
-    :3Occurrence delete       " Delete only the first 3 marked occurrences
-    :5Occurrence yank         " Yank only the first 5 marked occurrences
-    :2Occurrence uppercase    " Uppercase only the first 2 marked occurrences
-<
-
-Or to limit the number of marked occurrences:
-
->vim
-    :4Occurrence mark       " Mark only the first 4 occurrences
-    :3Occurrence next       " Navigate to the 3rd marked occurrence
-<
-
-
-RANGE MODIFIER ~
-
-Use a range to operate only on marked occurrences within specific lines:
-
->vim
-    :2,5Occurrence delete     " Delete marks only in lines 2-5
-    :'<,'>Occurrence change   " Change marks only in visual selection
-<
-
-
-==============================================================================
-7. API Reference                                    *occurrence-api-reference*
+6. API Reference                                    *occurrence-api-reference*
 
 
 LUA API                                     *occurrence-api-reference-lua-api*
@@ -654,10 +584,10 @@ All actions are available in three ways:
     <
 
 
-                                                *occurrence-modify_operator*
+                                            *occurrence-**modify_operator***
 
 
-modify_operator                        `require('occurrence').modify_operator()`
+**modify_operator**                    `require('occurrence').modify_operator()`
                                        `:Occurrence modify_operator`
                                        `<Plug>(OccurrenceModifyOperator)`
 
@@ -674,10 +604,10 @@ any effect when occurrence mode is active, as operators already act on
 occurrences in that mode.
 
 
-                                                           *occurrence-mark*
+                                                       *occurrence-**mark***
 
 
-mark                                   `require('occurrence').mark()`
+**mark**                               `require('occurrence').mark()`
                                        `:Occurrence mark`
                                        `<Plug>(OccurrenceMark)`
 
@@ -697,10 +627,10 @@ If no occurrence match exists to satisfy the above, add a new pattern based on:
 - Otherwise, mark occurrences of the word under the cursor.
 
 
-                                                         *occurrence-unmark*
+                                                     *occurrence-**unmark***
 
 
-unmark                                 `require('occurrence').unmark()`
+**unmark**                             `require('occurrence').unmark()`
                                        `:Occurrence unmark`
                                        `<Plug>(OccurrenceUnmark)`
 
@@ -716,10 +646,10 @@ If occurrence has matches, unmark matches based on:
 If no match exists to satisfy the above, does nothing.
 
 
-                                                         *occurrence-toggle*
+                                                     *occurrence-**toggle***
 
 
-toggle                                 `require('occurrence').toggle()`
+**toggle**                             `require('occurrence').toggle()`
                                        `:Occurrence toggle`
                                        `<Plug>(OccurrenceToggle)`
 
@@ -739,10 +669,10 @@ If no occurrence match exists to satisfy the above, add a new pattern based on:
 - Otherwise, mark the closest occurrence of the word under the cursor.
 
 
-                                                           *occurrence-next*
+                                                       *occurrence-**next***
 
 
-next                                   `require('occurrence').next()`
+**next**                               `require('occurrence').next()`
                                        `:Occurrence next`
                                        `<Plug>(OccurrenceNext)`
 
@@ -754,10 +684,10 @@ If occurrence has no matches, acts like `mark` and then moves to the next
 marked occurrence.
 
 
-                                                       *occurrence-previous*
+                                                   *occurrence-**previous***
 
 
-previous                               `require('occurrence').previous()`
+**previous**                           `require('occurrence').previous()`
                                        `:Occurrence previous`
                                        `<Plug>(OccurrencePrevious)`
 
@@ -769,10 +699,10 @@ If occurrence has no matches, acts like `mark` and then moves to the previous
 marked occurrence.
 
 
-                                                     *occurrence-match_next*
+                                                 *occurrence-**match_next***
 
 
-match_next                             `require('occurrence').match_next()`
+**match_next**                         `require('occurrence').match_next()`
                                        `:Occurrence match_next`
                                        `<Plug>(OccurrenceMatchNext)`
 
@@ -785,10 +715,10 @@ If occurrence has no matches, acts like `mark` and then moves to the next
 occurrence match.
 
 
-                                                 *occurrence-match_previous*
+                                             *occurrence-**match_previous***
 
 
-match_previous                         `require('occurrence').match_previous()`
+**match_previous**                     `require('occurrence').match_previous()`
                                        `:Occurrence match_previous`
                                        `<Plug>(OccurrenceMatchPrevious)`
 
@@ -801,10 +731,10 @@ If occurrence has no matches, acts like `mark` and then moves to the previous
 occurrence match.
 
 
-                                                     *occurrence-deactivate*
+                                                 *occurrence-**deactivate***
 
 
-deactivate                             `require('occurrence').deactivate()`
+**deactivate**                         `require('occurrence').deactivate()`
                                        `:Occurrence deactivate`
                                        `<Plug>(OccurrenceDeactivate)`
 
@@ -814,7 +744,7 @@ Clear all marks and patterns, and deactivate occurrence mode.
 
 
 ==============================================================================
-8. Builtin Operators                            *occurrence-builtin-operators*
+7. Builtin Operators                            *occurrence-builtin-operators*
 
 The following operators are supported via `modify_operator` or with marked
 occurrences (configured via `operators` table):
@@ -862,7 +792,10 @@ And as subcommands, e.g.,:
 
 
 ==============================================================================
-9. Custom Operators                              *occurrence-custom-operators*
+8. Custom Operators                              *occurrence-custom-operators*
+
+You can define custom operators to work with occurrences by configuring the
+`operators` table in `require("occurrence").setup({...})`.
 
 
 FEEDKEYS OPERATORS            *occurrence-custom-operators-feedkeys-operators*
@@ -901,9 +834,10 @@ Otherwise, you can define the full command to operate on the selection:
 
 FUNCTION OPERATORS            *occurrence-custom-operators-function-operators*
 
-Custom operators can be defined as Lua functions that transform the text of
-each marked occurrence. The function receives information about the current
-mark being processed and returns the replacement text.
+Custom operators can be defined as Lua functions that process each marked
+occurrence. The function receives information about the current mark being
+processed and can return replacement text or perform side effects, and can
+optionally execute asynchronously.
 
 
 BASIC FUNCTION OPERATOR ~
@@ -927,16 +861,16 @@ The operator function receives two parameters:
 - `mark`: Information about the current occurrence being processed
     - `mark.index`: 1-based index among all marks
     - `mark.id`: Extmark ID
-    - `mark.range`: Range object with `start` and `stop` positions
+    - `mark.range`: Range of the mark with `start` and `stop` positions
     - `mark.text`: Array of lines as strings
 - `ctx`: Operator Context
     - `ctx.occurrence`: The Occurrence instance
     - `ctx.marks`: All marks being processed
     - `ctx.mode`: Mode the operator was triggered in (`"n"`, `"v"`, or `"o"`)
-    - `ctx.register`: Register instance (if applicable)
+    - `ctx.register`: Register available for the operation (if applicable)
 
 
-RETURN VALUES ~
+OPERATOR RETURN VALUES ~
 
 Function operators can return different values to control behavior:
 
@@ -954,7 +888,7 @@ Function operators can return different values to control behavior:
     -- Return nil or true for side-effect only (mark will be unmarked)
     operator = function(mark, ctx)
       print("Processing mark " .. mark.index)
-      return nil -- or return true to yank without replacement
+      return nil -- or return true to also yank to register
     end
     
     -- Return false to cancel the remaining operations.
@@ -978,7 +912,7 @@ user input), return a function that accepts a `done` callback:
         format_with_prettier = {
           desc = "Format with prettier",
           operator = function(mark, ctx)
-            -- Return async initiator function
+            -- Return async operator function
             return function(done)
               local text = table.concat(mark.text, "\n")
               vim.system(
@@ -1003,7 +937,7 @@ user input), return a function that accepts a `done` callback:
 <
 
 
-OPERATORS WITH SETUP ~
+OPERATOR BEFORE HOOK ~
 
 For operations that need setup before processing marks (like prompting the
 user), use the `before` hook.
@@ -1064,17 +998,15 @@ marks:
     })
 <
 
-**Key points about async operators:**
+**Key points about operators:**
 
-- Async operations are batched to avoid overwhelming external services
-- Default batch size is 10 concurrent operations
-- Configure per-operator via `batch_size` field
+- Async operations are sized to 10 concurrent operations by default (configurable via `batch_size`)
 - The `before` hook runs once before processing marks
 - The `operator` function runs for each mark
 - Both can be async by returning a function that accepts `done`
 
 
-CUSTOM LINE-BASED OPERATORS*occurrence-custom-operators-custom-line-based-operators*
+FIXED OPERATORS                  *occurrence-custom-operators-fixed-operators*
 
 A custom operator defined via `operators` will always expect a motion or visual
 selection. To define a custom operator that operates on a fixed motion, define
@@ -1126,7 +1058,7 @@ marked occurrences on the current line:
 
 
 ==============================================================================
-10. Events                                                 *occurrence-events*
+9. Events                                                  *occurrence-events*
 
 occurrence.nvim triggers custom User events that you can listen to with
 autocommands. These events allow you to react to occurrence lifecycle changes
@@ -1268,6 +1200,77 @@ up.
         -- Clean up any custom state associated with this occurrence
       end,
     })
+<
+
+
+==============================================================================
+10. Command Usage                                   *occurrence-command-usage*
+
+The `:Occurrence` command provides access to all builtin actions and operators.
+It features basic completion for subcommands, count and range modifiers for
+fine-grained control, and arguments for specific actions.
+
+Actions can be invoked via the `:Occurrence` command:
+
+>vim
+    :Occurrence mark          " Mark occurrences of word under cursor
+    :Occurrence toggle        " Toggle mark at cursor position
+    :Occurrence next          " Navigate to next marked occurrence
+    :Occurrence deactivate    " Clear all marks
+<
+
+And some can take arguments:
+
+>vim
+    :Occurrence mark \w\s\s    " Mark occurrences of a pattern
+    :Occurrence toggle foo     " Toggle the next occurrence of 'foo'
+    :Occurrence next 2         " Move to the 2nd next marked occurrence
+<
+
+Operators will trigger operator-pending mode and then operate on marked
+occurrences:
+
+>vim
+    :Occurrence delete        " Delete all marked occurrences
+    :Occurrence change        " Change all marked occurrences (prompts for input)
+    :Occurrence yank          " Yank all marked occurrences to register
+    :Occurrence uppercase     " Convert all marked to uppercase
+<
+
+And any that use a register can specify which register to use:
+
+>vim
+    :Occurrence delete b      " Delete all marked occurrences to register 'b'
+    :Occurrence put b         " Put register 'b' content at all marked occurrences
+<
+
+
+COUNT MODIFIER ~
+
+Prefix the command with a count to limit operations to the first N marked
+occurrences:
+
+>vim
+    :3Occurrence delete       " Delete only the first 3 marked occurrences
+    :5Occurrence yank         " Yank only the first 5 marked occurrences
+    :2Occurrence uppercase    " Uppercase only the first 2 marked occurrences
+<
+
+Or to limit the number of marked occurrences:
+
+>vim
+    :4Occurrence mark       " Mark only the first 4 occurrences
+    :3Occurrence next       " Navigate to the 3rd marked occurrence
+<
+
+
+RANGE MODIFIER ~
+
+Use a range to operate only on marked occurrences within specific lines:
+
+>vim
+    :2,5Occurrence delete     " Delete marks only in lines 2-5
+    :'<,'>Occurrence change   " Change marks only in visual selection
 <
 
 Generated by panvimdoc <https://github.com/kdheepak/panvimdoc>
