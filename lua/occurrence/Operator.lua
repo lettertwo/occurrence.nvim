@@ -202,7 +202,10 @@ function EditList:add(current, new_text)
   log.trace("EditList:add called for index", current.index, "total edits:", #self.edits)
 end
 
+---@return integer[]
 function EditList:apply()
+  ---@type integer[]
+  local edited = {}
   local edits = self.edits or {}
   self.edits = nil
 
@@ -223,7 +226,7 @@ function EditList:apply()
       mark.stop.col,
       new_text
     )
-    self.occurrence.extmarks:unmark(id)
+    table.insert(edited, id)
   end
 
   if self.ctx.register ~= nil then
@@ -237,6 +240,7 @@ function EditList:apply()
   else
     self.cursor:restore()
   end
+  return edited
 end
 
 ---@param occurrence occurrence.Occurrence
@@ -252,37 +256,34 @@ end
 -- Apply an operator string (e.g. `"d"`, `"y"`, etc) to a visual selection of each mark.
 ---@param operator string The operator string (e.g. "d", "y", etc).
 ---@param ctx occurrence.OperatorContext The operator context.
----@param done fun() Callback when operations are complete.
+---@param done fun(edited: number[]) Callback when operations are complete.
 local function apply_operator_string(operator, ctx, done)
-  local occurrence = ctx.occurrence
   local marks = ctx.marks
   local original_cursor = Cursor.save()
 
-  local edited = 0
+  local edited = {}
   local last_edited = nil
 
   -- Visually select and feedkeys for each mark in reverse order
   for i = #marks, 1, -1 do
     local id, mark = unpack(marks[i])
     -- Create single undo block for all edits
-    if edited > 0 then
+    if #edited > 0 then
       vim.cmd("silent! undojoin")
     end
 
     Cursor.move(mark.start)
     feedkeys.change_mode("v", { force = true, silent = true })
     Cursor.move(mark.stop)
-    occurrence.extmarks:unmark(id)
     feedkeys(operator, { noremap = true })
-
-    edited = edited + 1
+    table.insert(edited, id)
     last_edited = mark
   end
 
-  if edited == 0 then
+  if #edited == 0 then
     log.debug("No marks to execute", operator)
   else
-    log.debug("Executed", operator, "on", edited, "marks")
+    log.debug("Executed", operator, "on", #edited, "marks")
   end
 
   if last_edited then
@@ -291,18 +292,19 @@ local function apply_operator_string(operator, ctx, done)
     original_cursor:restore()
   end
 
-  done()
+  done(edited)
 end
 
 ---@param operator occurrence.OperatorFn
 ---@param ctx occurrence.OperatorContext The operator context.
 ---@param batch_size number Maximum concurrent operations.
----@param done fun(result: boolean?) Callback when all operations are complete or cancelled.
+---@param done fun(edited: number[], result?: boolean) Callback when all operations are complete or cancelled.
 local function apply_operator_fn(operator, ctx, batch_size, done)
   local occurrence = ctx.occurrence
   local marks = ctx.marks
   local edits = create_edit_list(occurrence, ctx)
   local operations = create_operator_queue(operator, ctx)
+  local edited = {}
 
   for i = 1, #marks do
     local id, mark = unpack(marks[i])
@@ -335,9 +337,8 @@ local function apply_operator_fn(operator, ctx, batch_size, done)
             cancelled = true
           else
             if result == nil or result == true then
-              -- If the `result` is `nil` or `true`,
-              -- assume the occurrence has been handled and unmark it
-              occurrence.extmarks:unmark(current.id)
+              -- If the `result` is `nil` or `true`, assume the occurrence has been handled
+              table.insert(edited, current.id)
             elseif type(result) == "string" then
               -- Split on newlines if present
               if result:find("\n") then
@@ -356,7 +357,7 @@ local function apply_operator_fn(operator, ctx, batch_size, done)
           if remaining <= 0 then
             if cancelled then
               log.trace("Operation cancelled")
-              done(false)
+              done(edited, false)
             else
               execute_next_batch()
             end
@@ -364,8 +365,8 @@ local function apply_operator_fn(operator, ctx, batch_size, done)
         end)
       end
     else
-      edits:apply()
-      done()
+      vim.list_extend(edited, edits:apply())
+      done(edited)
     end
   end
 
@@ -393,10 +394,12 @@ local function create_opfunc(occurrence, operator, ctx)
   local win = vim.api.nvim_get_current_win()
   local count = ctx.count or 0
   local before_hook = nil
+  local after_hook = nil
   local batch_size = 10
 
   if type(operator) == "table" then
     before_hook = operator.before
+    after_hook = operator.after
     batch_size = operator.batch_size or batch_size
     operator = operator.operator
     ---@cast operator -occurrence.OperatorConfig
@@ -477,9 +480,36 @@ local function create_opfunc(occurrence, operator, ctx)
       expand_around(marks)
     end
 
+    ---@type occurrence.OperatorContext
+    local operator_ctx = {
+      mode = ctx.mode,
+      occurrence = occurrence,
+      marks = marks,
+      register = Register.new(ctx.register),
+    }
+
+    ---@param edited integer[]
     ---@param result boolean?
-    local function on_done(result)
+    local function on_done(edited, result)
+      log.debug("Operator operation done with", #edited, "edited marks and result:", result)
+      ---@type integer[]
+      local updated_marks = {}
+
       if result ~= false then
+        -- we only need to update marks if there is an after_hook and edits were made
+        if type(after_hook) == "function" and #edited > 0 then
+          ---@type [number, occurrence.Range][]
+          for _, id in ipairs(edited) do
+            table.insert(updated_marks, { id, assert(occurrence.extmarks:get_mark(id)) })
+          end
+          -- The order of marks may have changed due to asynchronous operations
+          -- or due to reverse application of replacements, so sort by mark id
+          -- to provide a consistent order to the after_hook.
+          table.sort(updated_marks, function(a, b)
+            return a[1] < b[1]
+          end)
+        end
+
         if ctx.mode == "v" then
           -- Clear visual selection
           feedkeys.change_mode("n", { noflush = true, silent = true })
@@ -487,10 +517,19 @@ local function create_opfunc(occurrence, operator, ctx)
 
         cursor = nil
 
-        if occurrence and not occurrence.extmarks:has_any_marks() then
-          log.debug("Occurrence has no marks after operation; deactivating")
-          occurrence:dispose()
-          occurrence = nil ---@diagnostic disable-line: cast-local-type
+        if occurrence then
+          if #edited > 0 then
+            log.debug("Clearing", #edited, "edited marks")
+            for _, id in ipairs(edited) do
+              occurrence.extmarks:unmark(id)
+            end
+          end
+
+          if not occurrence.extmarks:has_any_marks() then
+            log.debug("Occurrence has no marks after operation; deactivating")
+            occurrence:dispose()
+            occurrence = nil ---@diagnostic disable-line: cast-local-type
+          end
         end
 
         -- If running the edits changed `vim.v.operator`, we need to restore it.
@@ -507,15 +546,11 @@ local function create_opfunc(occurrence, operator, ctx)
         -- Watch for dot-repeat to cache cursor position prior to repeating the operation.
         watch_dot_repeat()
       end
-    end
 
-    ---@type occurrence.OperatorContext
-    local operator_ctx = {
-      mode = ctx.mode,
-      occurrence = occurrence,
-      marks = marks,
-      register = Register.new(ctx.register),
-    }
+      if type(after_hook) == "function" then
+        after_hook(updated_marks, vim.tbl_extend("keep", { marks = updated_marks }, operator_ctx))
+      end
+    end
 
     local function apply_operator()
       if type(operator) == "string" then
@@ -529,12 +564,12 @@ local function create_opfunc(occurrence, operator, ctx)
       local before_result = before_hook(marks, operator_ctx)
       if before_result == false then
         log.debug("Operation cancelled by before hook")
-        on_done(false)
+        on_done({}, false)
       elseif type(before_result) == "function" then
         before_result(function(ok)
           if ok == false then
             log.debug("Operation cancelled by before hook async result")
-            on_done(false)
+            on_done({}, false)
           else
             apply_operator()
           end

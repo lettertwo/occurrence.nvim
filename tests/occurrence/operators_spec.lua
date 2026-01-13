@@ -661,4 +661,266 @@ describe("operators", function()
       assert.same(initial_pos, final_pos)
     end)
   end)
+
+  describe("after hook", function()
+    it("calls after hook after successful operation", function()
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      local after_hook_called = false
+      local received_marks = nil
+      local received_ctx = nil
+
+      local custom_config = Config.new({
+        default_operators = false,
+        operators = {
+          test = {
+            desc = "Test operator with after hook",
+            operator = function()
+              return "replaced"
+            end,
+            after = function(marks, ctx)
+              after_hook_called = true
+              received_marks = marks
+              received_ctx = ctx
+            end,
+          },
+        },
+      })
+
+      -- Apply operator with after hook
+      occurrence:apply_operator("test", { motion = Range.of_buffer() }, custom_config)
+
+      -- Verify after hook was called
+      assert.is_true(after_hook_called, "After hook should have been called")
+      assert.is_not_nil(received_marks, "After hook should receive marks")
+      assert.is_not_nil(received_ctx, "After hook should receive context")
+      assert.equals(3, #received_marks, "After hook should receive all edited marks")
+    end)
+
+    it("provides updated mark positions to after hook", function()
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      local before_marks = nil
+      local after_marks = nil
+
+      local custom_config = Config.new({
+        default_operators = false,
+        operators = {
+          test = {
+            desc = "Test operator with after hook",
+            before = function(marks)
+              before_marks = marks
+            end,
+            operator = function()
+              return "LONGER_TEXT"
+            end,
+            after = function(marks)
+              after_marks = marks
+            end,
+          },
+        },
+      })
+
+      -- Apply operator that changes text length
+      occurrence:apply_operator("test", { motion = Range.of_buffer() }, custom_config)
+
+      assert(before_marks)
+      assert.equals(3, #before_marks)
+
+      assert(after_marks)
+      assert.equals(3, #after_marks)
+
+      for i = 1, 3 do
+        local before_id, before_range = unpack(before_marks[i])
+        local after_id, after_range = unpack(after_marks[i])
+        assert.equals(before_id, after_id, "Mark IDs should match before and after")
+        assert.not_same(after_range, before_range, "Ranges should be different after modification")
+        assert.is_true(after_range.stop > before_range.stop, "After range should reflect longer text")
+      end
+
+      -- Check that marks contain updated range information
+      for _, mark in ipairs(after_marks) do
+        local id, range = unpack(mark)
+        assert.is_number(id, "Mark should have an ID")
+        assert.is_table(range, "Mark should have a range")
+        assert.is_not_nil(range.start, "Range should have a start")
+        assert.is_not_nil(range.stop, "Range should have a stop")
+      end
+    end)
+
+    it("calls after hook with empty marks when operation is cancelled", function()
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      local after_hook_called = false
+      local received_marks = nil
+
+      local custom_config = Config.new({
+        default_operators = false,
+        operators = {
+          test = {
+            desc = "Test operator that cancels",
+            before = function()
+              return false -- Cancel operation
+            end,
+            operator = function()
+              return "replaced"
+            end,
+            after = function(marks)
+              after_hook_called = true
+              received_marks = marks
+            end,
+          },
+        },
+      })
+
+      -- Apply operator that gets cancelled
+      occurrence:apply_operator("test", { motion = Range.of_buffer() }, custom_config)
+
+      -- Verify after hook was called but with empty marks
+      assert.is_true(after_hook_called, "After hook should be called even when operation is cancelled")
+      assert.is_not_nil(received_marks, "After hook should receive marks parameter")
+      assert.equals(0, #received_marks, "Marks should be empty when operation is cancelled")
+    end)
+
+    it("calls after hook with marks even when operator returns nil", function()
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      local after_hook_called = false
+      local received_marks = nil
+
+      local custom_config = Config.new({
+        default_operators = false,
+        operators = {
+          test = {
+            desc = "Test operator that returns nil",
+            operator = function()
+              return nil -- Side-effect only, no replacement
+            end,
+            after = function(marks)
+              after_hook_called = true
+              received_marks = marks
+            end,
+          },
+        },
+      })
+
+      -- Apply operator that doesn't modify text
+      occurrence:apply_operator("test", { motion = Range.of_buffer() }, custom_config)
+
+      -- Verify after hook was called (marks are cleared as side-effect)
+      assert.is_true(after_hook_called, "After hook should be called even when operator returns nil")
+      assert.is_not_nil(received_marks, "After hook should receive marks parameter")
+      -- When operator returns nil, marks are cleared but after hook still gets them
+      assert.equals(3, #received_marks, "After hook should receive all processed marks")
+    end)
+
+    it("calls after hook with context including occurrence and marks", function()
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      local received_marks = nil
+      local received_ctx = nil
+
+      local custom_config = Config.new({
+        default_operators = false,
+        operators = {
+          test = {
+            desc = "Test operator with after hook",
+            operator = function()
+              return "replaced"
+            end,
+            after = function(marks, ctx)
+              received_marks = marks
+              received_ctx = ctx
+            end,
+          },
+        },
+      })
+
+      -- Apply operator
+      occurrence:apply_operator("test", { motion = Range.of_buffer() }, custom_config)
+
+      -- Verify context contains expected fields
+      assert(received_ctx)
+      assert.is_not_nil(received_ctx.occurrence, "Context should have occurrence")
+      assert.is_not_nil(received_ctx.marks, "Context should have marks")
+      assert.is_not_nil(received_ctx.mode, "Context should have mode")
+      assert.is_not_nil(received_ctx.register, "Context should have register")
+      assert.is_equal(received_marks, received_ctx.marks, "Marks in context should match received marks")
+    end)
+
+    it("calls after hook after async operation completes", function()
+      bufnr = util.buffer("foo bar foo\nbaz foo bar")
+      local occurrence = Occurrence.get(bufnr, "foo")
+
+      -- Mark all occurrences
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      local after_hook_called = false
+      local async_completed = false
+
+      local custom_config = Config.new({
+        default_operators = false,
+        operators = {
+          test = {
+            desc = "Test async operator with after hook",
+            operator = function()
+              return function(done)
+                vim.schedule(function()
+                  async_completed = true
+                  done("async_result")
+                end)
+              end
+            end,
+            after = function()
+              after_hook_called = true
+            end,
+          },
+        },
+      })
+
+      -- Apply async operator
+      occurrence:apply_operator("test", { motion = Range.of_buffer() }, custom_config)
+
+      -- Wait for async operation to complete
+      vim.wait(100, function()
+        return async_completed and after_hook_called
+      end)
+
+      -- Verify both async operation and after hook completed
+      assert.is_true(async_completed, "Async operation should have completed")
+      assert.is_true(after_hook_called, "After hook should have been called after async operation")
+    end)
+  end)
 end)

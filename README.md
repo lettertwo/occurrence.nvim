@@ -693,7 +693,9 @@ You can define custom operators to work with occurrences by configuring the `ope
 - Async operations are sized to 10 concurrent operations by default (configurable via `batch_size`)
 - The `before` hook runs once before processing marks
 - The `operator` function runs for each mark
-- Both can be async by returning a function that accepts `done`
+- The `after` hook runs once after all marks have been processed
+- The `before` and `operator` can be async by returning a function that accepts `done`
+- The `after` hook receives updated mark positions for post-processing
 
 See the [Configuration](#configuration) section for simple examples of defining custom operators.
 

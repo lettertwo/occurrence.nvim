@@ -99,6 +99,14 @@ local _global_config = nil
 -- If called with `done(false)`, the operation will be cancelled.
 ---@alias occurrence.OperatorBeforeHook fun(marks: [number, occurrence.Range][], ctx: occurrence.OperatorContext): boolean | nil | fun(done: fun(cancel: boolean?))
 
+-- Function called after operator execution.
+-- Use this for cleanup or post-processing.
+-- Any changes to `ctx` will be ignored.
+--
+-- The function will be called with the updated `marks`.
+-- If the operation was cancelled, `marks` will be an empty list.
+---@alias occurrence.OperatorAfterHook fun(marks: [number, occurrence.Range][], ctx: occurrence.OperatorContext)
+
 -- A configuration for a keymap that will run an operation
 -- on occurrences either as part of modifying a pending operator,
 -- or when occurrence mode is active.
@@ -116,6 +124,9 @@ local _global_config = nil
 -- Optional setup hook called before operator execution.
 -- Use for async setup like prompting the user.
 ---@field before? occurrence.OperatorBeforeHook
+-- Optional cleanup hook called after operator execution.
+-- Use for post-processing, e.g., disposing the occurrence.
+---@field after? occurrence.OperatorBeforeHook
 -- Maximum number of concurrent async operations.
 -- Defaults to 10 if not specified.
 ---@field batch_size? number
