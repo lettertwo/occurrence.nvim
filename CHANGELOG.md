@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/lettertwo/occurrence.nvim/compare/v0.2.0...v0.3.0) (2026-01-14)
+
+
+### Features
+
+* **operators:** add after hook ([30e1111](https://github.com/lettertwo/occurrence.nvim/commit/30e1111597c143cb5f173343c93b36cb26d5e891))
+
 ## [0.2.0](https://github.com/lettertwo/occurrence.nvim/compare/v0.1.0...v0.2.0) (2026-01-08)
 
 
