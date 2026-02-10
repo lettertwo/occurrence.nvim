@@ -35,6 +35,28 @@ Inspired by [vim-mode-plus]'s occurrence feature.
 - Customizable highlight groups
 - Lua API for advanced usage and integration
 
+### Demos
+
+#### Using the occurrence operator-modifier
+
+The sequence `gUoip` uppercases occurrences of the word under the cursor in the current paragraph.
+
+https://github.com/user-attachments/assets/2c7bb264-b93d-4f21-ad5f-f8d6b17550b8
+
+The `o` operator-modifier can be used with any operator and motion, e.g., `yog}` yanks occurrences to the end of the paragraph, `gUoG` uppercases occurrences to the end of the paragraph, etc.
+
+#### Using the operator-modifier with a count
+
+The sequence `d2oj` deletes the first 2 occurrences of the word under the cursor until the next line.
+
+https://github.com/user-attachments/assets/ba898088-689b-4708-9dec-763cc2ea0dda
+
+#### Selective editing in occurrence mode
+
+This example shows marking occurrences of a selection and then unmarking one of them before changing the rest.
+
+https://github.com/user-attachments/assets/858ae5c6-8f9e-4408-ad60-52938b082782
+
 <!-- panvimdoc-ignore-end -->
 
 # Installation

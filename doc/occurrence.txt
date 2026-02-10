@@ -1,4 +1,4 @@
-*occurrence.txt*        For NVIM >= 0.10.0        Last change: 2026 January 13
+*occurrence.txt*        For NVIM >= 0.10.0       Last change: 2026 February 10
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
