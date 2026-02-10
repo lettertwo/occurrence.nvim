@@ -23,7 +23,6 @@ function dev.setup(opts)
     group = vim.api.nvim_create_augroup("OccurrenceDev", { clear = true }),
   })
 
-  log.debug("occurrence.dev.setup(" .. vim.inspect(opts) .. ")")
   require("occurrence").setup(opts)
 end
 
