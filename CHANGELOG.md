@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0](https://github.com/lettertwo/occurrence.nvim/compare/v0.3.0...v1.0.0) (2026-02-10)
+
+
+### Documentation
+
+* add demos ([a92039c](https://github.com/lettertwo/occurrence.nvim/commit/a92039cae9ee97ff061012f4c74f65a71ccd43a6))
+
+
+### Miscellaneous Chores
+
+* release 1.0.0 ([66e100a](https://github.com/lettertwo/occurrence.nvim/commit/66e100aafabcc087531f16f0f373875958ba68fc))
+
 ## [0.3.0](https://github.com/lettertwo/occurrence.nvim/compare/v0.2.0...v0.3.0) (2026-01-14)
 
 
