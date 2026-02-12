@@ -221,6 +221,13 @@ function extmarks.new(buffer)
   return self
 end
 
+-- Get the serialized range key for a mark extmark id.
+---@param id number The extmark id.
+---@return string? key The serialized range key, or nil if not found.
+function Extmarks:get_mark_key(id)
+  return self.marks[id]
+end
+
 -- Check if there is an extmark for the given id or `Range`.
 ---@param id_or_range? number | occurrence.Range
 ---@return boolean
@@ -237,12 +244,22 @@ function Extmarks:has_any_marks(range)
   return iter() ~= nil
 end
 
--- Add an match extmark and highlight for the given `Range`.
+-- Add a match extmark and highlight for the given `Range`.
 ---@param range occurrence.Range
 ---@return boolean added Whether an extmark was added.
 function Extmarks:add(range)
   assert(not self:is_disposed(), "Cannot use a disposed Extmarks")
   return self.matches:add(range)
+end
+
+-- Remove a match extmark for the given `Range` or extmark id.
+---@param id_or_range number | occurrence.Range
+---@return boolean deleted Whether the match extmark was removed.
+function Extmarks:remove(id_or_range)
+  assert(not self:is_disposed(), "Cannot use a disposed Extmarks")
+  self.marks:del(id_or_range)
+
+  return self.matches:del(id_or_range)
 end
 
 -- Add an mark extmark and highlight for the given `Range`.

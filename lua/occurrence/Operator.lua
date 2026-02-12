@@ -23,6 +23,135 @@ vim.api.nvim_create_autocmd("WinClosed", {
   end,
 })
 
+-- A map of Buffer ids to their undo restoration stacks.
+---@class occurrence.UndoRecord
+---@field seq integer The undo sequence number at time of operator execution.
+---@field patterns string[] Copy of the occurrence patterns at time of operator execution.
+---@field mark_keys string[] Serialized range keys of marks removed by the operator.
+
+---@type table<integer, occurrence.UndoRecord[]>
+local UNDO_STACKS = {}
+
+---@type table<integer, integer>
+local UNDO_AUTOCMDS = {}
+
+local function clear_undo(buffer)
+  UNDO_STACKS[buffer] = nil
+  if UNDO_AUTOCMDS[buffer] then
+    pcall(vim.api.nvim_del_autocmd, UNDO_AUTOCMDS[buffer])
+    UNDO_AUTOCMDS[buffer] = nil
+  end
+end
+
+local function on_undo_text_changed(buffer)
+  local stack = UNDO_STACKS[buffer]
+  if not stack or #stack == 0 then
+    return
+  end
+
+  local seq_cur = vim.fn.undotree().seq_cur
+  if not seq_cur then
+    return
+  end
+
+  -- Check from top of stack (most recent operator) down.
+  -- If seq_cur dropped below a record's seq, the operator was undone.
+  -- We use strict < because when the operator's own TextChanged fires,
+  -- seq_cur == record.seq — that's the operator itself, not an undo.
+  local restored = false
+  while #stack > 0 do
+    local record = stack[#stack]
+    if seq_cur < record.seq then
+      log.debug(
+        "Undo detected (seq_cur:",
+        seq_cur,
+        "< record.seq:",
+        record.seq,
+        "); restoring",
+        #record.mark_keys,
+        "marks"
+      )
+
+      local Occurrence = require("occurrence.Occurrence")
+      local occurrence = Occurrence.get(buffer)
+      local was_active = occurrence:is_active()
+
+      -- Re-add patterns (of_pattern deduplicates)
+      for _, pattern in ipairs(record.patterns) do
+        occurrence:of_pattern(false, pattern)
+      end
+
+      -- Remove stale match extmarks (collapsed after text deletion)
+      -- and re-add match + mark extmarks at correct positions (text restored by undo)
+      for _, key in ipairs(record.mark_keys) do
+        local range = Range.deserialize(key)
+        occurrence.extmarks:remove(range)
+        occurrence.extmarks:mark(range)
+      end
+
+      if not was_active then
+        occurrence:activate_occurrence_mode()
+      end
+
+      occurrence.extmarks:update_current()
+      vim.api.nvim_exec_autocmds("User", { pattern = "OccurrenceUpdate" })
+
+      table.remove(stack)
+      restored = true
+    else
+      break
+    end
+  end
+
+  if not restored then
+    -- New edit (seq increased past records): discard stale records.
+    -- When seq_cur > record.seq, a new edit branch was created and
+    -- undo can no longer reach the operator's undo entry.
+    while #stack > 0 and seq_cur > stack[#stack].seq do
+      table.remove(stack)
+    end
+  end
+
+  if #stack == 0 then
+    clear_undo(buffer)
+  end
+end
+
+local function ensure_undo_autocmd(buffer)
+  if UNDO_AUTOCMDS[buffer] then
+    return
+  end
+  if not vim.api.nvim_buf_is_valid(buffer) then
+    return
+  end
+  UNDO_AUTOCMDS[buffer] = vim.api.nvim_create_autocmd("TextChanged", {
+    buffer = buffer,
+    callback = function()
+      on_undo_text_changed(buffer)
+    end,
+  })
+  log.debug("Registered undo TextChanged autocmd for buffer", buffer)
+end
+
+local function push_undo_record(buffer, record)
+  if not UNDO_STACKS[buffer] then
+    UNDO_STACKS[buffer] = {}
+  end
+  table.insert(UNDO_STACKS[buffer], record)
+  ensure_undo_autocmd(buffer)
+  log.debug("Pushed undo record for buffer", buffer, "seq:", record.seq, "marks:", #record.mark_keys)
+end
+
+vim.api.nvim_create_autocmd("BufDelete", {
+  group = vim.api.nvim_create_augroup("OccurrenceUndoCache", { clear = true }),
+  callback = function(args)
+    if UNDO_STACKS[args.buf] then
+      clear_undo(args.buf)
+      log.debug("Cleared undo stack for deleted buffer", args.buf)
+    end
+  end,
+})
+
 ---@type integer?
 local watching_dot_repeat
 
@@ -518,6 +647,24 @@ local function create_opfunc(occurrence, operator, ctx)
         cursor = nil
 
         if occurrence then
+          if #edited > 0 then
+            -- Capture undo info before clearing marks so they can be restored on undo
+            local mark_keys = {}
+            for _, id in ipairs(edited) do
+              local key = occurrence.extmarks:get_mark_key(id)
+              if key then
+                table.insert(mark_keys, key)
+              end
+            end
+            if #mark_keys > 0 then
+              push_undo_record(occurrence.buffer, {
+                seq = vim.fn.undotree().seq_cur,
+                patterns = vim.deepcopy(occurrence.patterns),
+                mark_keys = mark_keys,
+              })
+            end
+          end
+
           if #edited > 0 then
             log.debug("Clearing", #edited, "edited marks")
             for _, id in ipairs(edited) do
