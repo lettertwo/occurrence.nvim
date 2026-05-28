@@ -76,6 +76,14 @@
 -- Clear all marks and patterns, and deactivate occurrence mode.
 ---@field deactivate fun(args?: occurrence.SubcommandArgs): nil
 --
+-- Table of all built-in operators (indexed by operator name).
+-- Useful for enumerating available operators without filtering the flat api table.
+---@field operators { [occurrence.BuiltinOperator]: occurrence.OperatorConfig }
+--
+-- Table of all built-in actions and the operator-modifier (indexed by action name).
+-- Useful for enumerating available actions without filtering the flat api table.
+---@field actions { [occurrence.KeymapAction]: occurrence.OccurrenceModeConfig | occurrence.OperatorModifierConfig }
+--
 -- Change marked occurrences (may prompt for replacement)
 ---@field change fun(args?: occurrence.SubcommandArgs):nil
 --

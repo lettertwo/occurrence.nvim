@@ -462,4 +462,7 @@ local operators = {
   swap_case = swap_case,
 }
 
-return vim.tbl_extend("error", api, operators)
+return vim.tbl_extend("error", api, operators, {
+  operators = operators,
+  actions = api,
+})
