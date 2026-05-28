@@ -104,6 +104,23 @@ vim.pack.add("lettertwo/occurrence.nvim")
 -- require("occurrence").setup({}) -- setup is optional; the defaults will work out of the box.
 ```
 
+# Migrating from v1 to v2
+
+**Breaking change:** occurrence mode now exits automatically after an operator
+completes (`dispose_after_operator = true` by default). In v1, occurrence mode
+persisted after an operator unless all marks were consumed.
+
+If you relied on the old behavior — for example, chaining several operators on
+the same set of marks — restore it globally:
+
+```lua
+require("occurrence").setup({ dispose_after_operator = false })
+```
+
+You can also opt out for individual operators, or flip the decision for a single
+operator at runtime with the `toggle_dispose` action. See
+[Disposing after operators](#disposing-after-operators).
+
 # Quick Start
 
 With the default configuration, you can try these workflows to get a feel for `occurrence.nvim`.
@@ -119,7 +136,11 @@ You can enter 'occurrence mode' to mark occurrences and then operate on them:
 2. Use `n`/`N` to navigate between marked occurrences
 3. Press `c` followed by a motion (e.g., `ip`) to change marked occurrences in that range
 4. Type your replacement text
-5. Press `<Esc>` to exit occurrence mode
+
+By default, occurrence mode exits automatically once the operator completes. If
+you'd rather keep it active to chain more operators, see
+[Disposing after operators](#disposing-after-operators). You can always press
+`<Esc>` to exit occurrence mode manually.
 
 Marking occurrences can be done in several ways:
 
@@ -147,7 +168,10 @@ Or, you can use visual mode:
 2. **Select range**: Use vim motions to select a range
 3. **Choose operation**: Use vim operators like `c` (change), `d` (delete), `y` (yank) on marked occurrences in the visual range.
 
-When you're done, press `<Esc>` to exit occurrence mode and clear all marks.
+By default, occurrence mode exits automatically after the operator completes. To
+keep it active for chaining further operations, set `dispose_after_operator = false`
+(see [Disposing after operators](#disposing-after-operators)). You can also press
+`<Esc>` at any time to exit occurrence mode and clear all marks.
 
 ## Operator-pending mode
 
@@ -191,6 +215,23 @@ require("occurrence").setup({
   --
   -- Defaults to `true`.
   default_operators = true,
+
+  -- Whether to exit occurrence mode after an operator completes.
+  --
+  -- When `true`, occurrence mode is disposed once any operator finishes,
+  -- so a typical mark-then-operate sequence does not need a trailing
+  -- `<Esc>` to clean up.
+  --
+  -- When `false`, occurrence mode persists after an operator (the pre-v2
+  -- behavior), letting you chain multiple operators on the same marks until
+  -- you exit explicitly.
+  --
+  -- Can be overridden per-operator via the operator's own
+  -- `dispose_after_operator` field, and inverted for a single operator at
+  -- runtime via the `toggle_dispose` action.
+  --
+  -- Defaults to `true`.
+  dispose_after_operator = true,
 
   -- A table defining keymaps that will be active in occurrence mode.
   -- Each key is a string representing the keymap, and each value is either:
@@ -340,6 +381,41 @@ require("occurrence").setup({
 ```
 
 For more on defining custom operators, see [Custom Operators](#custom-operators).
+
+### Disposing after operators
+
+By default, occurrence mode exits as soon as an operator completes
+(`dispose_after_operator = true`). Individual operators can override this with
+their own `dispose_after_operator` field, which takes precedence over the global
+option:
+
+```lua
+require("occurrence").setup({
+  -- Keep occurrence mode active after operators globally...
+  dispose_after_operator = false,
+  operators = {
+    -- ...but exit after this one specifically.
+    ["d"] = {
+      desc = "Delete marked occurrences",
+      operator = function()
+        return {}
+      end,
+      dispose_after_operator = true,
+    },
+  },
+})
+```
+
+Resolution order is: per-operator value, then the global option, then the
+default of `true`.
+
+To flip the decision for just the next operator at runtime, use the
+`toggle_dispose` action (see [Actions](#actions)). It has no default keymap; bind
+it via `<Plug>(OccurrenceToggleDispose)` if you want it:
+
+```lua
+vim.keymap.set({ "n", "v" }, "<leader>od", "<Plug>(OccurrenceToggleDispose)")
+```
 
 ## Highlights
 
@@ -539,6 +615,27 @@ Get occurrence count information for statusline (or other) integrations.
   - `exact_match` (integer): 1 if cursor is exactly on a match, 0 otherwise
   - `marked_only` (boolean): Whether counting only marked occurrences
 
+### Enumerating builtins
+
+The `occurrence.api` module exposes the built-in operators and actions as named
+sub-tables, so you can enumerate them without filtering the flat table:
+
+```lua
+local api = require("occurrence.api")
+
+for name, config in pairs(api.operators) do
+  -- name: e.g. "change", "delete", "yank", ...
+  -- config: the occurrence.OperatorConfig descriptor
+end
+
+for name, config in pairs(api.actions) do
+  -- name: e.g. "mark", "toggle", "deactivate", "toggle_dispose", ...
+end
+```
+
+Flat access (e.g. `api.change`, `api.mark`) is still supported for backward
+compatibility.
+
 ## Actions
 
 All actions are available in three ways:
@@ -673,6 +770,25 @@ If occurrence has no matches, acts like `mark` and then moves to the previous oc
 `<Plug>(OccurrenceDeactivate)`
 
 Clear all marks and patterns, and deactivate occurrence mode.
+
+**toggle_dispose**
+
+: `require('occurrence').toggle_dispose()`  
+`:Occurrence toggle_dispose`  
+`<Plug>(OccurrenceToggleDispose)`
+
+Invert the `dispose_after_operator` decision for the next operator only.
+
+- When `dispose_after_operator` is `true` (the default), this prevents occurrence
+  mode from exiting after the next operator, enabling one-off chaining.
+- When `dispose_after_operator` is `false`, this forces occurrence mode to exit
+  after the next operator.
+
+The inversion is one-shot: it is consumed when the next operator completes. Press
+again before running an operator to cancel it.
+
+This action has no default keymap. Bind it via `<Plug>(OccurrenceToggleDispose)`
+if you want it.
 
 # Builtin Operators
 

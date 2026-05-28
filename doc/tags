@@ -17,6 +17,7 @@ occurrence-events-occurrencecreate	occurrence.txt	/*occurrence-events-occurrence
 occurrence-events-occurrencedispose	occurrence.txt	/*occurrence-events-occurrencedispose*
 occurrence-events-occurrenceupdate	occurrence.txt	/*occurrence-events-occurrenceupdate*
 occurrence-installation	occurrence.txt	/*occurrence-installation*
+occurrence-migrating-from-v1-to-v2	occurrence.txt	/*occurrence-migrating-from-v1-to-v2*
 occurrence-occurrence.nvim	occurrence.txt	/*occurrence-occurrence.nvim*
 occurrence-quick-start	occurrence.txt	/*occurrence-quick-start*
 occurrence-quick-start-marking-occurrences	occurrence.txt	/*occurrence-quick-start-marking-occurrences*
