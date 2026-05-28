@@ -126,7 +126,7 @@ local _global_config = nil
 ---@field before? occurrence.OperatorBeforeHook
 -- Optional cleanup hook called after operator execution.
 -- Use for post-processing, e.g., disposing the occurrence.
----@field after? occurrence.OperatorBeforeHook
+---@field after? occurrence.OperatorAfterHook
 -- Maximum number of concurrent async operations.
 -- Defaults to 10 if not specified.
 ---@field batch_size? number
