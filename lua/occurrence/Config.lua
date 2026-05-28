@@ -146,6 +146,11 @@ local _global_config = nil
 -- similar to the difference between `iw` and `aw` text objects.
 -- Default is `true`.
 ---@field inner? boolean
+-- Whether to dispose occurrence mode after the operator completes.
+-- When `nil`, inherits the global `dispose_after_operator` option.
+-- When `true`, overrides the global option and disposes after this operator.
+-- When `false`, overrides the global option and preserves occurrence mode.
+---@field dispose_after_operator? boolean
 
 -- Internal descriptor for actions
 ---@alias occurrence.ApiConfig
@@ -201,6 +206,10 @@ local _global_config = nil
 --   - a table defining a custom operator configuration,
 --   - or `false` to disable the operator.
 ---@field operators? occurrence.OperatorKeymapConfig
+-- Whether to dispose occurrence mode after any operator completes.
+-- Can be overridden per-operator via `OperatorConfig.dispose_after_operator`.
+-- Defaults to `true`.
+---@field dispose_after_operator? boolean
 
 ---@type { [string]: occurrence.KeymapAction }
 local DEFAULT_OCCURRENCE_KEYMAPS = {
@@ -236,6 +245,7 @@ local DEFAULT_CONFIG = {
   operators = DEFAULT_OPERATORS,
   default_keymaps = true,
   default_operators = true,
+  dispose_after_operator = true,
 }
 
 ---@param value occurrence.OperatorConfig
@@ -246,6 +256,7 @@ local function validate_operator_config(value)
     vim.validate("mode", value.mode, { "string", "table" }, true)
   end
   vim.validate("desc", value.desc, "string", true)
+  vim.validate("dispose_after_operator", value.dispose_after_operator, "boolean", true)
 end
 
 ---@param value occurrence.KeymapConfig
@@ -262,6 +273,7 @@ end
 ---@field validate fun(self: occurrence.Config, opts: occurrence.Options): string? error_message
 ---@field default_keymaps boolean
 ---@field default_operators boolean
+---@field dispose_after_operator boolean
 ---@field keymaps occurrence.OccurrenceModeKeymapConfig
 ---@field operators occurrence.OperatorKeymapConfig
 local Config = {}
@@ -410,6 +422,7 @@ function config.validate(opts)
       operators = { "table", true },
       default_keymaps = { "boolean", true },
       default_operators = { "boolean", true },
+      dispose_after_operator = { "boolean", true },
     }
 
     for key, validator in pairs(valid_keys) do

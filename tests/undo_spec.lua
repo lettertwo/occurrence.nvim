@@ -3,6 +3,7 @@ local util = require("tests.util")
 
 local Occurrence = require("occurrence.Occurrence")
 local Range = require("occurrence.Range")
+local plugin = require("occurrence")
 
 local MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
 
@@ -29,12 +30,17 @@ end
 describe("undo restoration", function()
   local bufnr
 
+  before_each(function()
+    plugin.setup({ dispose_after_operator = false })
+  end)
+
   after_each(function()
     if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
       Occurrence.del(bufnr)
       vim.api.nvim_buf_delete(bufnr, { force = true })
     end
     bufnr = nil
+    plugin.reset()
   end)
 
   it("restores marks after undo of partial delete", function()

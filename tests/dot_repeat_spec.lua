@@ -29,6 +29,7 @@ describe("dot repeat functionality", function()
 
     plugin.setup({
       default_operators = false,
+      dispose_after_operator = false,
       operators = {
         d = {
           inner = false,
@@ -172,6 +173,7 @@ describe("dot repeat functionality", function()
 
     plugin.setup({
       default_operators = false,
+      dispose_after_operator = false,
       operators = {
         c = {
           operator = function()
@@ -233,6 +235,7 @@ describe("dot repeat functionality", function()
 
     plugin.setup({
       default_operators = false,
+      dispose_after_operator = false,
       operators = {
         c = {
           operator = function()
@@ -362,6 +365,7 @@ describe("dot repeat functionality", function()
 
     plugin.setup({
       default_operators = false,
+      dispose_after_operator = false,
       operators = {
         d = {
           inner = false,
@@ -405,6 +409,7 @@ describe("dot repeat functionality", function()
 
     plugin.setup({
       default_operators = false,
+      dispose_after_operator = false,
       operators = {
         delete = {
           inner = false,

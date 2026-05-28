@@ -456,6 +456,7 @@ describe("README examples", function()
       })
 
       plugin.setup({
+        dispose_after_operator = false,
         keymaps = {
           -- dd - Delete marked occurrences on current line
           ["dd"] = {
@@ -516,6 +517,7 @@ describe("README examples", function()
       })
 
       plugin.setup({
+        dispose_after_operator = false,
         keymaps = {
           -- D - Delete marked occurrences from cursor to end of line
           ["D"] = {
@@ -587,7 +589,7 @@ describe("README examples", function()
         "change foo other foo",
       })
 
-      plugin.setup({})
+      plugin.setup({ dispose_after_operator = false })
 
       vim.api.nvim_create_autocmd("User", {
         pattern = "OccurrenceActivate",
@@ -653,7 +655,7 @@ describe("README examples", function()
         "change foo everywhere foo",
       })
 
-      plugin.setup({})
+      plugin.setup({ dispose_after_operator = false })
 
       vim.api.nvim_create_autocmd("User", {
         pattern = "OccurrenceActivate",

@@ -9,7 +9,7 @@ describe(":Occurrence command", function()
   local MARK_NS
 
   before_each(function()
-    plugin.setup({})
+    plugin.setup({ dispose_after_operator = false })
     MARK_NS = vim.api.nvim_create_namespace("OccurrenceMark")
   end)
 

@@ -76,6 +76,13 @@
 -- Clear all marks and patterns, and deactivate occurrence mode.
 ---@field deactivate fun(args?: occurrence.SubcommandArgs): nil
 --
+-- Invert the dispose-after-operator decision for the next operator only.
+-- When `dispose_after_operator` is `true` (the default), pressing this
+-- in occurrence mode prevents mode exit after the next operator, enabling
+-- one-off chaining. When `dispose_after_operator` is `false`, it forces
+-- mode exit after the next operator. Press again to cancel the inversion.
+---@field toggle_dispose fun(args?: occurrence.SubcommandArgs): nil
+--
 -- Table of all built-in operators (indexed by operator name).
 -- Useful for enumerating available operators without filtering the flat api table.
 ---@field operators { [occurrence.BuiltinOperator]: occurrence.OperatorConfig }

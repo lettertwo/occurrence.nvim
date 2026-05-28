@@ -3,6 +3,7 @@ local Location = require("occurrence.Location")
 local Range = require("occurrence.Range")
 local Register = require("occurrence.Register")
 
+local Config = require("occurrence.Config")
 local feedkeys = require("occurrence.feedkeys")
 local log = require("occurrence.log")
 
@@ -525,11 +526,13 @@ local function create_opfunc(occurrence, operator, ctx)
   local before_hook = nil
   local after_hook = nil
   local batch_size = 10
+  local dispose_after_op = nil ---@type boolean?
 
   if type(operator) == "table" then
     before_hook = operator.before
     after_hook = operator.after
     batch_size = operator.batch_size or batch_size
+    dispose_after_op = operator.dispose_after_operator
     operator = operator.operator
     ---@cast operator -occurrence.OperatorConfig
   end
@@ -696,6 +699,27 @@ local function create_opfunc(occurrence, operator, ctx)
 
       if type(after_hook) == "function" then
         after_hook(updated_marks, vim.tbl_extend("keep", { marks = updated_marks }, operator_ctx))
+      end
+
+      -- Resolve effective dispose: per-op override > global config > default true
+      local effective_dispose
+      if dispose_after_op ~= nil then
+        effective_dispose = dispose_after_op
+      else
+        effective_dispose = Config.get().dispose_after_operator
+      end
+
+      -- Apply one-shot transient inversion from toggle_dispose action (XOR)
+      local invert = occurrence and occurrence._invert_next_dispose or false
+      effective_dispose = effective_dispose ~= invert
+      if occurrence then
+        occurrence._invert_next_dispose = nil
+      end
+
+      if effective_dispose and occurrence then
+        log.debug("Disposing occurrence after operator (dispose_after_operator)")
+        occurrence:dispose()
+        occurrence = nil ---@diagnostic disable-line: cast-local-type
       end
     end
 

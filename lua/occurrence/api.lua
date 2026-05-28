@@ -322,6 +322,24 @@ local deactivate = {
   end,
 }
 
+-- Invert the dispose-after-operator decision for the next operator only.
+-- When `dispose_after_operator` is `true` (the default), this prevents
+-- occurrence mode from exiting after the next operator, enabling
+-- one-off chaining (e.g., `gU` then `y` on the same marks).
+-- When `dispose_after_operator` is `false`, this forces occurrence
+-- mode to exit after the next operator.
+-- Press again to cancel the inversion before running an operator.
+---@type occurrence.OccurrenceModeConfig
+local toggle_dispose = {
+  mode = { "n", "v" },
+  desc = "Toggle dispose after next operator",
+  plug = "<Plug>(OccurrenceToggleDispose)",
+  type = "occurrence-mode",
+  callback = function(occurrence)
+    occurrence:toggle_dispose_next()
+  end,
+}
+
 ---@enum (key) occurrence.KeymapAction
 local api = {
   mark = mark,
@@ -332,6 +350,7 @@ local api = {
   match_next = match_next,
   match_previous = match_previous,
   deactivate = deactivate,
+  toggle_dispose = toggle_dispose,
   modify_operator = modify_operator,
 }
 

@@ -1046,6 +1046,11 @@ function Occurrence:apply_operator(operator, options, config)
   end
 end
 
+-- Toggle whether to invert the 'dispose after operator' behavior for the next operator action.
+function Occurrence:toggle_dispose_next()
+  self._invert_next_dispose = not self._invert_next_dispose
+end
+
 -- Get or create an Occurrence for the given buffer and text.
 -- If no `buffer` is provided, the current buffer will be used.
 -- If a `pattern` is provided, it will be added as a pattern to the active occurrence patterns.

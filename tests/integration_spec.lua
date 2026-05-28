@@ -1206,6 +1206,7 @@ describe("integration tests", function()
       plugin.setup({
         default_operators = false,
         default_keymaps = false,
+        dispose_after_operator = false,
         operators = {
           ["gU"] = {
             desc = "Uppercase",
@@ -1251,6 +1252,7 @@ describe("integration tests", function()
       plugin.setup({
         default_operators = false,
         default_keymaps = false,
+        dispose_after_operator = false,
         operators = {
           ["U"] = {
             desc = "Uppercase",
@@ -1297,6 +1299,7 @@ describe("integration tests", function()
       -- Setup plugin with custom operator
       plugin.setup({
         default_operators = false,
+        dispose_after_operator = false,
         operators = {
           q = {
             desc = "Custom operator: replace with 'test'",
