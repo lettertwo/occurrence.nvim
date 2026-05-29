@@ -35,6 +35,7 @@ end
 local function restore_keymaps(buffer, maps)
   for _, map in ipairs(maps) do
     local rhs = map.callback or map.rhs
+    ---@diagnostic disable-next-line: undefined-field
     if map.buffer == buffer and rhs then
       vim.keymap.set(map.mode, map.lhs, rhs, {
         buffer = buffer,
@@ -55,6 +56,7 @@ end
 function Keymap:set(mode, lhs, rhs, opts)
   assert(not self:is_disposed(), "Cannot use a disposed Keymap")
   opts = opts or {}
+  ---@diagnostic disable-next-line: inject-field
   opts.buffer = self.buffer
 
   -- Save existing keymaps so we can restore them later.

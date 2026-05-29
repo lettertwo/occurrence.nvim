@@ -318,6 +318,7 @@ function Extmarks:collect(range, count)
     return acc
   end))
   if count and count > 0 then
+    ---@diagnostic disable-next-line: cast-local-type
     marks = marks:take(count)
   end
   return marks:totable()
