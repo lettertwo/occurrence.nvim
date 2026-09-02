@@ -231,13 +231,6 @@ local DEFAULT_OCCURRENCE_KEYMAPS = {
   ["gx"] = "unmark",
 }
 
--- `Q` (mirroring native `Q`/`gQ`) is only wired up when the running
--- Neovim exposes `vim.api.nvim_mcursor`, so stable users never get a
--- dead `Q` shadowing occurrence mode.
-if require("occurrence.mcursor").is_supported() then
-  DEFAULT_OCCURRENCE_KEYMAPS["Q"] = "cursors"
-end
-
 ---@type { [string]: occurrence.BuiltinOperator }
 local DEFAULT_OPERATORS = {
   ["c"] = "change",
@@ -252,16 +245,6 @@ local DEFAULT_OPERATORS = {
   ["gU"] = "uppercase",
   ["g~"] = "swap_case",
 }
-
--- `I`/`A` (cursors at mark start/end) follow the wiki's
--- multicursor.nvim integration recipe, and `c` hands off to native cursors
--- instead of prompting for a replacement. Same nightly-only gating as `Q`;
--- `operators = { c = "change" }` restores the prompt.
-if require("occurrence.mcursor").is_supported() then
-  DEFAULT_OPERATORS["c"] = "change_cursors"
-  DEFAULT_OPERATORS["I"] = "cursors_start"
-  DEFAULT_OPERATORS["A"] = "cursors_end"
-end
 
 local DEFAULT_CONFIG = {
   keymaps = DEFAULT_OCCURRENCE_KEYMAPS,
@@ -490,7 +473,24 @@ end
 
 ---Get a copy of the default configuration.
 function config.default()
-  return vim.deepcopy(DEFAULT_CONFIG)
+  local default = vim.deepcopy(DEFAULT_CONFIG)
+
+  -- The native multicursor surface is only wired up when the running Neovim
+  -- exposes `vim.api.nvim_mcursor`, so stable users never get a dead `Q`
+  -- shadowing occurrence mode. `Q` mirrors native `Q`/`gQ`; `I`/`A` (cursors
+  -- at mark start/end) follow the wiki's multicursor.nvim integration recipe;
+  -- and `c` hands off to native cursors instead of prompting for a
+  -- replacement (`operators = { c = "change" }` restores the prompt).
+  -- Resolved here, per call, rather than at module load, so the gate follows
+  -- the API that is actually present when the config is built.
+  if require("occurrence.mcursor").is_supported() then
+    default.keymaps["Q"] = "cursors"
+    default.operators["c"] = "change_cursors"
+    default.operators["I"] = "cursors_start"
+    default.operators["A"] = "cursors_end"
+  end
+
+  return default
 end
 
 ---Validate and parse the given options.
@@ -517,7 +517,7 @@ function config.new(opts, ...)
     end
   end
 
-  local self = vim.tbl_deep_extend("force", {}, DEFAULT_CONFIG, opts or {})
+  local self = vim.tbl_deep_extend("force", config.default(), opts or {})
 
   if not self.default_keymaps then
     self.keymaps = (opts and opts.keymaps) or {}

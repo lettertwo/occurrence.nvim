@@ -10,11 +10,9 @@ describe("mcursor (stable, unsupported nvim)", function()
   local bufnr
   local notify_stub
   local real_nvim_mcursor
-  local real_config_module
 
   before_each(function()
     real_nvim_mcursor = rawget(vim.api, "nvim_mcursor")
-    real_config_module = package.loaded["occurrence.Config"]
     vim.api.nvim_mcursor = nil ---@diagnostic disable-line: inject-field
     notify_stub = stub(vim, "notify")
   end)
@@ -22,10 +20,6 @@ describe("mcursor (stable, unsupported nvim)", function()
   after_each(function()
     notify_stub:revert()
     vim.api.nvim_mcursor = real_nvim_mcursor ---@diagnostic disable-line: inject-field
-    -- Restore the cached module (by assignment, never by re-`require`-ing
-    -- under the stub) only after `nvim_mcursor` is back, so a later test
-    -- that does re-require `occurrence.Config` sees the real API.
-    package.loaded["occurrence.Config"] = real_config_module
     if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
       vim.api.nvim_buf_delete(bufnr, { force = true })
     end
@@ -46,18 +40,17 @@ describe("mcursor (stable, unsupported nvim)", function()
   end)
 
   it("Q/I/A default keys are not registered when the running nvim lacks nvim_mcursor", function()
-    -- The gating happens once at module load, so exercise it by forcing
-    -- a fresh load of occurrence.Config with nvim_mcursor stubbed out.
-    -- `after_each` restores the real cached module (by assignment) once
-    -- `nvim_mcursor` itself is restored, so we never re-require it here.
-    package.loaded["occurrence.Config"] = nil
-    local ok, Config = pcall(require, "occurrence.Config")
+    -- The gate is resolved each time a config is built, so the stubbed-out
+    -- `nvim_mcursor` from `before_each` is all this needs.
+    local Config = require("occurrence.Config")
 
-    assert.is_true(ok)
     local default_config = Config.default()
     assert.is_nil(default_config.keymaps["Q"])
     assert.is_nil(default_config.operators["I"])
     assert.is_nil(default_config.operators["A"])
+    assert.equals("change", default_config.operators["c"])
+
+    assert.equals("change", Config.new({}).operators["c"])
   end)
 
   it("cursors action notifies and disposes when unsupported", function()
