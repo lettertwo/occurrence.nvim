@@ -1568,6 +1568,57 @@ describe("integration tests", function()
       assert.spy(input_stub).was_not_called()
     end)
 
+    it("coip (operator-pending change_cursors) deletes marks in the motion and converts to cursors", function()
+      bufnr = util.buffer({ "foo bar foo", "foo baz" })
+
+      plugin.setup({})
+      vim.keymap.set("o", "o", "<Plug>(OccurrenceModifyOperator)", { buffer = bufnr })
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      -- The `o` modifier re-enters operator-pending mode asynchronously, so
+      -- the motion has to be fed after a tick (as tests/dot_repeat_spec.lua does).
+      feedkeys("co")
+      vim.wait(0)
+      feedkeys("ip")
+      vim.wait(0)
+
+      assert.same({ " bar ", " baz" }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+      assert.equals(2, mcursor.count(), "The other two occurrences should become extra cursors")
+      assert.is_nil(plugin.get(bufnr))
+    end)
+
+    it("follow_cursors = false reaches the cursor handoff", function()
+      bufnr = util.buffer({ "foo bar", "foo baz" })
+
+      plugin.setup({ follow_cursors = false })
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      feedkeys("go")
+
+      local feed = stub(vim.api, "nvim_feedkeys")
+      plugin.cursors()
+      vim.wait(0)
+      feed:revert()
+
+      assert.equals(1, mcursor.count())
+      assert.spy(feed).was_not_called_with("1q=", match._, match._)
+    end)
+
+    it("follow_cursors = true (default) turns follow-mode on after the handoff", function()
+      bufnr = util.buffer({ "foo bar", "foo baz" })
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      feedkeys("go")
+
+      local feed = stub(vim.api, "nvim_feedkeys")
+      plugin.cursors()
+      vim.wait(0)
+      feed:revert()
+
+      assert.equals(1, mcursor.count())
+      assert.spy(feed).was_called_with("1q=", "n", false)
+    end)
+
     it("operators = { c = 'change' } restores the prompt-based change operator", function()
       bufnr = util.buffer("foo bar foo")
       plugin.setup({ operators = { c = "change" } })
