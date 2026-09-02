@@ -732,7 +732,7 @@ describe("README examples", function()
         "Another fox and dog appear here.",
       })
 
-      plugin.setup()
+      plugin.setup({ operators = { c = "change" } })
 
       -- Place cursor on first "fox"
       vim.api.nvim_win_set_cursor(0, { 1, 16 }) -- "fox" on line 1
@@ -829,7 +829,7 @@ describe("README examples", function()
         "only bar there",
       })
 
-      plugin.setup()
+      plugin.setup({ operators = { c = "change" } })
 
       -- Place cursor on first "foo" on line 1
       vim.api.nvim_win_set_cursor(0, { 1, 0 })

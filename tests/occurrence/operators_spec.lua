@@ -923,4 +923,110 @@ describe("operators", function()
       assert.is_true(after_hook_called, "After hook should have been called after async operation")
     end)
   end)
+
+  describe("cursor operators", function()
+    local mcursor = require("occurrence.mcursor")
+
+    describe("before hook (unsupported)", function()
+      local real_nvim_mcursor
+      local notify_stub
+
+      before_each(function()
+        real_nvim_mcursor = rawget(vim.api, "nvim_mcursor")
+        vim.api.nvim_mcursor = nil ---@diagnostic disable-line: inject-field
+        notify_stub = stub(vim, "notify")
+      end)
+
+      after_each(function()
+        notify_stub:revert()
+        vim.api.nvim_mcursor = real_nvim_mcursor ---@diagnostic disable-line: inject-field
+      end)
+
+      it("notifies and cancels without creating cursors", function()
+        bufnr = util.buffer("foo bar foo")
+        local occurrence = Occurrence.get(bufnr, "foo")
+        for range in occurrence:matches() do
+          occurrence:mark(range)
+        end
+
+        occurrence:apply_operator("cursors_start", { motion = Range.of_buffer() })
+
+        assert.spy(notify_stub).was_called()
+        -- Cancelled before any edit/unmark, and no cursors created; the
+        -- occurrence still disposes since `cursors_start` forces
+        -- `dispose_after_operator`, matching the `cursors` action's own
+        -- unsupported handling (see mcursor_spec.lua).
+        assert.is_true(
+          occurrence:is_disposed(),
+          "Occurrence should be disposed even though the operation was cancelled"
+        )
+      end)
+    end)
+
+    if not mcursor.is_supported() then
+      it("requires nvim_mcursor", function()
+        pending("requires nvim_mcursor")
+      end)
+      return
+    end
+
+    before_each(function()
+      mcursor.clear()
+    end)
+
+    it("cursors_start/cursors_end do not write to the register (unlike yank)", function()
+      bufnr = util.buffer("foo bar foo")
+      local occurrence = Occurrence.get(bufnr, "foo")
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      vim.fn.setreg('"', "sentinel")
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      occurrence:apply_operator("cursors_start", { motion = Range.of_buffer() })
+      vim.wait(0) -- cursor creation is deferred
+
+      assert.equals("sentinel", vim.fn.getreg('"'), "Unnamed register should be untouched")
+    end)
+
+    it("cursors_end puts primary and extra cursors on the last character, even at EOL", function()
+      bufnr = util.buffer({ "foo", "foo" })
+      local occurrence = Occurrence.get(bufnr, "foo")
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      occurrence:apply_operator("cursors_end", { motion = Range.of_buffer() })
+      vim.wait(0)
+
+      -- Both marks end at EOL. `cursors_end` targets the last character
+      -- (col 2), so the primary (which cannot sit past EOL) and the extra
+      -- agree.
+      assert.same({ 1, 2 }, vim.api.nvim_win_get_cursor(0))
+      local extra = vim.api.nvim_buf_get_extmarks(bufnr, vim.api.nvim_create_namespace("nvim.multicursor"), 0, -1, {})
+      assert.equals(1, #extra)
+      assert.equals(2, extra[1][3])
+    end)
+
+    it("cursors_end lands on the start byte of a multibyte last character", function()
+      bufnr = util.buffer({ "héé x", "héé" })
+      local occurrence = Occurrence.get(bufnr, "héé")
+      for range in occurrence:matches() do
+        occurrence:mark(range)
+      end
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      occurrence:apply_operator("cursors_end", { motion = Range.of_buffer() })
+      vim.wait(0)
+
+      -- "héé" is 5 bytes: h(0) é(1-2) é(3-4); the last char starts at byte 3.
+      assert.same({ 1, 3 }, vim.api.nvim_win_get_cursor(0))
+      local extra = vim.api.nvim_buf_get_extmarks(bufnr, vim.api.nvim_create_namespace("nvim.multicursor"), 0, -1, {})
+      assert.equals(1, #extra)
+      assert.same({ 1, 3 }, { extra[1][2], extra[1][3] })
+    end)
+  end)
 end)

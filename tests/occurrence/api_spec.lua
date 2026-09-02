@@ -259,6 +259,41 @@ describe("api", function()
     end)
   end)
 
+  describe("cursors", function()
+    local mcursor = require("occurrence.mcursor")
+
+    if not mcursor.is_supported() then
+      it("requires nvim_mcursor", function()
+        pending("requires nvim_mcursor")
+      end)
+      return
+    end
+
+    before_each(function()
+      mcursor.clear()
+    end)
+
+    it("converts only marks within args.range", function()
+      bufnr = util.buffer({ "foo bar", "foo baz" })
+      local Range = require("occurrence.Range")
+      local occurrence = Occurrence.get(bufnr)
+      occurrence:of_word(true, "foo")
+      assert.equals(2, #vim.iter(occurrence.extmarks:iter()):totable(), "Both 'foo' occurrences should be marked")
+
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      local result = api.cursors.callback(occurrence, { range = Range.of_line(0) })
+      vim.wait(0) -- cursor creation is deferred
+
+      -- `cursors` always disposes (returns `false`), regardless of scope.
+      assert.is_false(result)
+      -- Only the first line's mark was in scope, so it became the sole
+      -- (primary) cursor; the second line's mark was discarded by dispose.
+      assert.equals(0, mcursor.count(), "Only the in-scope mark should convert")
+      assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
+    end)
+  end)
+
   describe("API annotations", function()
     it("type annotations exist for all exported API functions", function()
       -- Read the source file to check for annotations

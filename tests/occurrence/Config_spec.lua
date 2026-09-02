@@ -375,4 +375,41 @@ describe("Config", function()
       assert.is_true(conf:keymap_is_supported("<Esc>"))
     end)
   end)
+
+  describe("follow_cursors", function()
+    it("defaults to true", function()
+      assert.is_true(Config.default().follow_cursors)
+    end)
+
+    it("rejects a non-boolean value", function()
+      assert.is_not_nil(Config.validate({ follow_cursors = "yes" }))
+    end)
+
+    it("accepts false", function()
+      assert.is_nil(Config.validate({ follow_cursors = false }))
+      assert.is_false(Config.new({ follow_cursors = false }).follow_cursors)
+    end)
+  end)
+
+  describe("change_cursors resolution", function()
+    it("c resolves to change_cursors in operator-pending mode when supported", function()
+      if not require("occurrence.mcursor").is_supported() then
+        pending("requires nvim_mcursor")
+        return
+      end
+      local cfg = Config.new({})
+      local o = cfg:get_operator_config("c", "o")
+      assert.is_not_nil(o)
+      assert.equals("Delete marked occurrences, convert to cursors, and insert", o.desc)
+    end)
+
+    it("I is not reachable in operator-pending mode", function()
+      if not require("occurrence.mcursor").is_supported() then
+        pending("requires nvim_mcursor")
+        return
+      end
+      local cfg = Config.new({})
+      assert.is_nil(cfg:get_operator_config("I", "o"))
+    end)
+  end)
 end)

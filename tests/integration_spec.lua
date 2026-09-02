@@ -1346,4 +1346,198 @@ describe("integration tests", function()
       assert.same({}, marks, "All marks should be cleared after deactivation")
     end)
   end)
+
+  describe("native multicursor", function()
+    local mcursor = require("occurrence.mcursor")
+
+    if not mcursor.is_supported() then
+      it("requires nvim_mcursor", function()
+        pending("requires nvim_mcursor")
+      end)
+      return
+    end
+
+    before_each(function()
+      mcursor.clear()
+    end)
+
+    it("Q converts all marks to cursors and disposes occurrence mode", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go") -- mark all 'foo' occurrences and activate occurrence mode
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(3, #marks, "All 'foo' occurrences should be marked")
+
+      feedkeys("Q")
+      vim.wait(0) -- cursor creation is deferred until occurrence has fully disposed
+
+      assert.equals(2, mcursor.count(), "The other two marks should become extra cursors")
+      assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0), "Primary cursor stays at the mark under the cursor")
+      assert.is_nil(plugin.get(bufnr), "occurrence should be disposed after handoff")
+      marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.same({}, marks, "No occurrence marks should remain")
+    end)
+
+    it("Q keeps the primary on the mark under the cursor, not the first mark", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+
+      plugin.setup({})
+      -- Position inside the third 'foo' (starts at col 16), far from the
+      -- first mark that an index-based fallback would otherwise pick.
+      vim.api.nvim_win_set_cursor(0, { 1, 17 })
+
+      feedkeys("go") -- mark all 'foo' occurrences and activate occurrence mode
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(3, #marks, "All 'foo' occurrences should be marked")
+
+      feedkeys("Q")
+      vim.wait(0)
+
+      assert.equals(2, mcursor.count())
+      assert.same({ 1, 16 }, vim.api.nvim_win_get_cursor(0), "Primary should stay on the third 'foo', not the first")
+    end)
+
+    it("Q in visual mode only converts marks within the selection", function()
+      bufnr = util.buffer({ "foo bar", "foo baz" })
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go") -- mark both 'foo' occurrences
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(2, #marks, "Both 'foo' occurrences should be marked")
+
+      feedkeys("V") -- select only the first line
+      feedkeys("Q")
+      vim.wait(0)
+
+      -- Only the first line's mark was in scope, so it became the sole
+      -- (primary) cursor; the second line's mark was discarded by dispose.
+      assert.equals(0, mcursor.count(), "Only the in-scope mark converts; it becomes the primary cursor")
+      assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
+      assert.is_nil(plugin.get(bufnr))
+    end)
+
+    it("Q marks the word under cursor first when occurrence has no matches yet", function()
+      bufnr = util.buffer("foo bar foo")
+      plugin.setup({})
+      vim.keymap.set({ "n", "v" }, "Q", "<Plug>(OccurrenceCursors)", { buffer = bufnr })
+
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      feedkeys("Q")
+      vim.wait(0)
+
+      assert.equals(1, mcursor.count(), "Both 'foo' occurrences should have been marked, then converted")
+      assert.is_nil(plugin.get(bufnr))
+    end)
+
+    it("Iip / Aip convert only marks within the motion to start/end cursors", function()
+      bufnr = util.buffer({ "foo bar foo", "baz", "", "foo qux" })
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go") -- mark all three 'foo' occurrences
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(3, #marks, "All 'foo' occurrences should be marked")
+
+      feedkeys("Iip") -- limit to the first paragraph (lines 1-2): two occurrences
+      vim.wait(0)
+
+      assert.equals(1, mcursor.count(), "Only the two in-paragraph marks convert")
+      -- Primary took the mark under the cursor (start of the first 'foo'); the
+      -- second 'foo' on line 1 starts at col 8.
+      assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
+      local extra = vim.api.nvim_buf_get_extmarks(bufnr, vim.api.nvim_create_namespace("nvim.multicursor"), 0, -1, {})
+      assert.equals(1, #extra)
+      assert.same({ 0, 8 }, { extra[1][2], extra[1][3] })
+      assert.is_nil(plugin.get(bufnr))
+    end)
+
+    it("Aip places cursors on the last character of in-scope marks", function()
+      bufnr = util.buffer({ "foo bar foo", "baz", "", "foo qux" })
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go")
+      feedkeys("Aip")
+      vim.wait(0)
+
+      assert.equals(1, mcursor.count())
+      -- Primary is the first 'foo' (last char col 2); the second 'foo' ends
+      -- at EOL, its last char is col 10. Pressing `a` would append after both.
+      assert.same({ 1, 2 }, vim.api.nvim_win_get_cursor(0))
+      local extra = vim.api.nvim_buf_get_extmarks(bufnr, vim.api.nvim_create_namespace("nvim.multicursor"), 0, -1, {})
+      assert.equals(1, #extra)
+      assert.same({ 0, 10 }, { extra[1][2], extra[1][3] })
+      assert.is_nil(plugin.get(bufnr))
+    end)
+
+    it("c (change_cursors by default) deletes marks and converts to cursors", function()
+      bufnr = util.buffer({ "foo bar foo", "foo baz" })
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go") -- mark all three 'foo' occurrences
+      local marks = vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {})
+      assert.equals(3, #marks, "All 'foo' occurrences should be marked")
+
+      feedkeys("cip") -- whole buffer is one paragraph, so all three marks are in scope
+      vim.wait(0)
+
+      assert.same(
+        { " bar ", " baz" },
+        vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
+        "Marked text should be deleted at every occurrence"
+      )
+      assert.equals(2, mcursor.count(), "The other two marks should become extra cursors")
+      assert.is_nil(plugin.get(bufnr))
+
+      -- The insert entry (`nvim_input("i")`) and the per-cursor cascade
+      -- cannot be exercised here: this headless harness does not pump the
+      -- low-level input queue, so `nvim_input` is inert and no cascade runs.
+      -- The insert-and-mirror behavior is covered by the plan's manual
+      -- interactive verification step instead.
+    end)
+
+    it("operators = { c = 'change' } restores the prompt-based change operator", function()
+      bufnr = util.buffer("foo bar foo")
+      plugin.setup({ operators = { c = "change" } })
+      assert.equals("change", require("occurrence.Config").get().operators.c)
+    end)
+
+    it("toggle_dispose does not keep occurrence mode alive across a cursor operator", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+
+      plugin.setup({})
+      vim.keymap.set("n", "gt", "<Plug>(OccurrenceToggleDispose)", { buffer = bufnr })
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go")
+      feedkeys("gt") -- would invert the next operator's dispose
+      feedkeys("Iip")
+      vim.wait(0)
+
+      assert.is_nil(plugin.get(bufnr), "forced dispose_after_operator must not be inverted by toggle_dispose")
+      assert.equals(2, mcursor.count())
+    end)
+
+    it("keeps occurrence mode disposed for cursor operators even when dispose_after_operator = false", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+
+      plugin.setup({ dispose_after_operator = false })
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go")
+      feedkeys("Iip")
+      vim.wait(0)
+
+      assert.is_nil(plugin.get(bufnr), "cursor operators always dispose, regardless of the global option")
+    end)
+  end)
 end)

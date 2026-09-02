@@ -10,6 +10,7 @@ occurrence-configuration-operators	occurrence.txt	/*occurrence-configuration-ope
 occurrence-configuration-statusline-integration	occurrence.txt	/*occurrence-configuration-statusline-integration*
 occurrence-custom-integrations	occurrence.txt	/*occurrence-custom-integrations*
 occurrence-custom-integrations-building-your-own	occurrence.txt	/*occurrence-custom-integrations-building-your-own*
+occurrence-custom-integrations-native-multicursor	occurrence.txt	/*occurrence-custom-integrations-native-multicursor*
 occurrence-custom-operators	occurrence.txt	/*occurrence-custom-operators*
 occurrence-events	occurrence.txt	/*occurrence-events*
 occurrence-events-occurrenceactivate	occurrence.txt	/*occurrence-events-occurrenceactivate*
