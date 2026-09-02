@@ -1421,6 +1421,25 @@ describe("integration tests", function()
       assert.is_nil(plugin.get(bufnr))
     end)
 
+    it("Q in blockwise visual mode only converts marks within the selection", function()
+      bufnr = util.buffer({ "foo bar", "foo baz", "foo qux" })
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go") -- mark all three 'foo' occurrences
+      assert.equals(3, #vim.api.nvim_buf_get_extmarks(bufnr, MARK_NS, 0, -1, {}))
+
+      feedkeys("<C-v>j$") -- block over the first two lines, to line end
+      feedkeys("Q")
+      vim.wait(0)
+
+      -- Two marks in scope: one primary plus one extra. The third line's
+      -- mark was outside the block and is gone with dispose.
+      assert.equals(1, mcursor.count(), "Only marks inside the block convert")
+      assert.is_nil(plugin.get(bufnr))
+    end)
+
     it("Q marks the word under cursor first when occurrence has no matches yet", function()
       bufnr = util.buffer("foo bar foo")
       plugin.setup({})

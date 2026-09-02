@@ -2,6 +2,13 @@
 
 local log = require("occurrence.log")
 
+-- Whether the editor is in any Visual mode: charwise `v`, linewise `V`,
+-- or blockwise `^V` (`"\22"`, which a bare `[vV]` pattern misses).
+---@return boolean
+local function in_visual_mode()
+  return vim.fn.mode():match("[vV\22]") ~= nil
+end
+
 -- Modify a pending operator to operate on occurrences within a motion.
 --
 -- When used in operator-pending mode (e.g., `doip`), this modifies
@@ -47,7 +54,7 @@ local mark = {
   plug = "<Plug>(OccurrenceMark)",
   desc = "Mark occurrence",
   callback = function(occurrence, args)
-    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local visual = (args and args.range ~= nil) or in_visual_mode()
     local hlsearch = (args and args[1] ~= nil) or (vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "")
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
     local cursor = require("occurrence.Cursor").save()
@@ -116,7 +123,7 @@ local unmark = {
   plug = "<Plug>(OccurrenceUnmark)",
   desc = "Unmark occurrence",
   callback = function(occurrence, args)
-    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local visual = (args and args.range ~= nil) or in_visual_mode()
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
 
     if occurrence:has_matches() then
@@ -154,7 +161,7 @@ local toggle = {
   plug = "<Plug>(OccurrenceToggle)",
   desc = "Add/Toggle occurrence mark(s)",
   callback = function(occurrence, args)
-    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local visual = (args and args.range ~= nil) or in_visual_mode()
     local hlsearch = (args and args[1] ~= nil) or (vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "")
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
     local cursor = require("occurrence.Cursor").save()
@@ -453,7 +460,7 @@ local cursors = {
       mark.callback(occurrence, args)
     end
 
-    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local visual = (args and args.range ~= nil) or in_visual_mode()
     local scope = visual and (args and args.range or require("occurrence.Range").of_selection()) or nil
 
     local marks = occurrence.extmarks:collect(scope)
