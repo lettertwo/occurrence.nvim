@@ -148,6 +148,22 @@ describe("mcursor", function()
       assert.equals(1, mcursor.count())
     end)
 
+    it("resolves opts.primary against the original list, not the deduped one", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      mcursor.clear()
+
+      local a = Location.new(0, 0)
+      local dup = Location.new(0, 0)
+      local b = Location.new(0, 8)
+
+      -- `b` is index 3 of the input but index 2 after dedupe.
+      mcursor.add({ a, dup, b }, { primary = 3 })
+
+      assert.same({ 1, 8 }, vim.api.nvim_win_get_cursor(0))
+      assert.equals(1, mcursor.count())
+    end)
+
     it("does nothing for an empty location list", function()
       bufnr = util.buffer("foo bar foo baz foo")
       mcursor.clear()

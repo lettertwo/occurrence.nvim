@@ -103,21 +103,29 @@ function M.add(locations, opts)
 
   local buf = (opts and opts.buf) or 0
 
+  -- `opts.primary` indexes `locations`, but the loop below shortens the list,
+  -- so resolve it to a `deduped` index as we go (a primary that duplicates
+  -- an earlier location resolves to that earlier entry).
+  ---@type integer?
+  local primary_index = nil
   ---@type occurrence.Location[]
   local deduped = {}
   do
+    ---@type table<string, integer>
     local seen = {}
-    for _, location in ipairs(locations) do
+    for i, location in ipairs(locations) do
       local clamped = clamp_to_line(buf, location)
       local key = clamped:serialize()
       if not seen[key] then
-        seen[key] = true
         table.insert(deduped, clamped)
+        seen[key] = #deduped
+      end
+      if opts and opts.primary == i then
+        primary_index = seen[key]
       end
     end
   end
 
-  local primary_index = opts and opts.primary
   if primary_index == nil then
     primary_index = nearest_primary_index(deduped)
   end
