@@ -368,7 +368,8 @@ local toggle_dispose = {
 ---@param occurrence occurrence.Occurrence
 ---@param marks [integer, occurrence.Range][]
 ---@param where "start" | "end" | "change"
-local function schedule_cursors(occurrence, marks, where)
+---@param on_placed? fun() Called only after the cursors were actually placed; skipped when the handoff is skipped or fails.
+local function schedule_cursors(occurrence, marks, where, on_placed)
   if #marks == 0 then
     return
   end
@@ -422,7 +423,13 @@ local function schedule_cursors(occurrence, marks, where)
       { primary = primary_index, buf = buffer, follow = require("occurrence.Config").get().follow_cursors }
     )
     if not ok then
-      log.debug("Deferred mcursor.add failed:", err)
+      -- Not debug: for `change_cursors` the mark text is already gone, so a
+      -- failed handoff leaves the user with edits and no cursors.
+      log.warn("Failed to convert occurrences to cursors:", err)
+      return
+    end
+    if on_placed then
+      on_placed()
     end
   end)
 end
@@ -664,30 +671,29 @@ local function make_cursor_operator(where)
         return
       end
 
-      schedule_cursors(ctx.occurrence, marks, where)
-
-      if where == "change" then
-        -- Deferred for the same reason `schedule_cursors` defers: entering
-        -- insert must happen only after occurrence's opfunc/dispose
-        -- machinery (including the `g@$` restore feed) has fully finished.
-        vim.schedule(function()
-          -- Enter insert via `nvim_input`, not `feedkeys`/`startinsert`.
-          -- `startinsert` only sets `restart_edit` for a Normal() loop to
-          -- notice, and there is none in this deferred context. A queued
-          -- `feedkeys("i")` does enter insert, but the multicursor cascade
-          -- arms its *live* per-cursor preview only for insert entered by a
-          -- clean top-level command; a typeahead `i` consumed alongside the
-          -- user's first keystroke does not qualify, so cursors would only
-          -- commit the text on `<Esc>`, not mirror it as typed. `nvim_input`
-          -- injects `i` into the low-level input queue exactly as a real
-          -- keypress, which is that clean insert-entry edge.
-          --
-          -- It is inert under a headless/no-UI harness (the input queue is
-          -- not pumped), so tests cannot exercise the insert entry; the
-          -- cascade needs interactive verification either way.
-          vim.api.nvim_input("i")
-        end)
-      end
+      -- Entering insert rides on the same deferred closure as the cursor
+      -- handoff, so it happens only after occurrence's opfunc/dispose
+      -- machinery (including the `g@$` restore feed) has fully finished,
+      -- and only if cursors were actually placed. Otherwise `cip` would
+      -- drop the user into Insert mode with the text deleted at every
+      -- occurrence but a single cursor, or in a different buffer.
+      schedule_cursors(ctx.occurrence, marks, where, where == "change" and function()
+        -- Enter insert via `nvim_input`, not `feedkeys`/`startinsert`.
+        -- `startinsert` only sets `restart_edit` for a Normal() loop to
+        -- notice, and there is none in this deferred context. A queued
+        -- `feedkeys("i")` does enter insert, but the multicursor cascade
+        -- arms its *live* per-cursor preview only for insert entered by a
+        -- clean top-level command; a typeahead `i` consumed alongside the
+        -- user's first keystroke does not qualify, so cursors would only
+        -- commit the text on `<Esc>`, not mirror it as typed. `nvim_input`
+        -- injects `i` into the low-level input queue exactly as a real
+        -- keypress, which is that clean insert-entry edge.
+        --
+        -- It is inert under a headless/no-UI harness (the input queue is
+        -- not pumped), so tests cannot exercise the insert entry; the
+        -- cascade needs interactive verification either way.
+        vim.api.nvim_input("i")
+      end or nil)
     end,
   }
 end

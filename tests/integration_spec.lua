@@ -1545,6 +1545,29 @@ describe("integration tests", function()
       -- interactive verification step instead.
     end)
 
+    it("c warns instead of entering insert when the cursor handoff fails", function()
+      bufnr = util.buffer({ "foo bar foo", "foo baz" })
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      feedkeys("go")
+
+      local add_stub = stub(mcursor, "add", function()
+        error("boom")
+      end)
+      local input_stub = stub(vim.api, "nvim_input")
+
+      feedkeys("cip")
+      vim.wait(0)
+
+      add_stub:revert()
+      input_stub:revert()
+
+      assert.same({ " bar ", " baz" }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+      assert.spy(notify_stub).was_called_with(match.is_match("boom"), vim.log.levels.WARN, { title = "Occurrence" })
+      assert.spy(input_stub).was_not_called()
+    end)
+
     it("operators = { c = 'change' } restores the prompt-based change operator", function()
       bufnr = util.buffer("foo bar foo")
       plugin.setup({ operators = { c = "change" } })
