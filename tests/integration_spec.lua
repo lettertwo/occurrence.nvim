@@ -1421,6 +1421,27 @@ describe("integration tests", function()
       assert.is_nil(plugin.get(bufnr))
     end)
 
+    it("Q in visual mode returns to Normal mode before placing cursors", function()
+      bufnr = util.buffer({ "foo bar", "foo baz", "foo qux" })
+
+      plugin.setup({})
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      feedkeys("go") -- mark all three 'foo' occurrences
+      feedkeys("Vj") -- select the first two lines
+      assert.equals("V", vim.fn.mode())
+      feedkeys("Q")
+      vim.wait(0)
+
+      -- Two marks were in scope. The window cursor ended `Vj` on line 2, so
+      -- that mark is the primary; line 1's mark is the extra. The selection
+      -- is gone rather than extended by the primary move.
+      assert.equals("n", vim.fn.mode(), "Q should leave Visual mode")
+      assert.same({ 2, 0 }, vim.api.nvim_win_get_cursor(0))
+      assert.equals(1, mcursor.count())
+      assert.is_nil(plugin.get(bufnr))
+    end)
+
     it("Q in blockwise visual mode only converts marks within the selection", function()
       bufnr = util.buffer({ "foo bar", "foo baz", "foo qux" })
 

@@ -463,6 +463,13 @@ local cursors = {
     local visual = (args and args.range ~= nil) or in_visual_mode()
     local scope = visual and (args and args.range or require("occurrence.Range").of_selection()) or nil
 
+    -- The selection has been consumed. Leave Visual mode now, before the
+    -- scheduled `Cursor.move(primary)` runs, or that move would extend the
+    -- selection instead of placing the primary cursor.
+    if in_visual_mode() then
+      require("occurrence.feedkeys").change_mode("n", { noflush = true, silent = true })
+    end
+
     local marks = occurrence.extmarks:collect(scope)
     if #marks == 0 then
       log.warn("No marked occurrences to convert to cursors")
