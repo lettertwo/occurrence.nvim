@@ -230,7 +230,8 @@ require("occurrence").setup({
   --
   -- Can be overridden per-operator via the operator's own
   -- `dispose_after_operator` field, and inverted for a single operator at
-  -- runtime via the `toggle_dispose` action.
+  -- runtime via the `toggle_dispose` action (which only applies to operators
+  -- without their own value).
   --
   -- Defaults to `true`.
   dispose_after_operator = true,
@@ -424,8 +425,12 @@ Resolution order is: per-operator value, then the global option, then the
 default of `true`.
 
 To flip the decision for just the next operator at runtime, use the
-`toggle_dispose` action (see [Actions](#actions)). It has no default keymap; bind
-it via `<Plug>(OccurrenceToggleDispose)` if you want it:
+`toggle_dispose` action (see [Actions](#actions)). It only applies to operators
+that resolve through the global option: an operator with its own
+`dispose_after_operator` keeps that value, and a pending toggle is consumed
+without effect. The built-in cursor operators force `true` this way, since
+occurrence mode cannot outlive a native multicursor session. The action has no
+default keymap; bind it via `<Plug>(OccurrenceToggleDispose)` if you want it:
 
 ```lua
 vim.keymap.set({ "n", "v" }, "<leader>od", "<Plug>(OccurrenceToggleDispose)")
@@ -801,6 +806,8 @@ Invert the `dispose_after_operator` decision for the next operator only.
   mode from exiting after the next operator, enabling one-off chaining.
 - When `dispose_after_operator` is `false`, this forces occurrence mode to exit
   after the next operator.
+- An operator with its own `dispose_after_operator` is not inverted; its value
+  wins, and the toggle is consumed anyway.
 
 The inversion is one-shot: it is consumed when the next operator completes. Press
 again before running an operator to cancel it.

@@ -121,6 +121,32 @@ describe("dispose_after_operator", function()
       assert(occ and not occ:is_disposed(), "toggle_dispose should prevent disposal once")
     end)
 
+    it("does not invert an operator that sets its own dispose_after_operator", function()
+      plugin.setup({
+        default_operators = false,
+        operators = {
+          ["gU"] = {
+            desc = "Uppercase",
+            operator = "gU",
+            dispose_after_operator = false,
+          },
+        },
+      })
+      bufnr = util.buffer("foo bar baz foo")
+      vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
+      vim.keymap.set("n", "<C-t>", "<Plug>(OccurrenceToggleDispose)", { buffer = bufnr })
+
+      feedkeys("q")
+      feedkeys("<C-t>") -- would force disposal, but the per-op value wins
+      feedkeys("v3e")
+      feedkeys("gU")
+      vim.wait(0)
+
+      local occ = plugin.get(bufnr)
+      assert(occ and not occ:is_disposed(), "per-op dispose_after_operator should not be inverted")
+      assert.is_nil(occ._invert_next_dispose, "the toggle should still be consumed")
+    end)
+
     it("forces disposal for the next operator when global is false", function()
       plugin.setup({ dispose_after_operator = false })
       bufnr = util.buffer("foo bar baz foo")
