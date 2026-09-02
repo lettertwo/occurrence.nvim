@@ -389,7 +389,7 @@ end
 -- text, so `edited` and `text_edited` are the same list.
 ---@param operator string The operator string (e.g. "d", "y", etc).
 ---@param ctx occurrence.OperatorContext The operator context.
----@param done fun(edited: number[], text_edited: number[]) Callback when operations are complete.
+---@param done fun(edited: number[], result?: boolean, text_edited?: number[]) Callback when operations are complete. `result` is always `nil` (never cancelled).
 local function apply_operator_string(operator, ctx, done)
   local marks = ctx.marks
   local original_cursor = Cursor.save()
@@ -425,7 +425,7 @@ local function apply_operator_string(operator, ctx, done)
     original_cursor:restore()
   end
 
-  done(edited, edited)
+  done(edited, nil, edited)
 end
 
 ---@param operator occurrence.OperatorFn
