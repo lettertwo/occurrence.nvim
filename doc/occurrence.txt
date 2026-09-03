@@ -1,4 +1,5 @@
-*occurrence.txt*          For NVIM >= 0.10.0          Last change: 2026 May 28
+*occurrence.txt*
+                          For NVIM >= 0.10.0    Last change: 2026 September 03
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
@@ -663,7 +664,7 @@ sub-tables, so you can enumerate them without filtering the flat table:
     end
 <
 
-Flat access (e.g.� `api.change`, `api.mark`) is still supported for backward
+Flat access (e.g. `api.change`, `api.mark`) is still supported for backward
 compatibility.
 
 
@@ -672,17 +673,20 @@ ACTIONS                                     *occurrence-api-reference-actions*
 All actions are available in three ways:
 
 - **Lua API**:
-    >lua
+
+>lua
         require('occurrence').mark()
-    <
+<
 - **Vim commands**:
-    >vim
+
+>vim
         :Occurrence mark
-    <
+<
 - ** mappings**:
-    >vim
-        <Plug>(OccurrenceMark)
-    <
+
+>vim
+<Plug>(OccurrenceMark)
+<
 
 
                                             *occurrence-**modify_operator***
