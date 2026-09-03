@@ -67,7 +67,7 @@ jobs:
           The vimdoc has been regenerated from README.md using panvimdoc.
 
           ## How to review
-          - Check that the changes in \`doc/occurrence.nvim.txt\` accurately reflect the README.md content
+          - Check that the changes in \`doc/occurrence.txt\` accurately reflect the README.md content
           - Verify no unintended formatting changes were introduced
 
           🤖 This PR was created automatically by the docs-update workflow." \
