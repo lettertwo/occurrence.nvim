@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0](https://github.com/lettertwo/occurrence.nvim/compare/v1.1.0...v2.0.0) (2026-09-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* occurrence mode previously persisted after an operator unless all marks were consumed. To restore the old behavior, set `require("occurrence").setup({ dispose_after_operator = false })`.
+
+### Features
+
+* **api:** expose operators and actions as named sub-tables ([4d3e01a](https://github.com/lettertwo/occurrence.nvim/commit/4d3e01ae8a62bb4aeb985ec4c4352e9ecf6ca500))
+* dispose occurrence mode after operator by default ([78e69f3](https://github.com/lettertwo/occurrence.nvim/commit/78e69f34762bfe39237d1be2899df61d0fdfed4b))
+
+
+### Bug Fixes
+
+* **ci:** regenerate the tracked vimdoc in docs-check ([#17](https://github.com/lettertwo/occurrence.nvim/issues/17)) ([f556c43](https://github.com/lettertwo/occurrence.nvim/commit/f556c4334fa38a0af99d0208e4c18141f1353335))
+* correct `after` hook type annotation on OperatorConfig ([1f2fa5e](https://github.com/lettertwo/occurrence.nvim/commit/1f2fa5e0045a8dbf7bf9b36f01a7ffbf89ecaa9d))
+* restore cursor before re-marking word on dot-repeat ([00edfd8](https://github.com/lettertwo/occurrence.nvim/commit/00edfd8f063f1c28ac6733a694e88db124420d89))
+* stop treating operators/actions api tables as subcommands ([12a6105](https://github.com/lettertwo/occurrence.nvim/commit/12a61051c39c4cfafa65f1c4b8468aa011d0ca4b))
+
+
+### Documentation
+
+* document dispose_after_operator, toggle_dispose, and api sub-tables ([6e1e8b0](https://github.com/lettertwo/occurrence.nvim/commit/6e1e8b0de57ed5825b6b9569b955247aef97b8a9))
+
 ## [1.1.0](https://github.com/lettertwo/occurrence.nvim/compare/v1.0.0...v1.1.0) (2026-02-13)
 
 
