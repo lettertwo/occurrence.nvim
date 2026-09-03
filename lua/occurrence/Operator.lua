@@ -567,9 +567,13 @@ local function create_opfunc(occurrence, operator, ctx)
       cursor = cursor or CURSOR_CACHE[win] or Cursor.save()
     end
 
+    -- Restore the cursor before looking up the word under it. On a dot-repeat of a
+    -- visual operation, nvim positions the cursor at the start of the reselected area
+    -- (column 0 for linewise, on nvim 0.13 nightlies), not where `.` was pressed.
+    cursor:restore()
+
     ---@cast occurrence +nil
     if not occurrence or occurrence:is_disposed() then
-      -- Get word at current cursor position before restoring
       occurrence = require("occurrence.Occurrence").get()
       local word = vim.fn.escape(vim.fn.expand("<cword>"), [[\/]]) ---@diagnostic disable-line: missing-parameter
       if word == "" then
@@ -601,8 +605,6 @@ local function create_opfunc(occurrence, operator, ctx)
         occurrence:mark(match_range)
       end
     end
-
-    cursor:restore()
 
     log.debug("Collecting marks for operation in range", range, "with count", count)
     local marks = occurrence.extmarks:collect(range, count > 0 and count or nil)
