@@ -128,10 +128,21 @@
 ---@field yank fun(args?: occurrence.SubcommandArgs):nil
 local occurrence = {}
 
+-- Keys on `require("occurrence.api")` that are tables of configs (`operators`,
+-- `actions`) rather than a single action/operator config. They are exposed as
+-- data, so `occurrence.<name>` must return the table itself, not an apply stub,
+-- and they must not be registered as `:Occurrence` subcommands.
+local API_TABLES = { operators = true, actions = true }
+
 -- Create stubs for `occurrence.<name>` API functions
 setmetatable(occurrence, {
   __index = function(_, name)
     local api = require("occurrence.api")
+    if API_TABLES[name] then
+      local api_table = assert(api[name], "Missing occurrence API table: " .. name)
+      rawset(occurrence, name, api_table)
+      return api_table
+    end
     local api_config = assert(api[name], "Missing occurrence API function: " .. name)
     ---@param args? occurrence.SubcommandArgs
     local impl = function(args)
@@ -179,9 +190,12 @@ local function init_command()
   local command = require("occurrence.command")
   if not command_initialized then
     local api = require("occurrence.api")
-    -- Generate subcommands for all api functions
+    -- Generate subcommands for all api functions (skipping the `operators` /
+    -- `actions` data tables, which are not runnable actions).
     for name in pairs(api) do
-      command.add(name, { impl = occurrence[name] })
+      if not API_TABLES[name] then
+        command.add(name, { impl = occurrence[name] })
+      end
     end
     vim.api.nvim_create_user_command("Occurrence", command.execute, {
       nargs = "+",
