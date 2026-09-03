@@ -1,4 +1,5 @@
-*occurrence.txt*       For NVIM >= 0.10.0       Last change: 2026 September 02
+*occurrence.txt*
+                          For NVIM >= 0.10.0    Last change: 2026 September 03
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
@@ -691,7 +692,7 @@ sub-tables, so you can enumerate them without filtering the flat table:
     end
 <
 
-Flat access (e.g.� `api.change`, `api.mark`) is still supported for backward
+Flat access (e.g. `api.change`, `api.mark`) is still supported for backward
 compatibility.
 
 
@@ -700,17 +701,20 @@ ACTIONS                                     *occurrence-api-reference-actions*
 All actions are available in three ways:
 
 - **Lua API**:
-    >lua
+
+>lua
         require('occurrence').mark()
-    <
+<
 - **Vim commands**:
-    >vim
+
+>vim
         :Occurrence mark
-    <
+<
 - ** mappings**:
-    >vim
-        <Plug>(OccurrenceMark)
-    <
+
+>vim
+<Plug>(OccurrenceMark)
+<
 
 
                                             *occurrence-**modify_operator***
@@ -923,9 +927,9 @@ supported Neovim versions; unavailable otherwise. See
 
 The following operators are supported via `modify_operator` or with marked
 occurrences (configured via `operators` table). Exception: `cursors_start` and
-`cursors_end` are not reachable via `modify_operator` (e.g.� `Ioip`), since
+`cursors_end` are not reachable via `modify_operator` (e.g. `Ioip`), since
 `I`/`A` are not Vim operators and there is no pending operator for `o` to
-rewrite; use them as motion-scoped operator keys instead (e.g.� `Iip`, `Aip`).
+rewrite; use them as motion-scoped operator keys instead (e.g. `Iip`, `Aip`).
 `change_cursors` is a real operator, so it works both as `cip` in occurrence
 mode and as `coip` in operator-pending mode.
 
