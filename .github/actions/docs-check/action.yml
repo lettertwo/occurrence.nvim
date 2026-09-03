@@ -11,9 +11,13 @@ runs:
     - name: Generate vimdoc with panvimdoc
       uses: kdheepak/panvimdoc@main
       with:
-        vimdoc: occurrence.nvim
+        # Must match the Makefile's `--project-name` (occurrence) and
+        # `--vim-version` (NVIM >= 0.10.0) so this regenerates the tracked
+        # doc/occurrence.txt. A mismatched name writes an untracked
+        # doc/occurrence.nvim.txt that the diff check below never sees.
+        vimdoc: occurrence
         pandoc: "README.md"
-        version: "NVIM >= v0.10.0"
+        version: "NVIM >= 0.10.0"
         toc: true
         description: ""
         titledatepattern: "%Y %B %d"
