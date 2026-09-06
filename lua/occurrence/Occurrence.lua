@@ -88,6 +88,45 @@ local function char_dist(loc1, loc2)
   return chars
 end
 
+-- Rank a candidate match for `closest()`.
+--
+-- When a direction is in effect (`flags.cursor == false`), `searchpos` still
+-- has to be called without the `c` flag, so a pattern with only one
+-- occurrence in the buffer wraps around and reports the cursor's own match
+-- again. Scoring that by absolute distance gives it 0, which beats every
+-- other pattern's real next/previous match. Score directed searches by
+-- distance in the direction of travel instead: a match on the wrong side of
+-- the cursor only counts when wrapping is enabled, and then it costs the
+-- full trip to the buffer boundary and back, so a same-position "match" is
+-- always a full wrap and loses to any other pattern's genuine match.
+---@param cursor occurrence.Location
+---@param match occurrence.Range
+---@param flags occurrence.SearchFlags
+---@param bounds? occurrence.Range
+---@return number
+local function candidate_dist(cursor, match, flags, bounds)
+  if not flags.cursor then
+    if flags.backward then
+      if match.start < cursor then
+        return char_dist(match.start, cursor)
+      elseif flags.wrap and bounds then
+        return char_dist(bounds.start, cursor) + char_dist(match.start, bounds.stop)
+      end
+      return math.huge
+    else
+      if match.start > cursor then
+        return char_dist(cursor, match.start)
+      elseif flags.wrap and bounds then
+        return char_dist(cursor, bounds.stop) + char_dist(bounds.start, match.start)
+      end
+      return math.huge
+    end
+  end
+  -- Undirected: a match at or straddling the cursor is fair game, so measure
+  -- absolute distance to whichever edge is nearer.
+  return math.min(char_dist(cursor, match.start), char_dist(cursor, match.stop))
+end
+
 ---@param state occurrence.Occurrence
 ---@param flags occurrence.SearchFlags
 ---@param cursor? occurrence.Location
@@ -99,33 +138,15 @@ local function closest(state, flags, cursor, bounds)
   end
   if #state.patterns > 1 then
     local closest_match = nil
+    local closest_match_dist = math.huge
     cursor = assert(cursor or Location.of_cursor(), "cursor location not found")
     for _, pattern in ipairs(state.patterns) do
       local match = search(pattern, flags)
-      if match and not closest_match then
-        closest_match = match
-      elseif match and closest_match then
-        local match_dist = math.min(char_dist(cursor, match.start), char_dist(cursor, match.stop))
-        local closest_match_dist =
-          math.min(char_dist(cursor, closest_match.start), char_dist(cursor, closest_match.stop))
-
-        -- If wrapping is enabled, we need to consider the distance to the bounds.
-        if flags.wrap and bounds then
-          if flags.backward then
-            match_dist = math.min(match_dist, char_dist(cursor, bounds.start) + char_dist(bounds.stop, match.stop))
-            closest_match_dist =
-              math.min(closest_match_dist, char_dist(cursor, bounds.start) + char_dist(bounds.stop, closest_match.stop))
-          else
-            match_dist = math.min(match_dist, char_dist(cursor, bounds.stop) + char_dist(bounds.start, match.start))
-            closest_match_dist = math.min(
-              closest_match_dist,
-              char_dist(cursor, bounds.stop) + char_dist(bounds.start, closest_match.start)
-            )
-          end
-        end
-
-        if match_dist < closest_match_dist then
+      if match then
+        local match_dist = candidate_dist(cursor, match, flags, bounds)
+        if not closest_match or match_dist < closest_match_dist then
           closest_match = match
+          closest_match_dist = match_dist
         end
       end
     end
@@ -184,14 +205,18 @@ function Occurrence:match_cursor(opts)
       local start = next_match
       repeat
         cursor:move(next_match.start)
-        next_match = closest(self, flags, cursor.location, bounds)
+        -- `Cursor:move()` moves the real cursor (which `search()` anchors
+        -- on) but doesn't update `cursor.location`; use the match's start,
+        -- which is where the cursor now sits, so ranking isn't computed
+        -- against the stale pre-loop position.
+        next_match = closest(self, flags, next_match.start, bounds)
       until not next_match or extmarks:has_mark(next_match) or next_match == start
     end
     if prev_match and not extmarks:has_mark(prev_match) then
       local start = prev_match
       repeat
         cursor:move(prev_match.start)
-        prev_match = closest(self, flags({ backward = true }), cursor.location, bounds)
+        prev_match = closest(self, flags({ backward = true }), prev_match.start, bounds)
       until not prev_match or extmarks:has_mark(prev_match) or prev_match == start
     end
   end

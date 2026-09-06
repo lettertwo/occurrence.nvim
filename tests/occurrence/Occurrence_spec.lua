@@ -850,6 +850,73 @@ describe("Occurrence", function()
       end)
     end)
 
+    describe("with multiple patterns", function()
+      -- A pattern with only one occurrence has `searchpos` wrap the whole
+      -- buffer and return the match under the cursor when searching without
+      -- the `c` flag. That match must lose to any other pattern's real
+      -- next/previous match, or `next`/`previous` sticks on it forever.
+      local function occurrence_buffer()
+        bufnr = util.buffer({
+          "Bash(a)",
+          "Bash(b)",
+          "Read(c)",
+          "Bash(d)",
+        })
+        local occ = Occurrence.get(bufnr, "Bash")
+        occ:of_word(true, "Bash")
+        occ:of_word(true, "Read")
+        return occ
+      end
+
+      it("moves forward past a pattern's only match instead of sticking on it", function()
+        local occ = occurrence_buffer()
+        vim.api.nvim_win_set_cursor(0, { 3, 0 }) -- on the sole 'Read' match
+
+        occ:match_cursor({ direction = "forward", wrap = true, marked = true })
+        assert.same({ 4, 0 }, vim.api.nvim_win_get_cursor(0)) -- next 'Bash', not 'Read' again
+      end)
+
+      it("moves backward past a pattern's only match instead of sticking on it", function()
+        local occ = occurrence_buffer()
+        vim.api.nvim_win_set_cursor(0, { 3, 0 }) -- on the sole 'Read' match
+
+        occ:match_cursor({ direction = "backward", wrap = true, marked = true })
+        assert.same({ 2, 0 }, vim.api.nvim_win_get_cursor(0)) -- previous 'Bash', not 'Read' again
+      end)
+
+      it("cycles forward through every marked occurrence exactly once before repeating", function()
+        local occ = occurrence_buffer()
+        vim.api.nvim_win_set_cursor(0, { 4, 6 }) -- off any match
+
+        local rows = {}
+        for _ = 1, 5 do
+          occ:match_cursor({ direction = "forward", wrap = true, marked = true })
+          table.insert(rows, vim.api.nvim_win_get_cursor(0)[1])
+        end
+
+        -- Visits each of the 4 occurrences once, then the 5th step wraps
+        -- back to the first one visited.
+        assert.same({ 1, 2, 3, 4, 1 }, rows)
+      end)
+
+      it("still returns a match at the cursor when undirected", function()
+        local occ = occurrence_buffer()
+        vim.api.nvim_win_set_cursor(0, { 3, 0 }) -- on the sole 'Read' match
+
+        occ:match_cursor({ marked = true })
+        assert.same({ 3, 0 }, vim.api.nvim_win_get_cursor(0)) -- unmoved, still on 'Read'
+      end)
+
+      it("returns nil without moving the cursor for a no-wrap forward search past the last match", function()
+        local occ = occurrence_buffer()
+        vim.api.nvim_win_set_cursor(0, { 4, 0 }) -- on the last match of any pattern
+
+        local match = occ:match_cursor({ direction = "forward", marked = true })
+        assert.is_nil(match)
+        assert.same({ 4, 0 }, vim.api.nvim_win_get_cursor(0))
+      end)
+    end)
+
     describe("marked = true", function()
       it("moves the cursor to marked occurrences", function()
         bufnr = util.buffer("foo bar foo")
