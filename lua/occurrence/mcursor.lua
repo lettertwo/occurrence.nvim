@@ -149,6 +149,60 @@ function M.add(locations, opts)
   end
 end
 
+-- All native cursor locations in `buf` (current buffer if omitted): the
+-- window cursor (only when `buf` is the current buffer) plus every extra
+-- cursor, deduped. Returns `{}` immediately when there are no extras, since
+-- the primary alone is never "cursors" for import purposes; callers gate
+-- on `M.count(buf) > 0` before calling this.
+--
+-- If `range` is given, only locations contained by it are returned (mirrors
+-- Visual `Q` export, which only converts marks inside the selection).
+---@param buf? integer
+---@param range? occurrence.Range
+---@return occurrence.Location[]
+function M.locations(buf, range)
+  buf = buf or 0
+  if M.count(buf) == 0 then
+    return {}
+  end
+
+  local Location = require("occurrence.Location")
+  local ns = vim.api.nvim_create_namespace(NS_NAME)
+
+  ---@type occurrence.Location[]
+  local locations = {}
+  ---@type table<string, boolean>
+  local seen = {}
+
+  local function add(location)
+    if not location then
+      return
+    end
+    local key = location:serialize()
+    if not seen[key] then
+      seen[key] = true
+      table.insert(locations, location)
+    end
+  end
+
+  if buf == vim.api.nvim_get_current_buf() then
+    add(Location.of_cursor())
+  end
+
+  for _, entry in ipairs(vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, {})) do
+    local _, row, col = unpack(entry)
+    add(Location.from_extmarkpos({ row, col }))
+  end
+
+  if range then
+    locations = vim.tbl_filter(function(location)
+      return range:contains(location)
+    end, locations)
+  end
+
+  return locations
+end
+
 -- Number of extra (non-primary) native cursors in `buf` (current buffer if omitted).
 ---@param buf? integer
 ---@return integer

@@ -689,6 +689,8 @@ All actions are available in three ways:
 
 Modify a pending operator to act on occurrences of the word under the cursor. Only useful in operator-pending mode (e.g., `c`, `d`, etc.)
 
+On Neovim >= 0.13, if native multicursors exist in the buffer, import the keyword under each cursor as a pattern and clear the cursors instead of using the word under the window cursor.
+
 Once a pending operator is modified, the operator will act on occurrences within the range specified by the subsequent motion.
 
 Note that this action does not activate occurrence mode, and it does not have any effect when occurrence mode is active, as operators already act on occurrences in that mode.
@@ -700,6 +702,8 @@ Note that this action does not activate occurrence mode, and it does not have an
 `<Plug>(OccurrenceMark)`
 
 Mark one or more occurrences and activate occurrence mode.
+
+- On Neovim >= 0.13, if native multicursors exist in the buffer, import the keyword under each cursor as a pattern and clear the cursors. Every occurrence is marked; with a count, only `count` matches from each cursor. Cursors not on a keyword are skipped with a warning.
 
 If occurrence already has matches, mark matches based on:
 
@@ -1121,6 +1125,26 @@ replay at every cursor. Set `follow_cursors = false` to leave that off, or press
 the native `q=` after the handoff to toggle it for one session.
 
 On Neovim < 0.13, these are unavailable and their default keys are not bound.
+
+### Importing cursors
+
+`mark` (`go`) and `modify_operator` (the `o` in `doip`) are the inverse of
+`cursors`: if native cursors already exist in the buffer, they import each
+cursor's keyword as a pattern, mark it, and clear the cursors, rather than
+acting on the word under the window cursor. This makes a full round trip
+possible: `go`, `Q`, `q=` plus motions to add cursors on other words,
+`<Esc>`, `go` to bring everything back into occurrence mode, then any
+operator (`d`, `y`, `gU`, ...) over the combined set. That set can mix
+words, which native `1Q` alone cannot express.
+
+A cursor that lands on whitespace, past end-of-line, or on an empty line has
+no keyword to import; it is skipped and counted, with one warning reporting
+how many were skipped. Plain `go` behaves differently: off a keyword it falls
+back to the word `<cword>` finds nearby. An imported cursor is a deliberate
+position, so it gets no such fallback.
+
+Importing does not read the search register, so `:h hlsearch` is left as it
+was.
 
 See the [wiki](https://github.com/lettertwo/occurrence.nvim/wiki) for detailed examples, including:
 

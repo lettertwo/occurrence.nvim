@@ -4,6 +4,10 @@
 -- under the cursor. Only useful in operator-pending mode
 -- (e.g., `c`, `d`, etc.)
 --
+-- On Neovim >= 0.13, if native multicursors exist in the buffer,
+-- imports the keyword under each cursor as a pattern and clears
+-- the cursors instead of using the word under the window cursor.
+--
 -- Once a pending operator is modified, the operator will act
 -- on occurrences within the range specified by the subsequent motion.
 --
@@ -13,6 +17,12 @@
 ---@field modify_operator fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Mark one or more occurrences and activate occurrence mode.
+--
+-- On Neovim >= 0.13, if native multicursors exist in the buffer,
+-- imports the keyword under each cursor as a pattern and marks it,
+-- then clears the cursors. Every occurrence is marked; with a count,
+-- only `count` matches from each cursor. Cursors not on a keyword
+-- are skipped, with a warning.
 --
 -- If occurrence already has matches, mark matches based on:
 -- - In visual mode, if matches exist in the range of the visual

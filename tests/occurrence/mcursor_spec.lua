@@ -201,4 +201,40 @@ describe("mcursor", function()
       assert.equals(0, mcursor.count())
     end)
   end)
+
+  describe(".locations", function()
+    local Range = require("occurrence.Range")
+
+    it("returns {} when there are no extra cursors", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      mcursor.clear()
+
+      assert.same({}, mcursor.locations(bufnr))
+    end)
+
+    it("returns the primary plus every extra, deduped", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      mcursor.clear()
+      mcursor.add({ Location.new(0, 0), Location.new(0, 8), Location.new(0, 8), Location.new(0, 16) })
+
+      local locations = mcursor.locations(bufnr)
+      table.sort(locations, function(a, b)
+        return a.col < b.col
+      end)
+      assert.same({ Location.new(0, 0), Location.new(0, 8), Location.new(0, 16) }, locations)
+    end)
+
+    it("filters to locations contained by range", function()
+      bufnr = util.buffer("foo bar foo baz foo")
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      mcursor.clear()
+      mcursor.add({ Location.new(0, 0), Location.new(0, 8), Location.new(0, 16) })
+
+      local narrow = Range.new(Location.new(0, 0), Location.new(0, 4))
+      local locations = mcursor.locations(bufnr, narrow)
+      assert.same({ Location.new(0, 0) }, locations)
+    end)
+  end)
 end)

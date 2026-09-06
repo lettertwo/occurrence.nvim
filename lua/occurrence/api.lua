@@ -9,6 +9,88 @@ local function in_visual_mode()
   return vim.fn.mode():match("[vV\22]") ~= nil
 end
 
+-- The keyword containing `loc.col`, or `""` if `loc` is not on a keyword
+-- (whitespace, EOL, an empty line). Unlike `of_word`'s `<cword>` fallback,
+-- this never looks ahead to the next word: a cursor is a deliberate
+-- position, so landing off a word is treated as "skip this cursor" rather
+-- than "find the nearest one".
+--
+-- `\%Nc` matches at a 1-based byte column; extmark/Location columns are
+-- 0-based bytes, hence `loc.col + 1`.
+---@param buf integer
+---@param loc occurrence.Location
+---@return string
+local function keyword_at(buf, loc)
+  local line = vim.api.nvim_buf_get_lines(buf, loc.line, loc.line + 1, false)[1] or ""
+  return vim.fn.matchstrpos(line, ([[\k*\%%%dc\k\+]]):format(loc.col + 1))[1]
+end
+
+-- Import native multicursors (see `:h dev-multicursor`) as occurrence
+-- patterns and marks, then clear them. This is the inverse of the `cursors`
+-- action's export: it lets `go`/`doip` pick up cursors placed by native
+-- `Q`, `1Q`, `{Visual}Q`, or an earlier occurrence handoff, instead of
+-- running an operator's mapping once per cursor via the native cascade.
+--
+-- With no `count`, every occurrence of each cursor's keyword is marked
+-- (plain `go` semantics, per word). With a `count`, each word's pattern is
+-- added unmarked, then `count` matches are marked starting from each
+-- cursor (count-`go` semantics, applied per cursor rather than per word).
+--
+-- Cursors not on a keyword are skipped and counted; if any were skipped, a
+-- single warning reports the count. All cursors are consumed (cleared)
+-- regardless, since occurrence mode and native cursors never coexist.
+--
+-- Returns `false` without side effects when there are no extra cursors, so
+-- callers can fall through to their normal pattern/mark logic.
+---@param occurrence occurrence.Occurrence
+---@param count? integer
+---@param scope? occurrence.Range Only import cursors within this range (Visual `go`).
+---@return boolean imported Whether extra cursors existed (and were consumed).
+local function import_cursors(occurrence, count, scope)
+  local mcursor = require("occurrence.mcursor")
+  if mcursor.count(occurrence.buffer) == 0 then
+    return false
+  end
+
+  local locations = mcursor.locations(occurrence.buffer, scope)
+
+  ---@type table<string, boolean>
+  local seen = {}
+  local skipped = 0
+
+  for _, loc in ipairs(locations) do
+    local word = keyword_at(occurrence.buffer, loc)
+    if word == "" then
+      skipped = skipped + 1
+    else
+      local escaped = vim.fn.escape(word, [[\/]])
+      if count == nil then
+        if not seen[escaped] then
+          seen[escaped] = true
+          occurrence:of_word(true, escaped)
+        end
+      else
+        if not seen[escaped] then
+          seen[escaped] = true
+          occurrence:of_word(false, escaped)
+        end
+        local pattern = ([[\V\C\<%s\>]]):format(escaped)
+        for range in occurrence:matches(loc, count, pattern) do
+          occurrence:mark(range)
+        end
+      end
+    end
+  end
+
+  mcursor.clear(occurrence.buffer)
+
+  if skipped > 0 then
+    log.warn(("Skipped %d cursor(s) not on a word"):format(skipped))
+  end
+
+  return true
+end
+
 -- Modify a pending operator to operate on occurrences within a motion.
 --
 -- When used in operator-pending mode (e.g., `doip`), this modifies
@@ -26,7 +108,7 @@ local modify_operator = {
   desc = "Occurrences",
   type = "operator-modifier",
   callback = function(occurrence)
-    if not occurrence:has_matches() then
+    if not import_cursors(occurrence, nil) and not occurrence:has_matches() then
       occurrence:of_word(true)
     end
     if not occurrence.extmarks:has_any_marks() then
@@ -59,10 +141,14 @@ local mark = {
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
     local cursor = require("occurrence.Cursor").save()
     local new_pattern = nil
+    local selection_range = visual and (args and args.range or require("occurrence.Range").of_selection()) or nil
 
-    if occurrence:has_matches() then
+    -- An explicit pattern argument is a stronger signal than ambient native
+    -- cursors, so it skips the import and falls through to the usual chain.
+    if not (args and args[1] ~= nil) and import_cursors(occurrence, count, selection_range) then
+      -- Cursors were consumed and their words marked; nothing else to do.
+    elseif occurrence:has_matches() then
       if visual then
-        local selection_range = args and args.range or require("occurrence.Range").of_selection()
         if selection_range and occurrence:has_matches(selection_range) then
           for range in occurrence:matches(selection_range, count) do
             occurrence:mark(range)
