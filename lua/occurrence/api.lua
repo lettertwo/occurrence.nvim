@@ -1,5 +1,96 @@
 ---@module 'occurrence.api'
 
+local log = require("occurrence.log")
+
+-- Whether the editor is in any Visual mode: charwise `v`, linewise `V`,
+-- or blockwise `^V` (`"\22"`, which a bare `[vV]` pattern misses).
+---@return boolean
+local function in_visual_mode()
+  return vim.fn.mode():match("[vV\22]") ~= nil
+end
+
+-- The keyword containing `loc.col`, or `""` if `loc` is not on a keyword
+-- (whitespace, EOL, an empty line). Unlike `of_word`'s `<cword>` fallback,
+-- this never looks ahead to the next word: a cursor is a deliberate
+-- position, so landing off a word is treated as "skip this cursor" rather
+-- than "find the nearest one".
+--
+-- `\%Nc` matches at a 1-based byte column; extmark/Location columns are
+-- 0-based bytes, hence `loc.col + 1`.
+---@param buf integer
+---@param loc occurrence.Location
+---@return string
+local function keyword_at(buf, loc)
+  local line = vim.api.nvim_buf_get_lines(buf, loc.line, loc.line + 1, false)[1] or ""
+  return vim.fn.matchstrpos(line, ([[\k*\%%%dc\k\+]]):format(loc.col + 1))[1]
+end
+
+-- Import native multicursors (see `:h dev-multicursor`) as occurrence
+-- patterns and marks, then clear them. This is the inverse of the `cursors`
+-- action's export: it lets `go`/`doip` pick up cursors placed by native
+-- `Q`, `1Q`, `{Visual}Q`, or an earlier occurrence handoff, instead of
+-- running an operator's mapping once per cursor via the native cascade.
+--
+-- With no `count`, every occurrence of each cursor's keyword is marked
+-- (plain `go` semantics, per word). With a `count`, each word's pattern is
+-- added unmarked, then `count` matches are marked starting from each
+-- cursor (count-`go` semantics, applied per cursor rather than per word).
+--
+-- Cursors not on a keyword are skipped and counted; if any were skipped, a
+-- single warning reports the count. All cursors are consumed (cleared)
+-- regardless, since occurrence mode and native cursors never coexist.
+--
+-- Returns `false` without side effects when there are no extra cursors, so
+-- callers can fall through to their normal pattern/mark logic.
+---@param occurrence occurrence.Occurrence
+---@param count? integer
+---@param scope? occurrence.Range Only import cursors within this range (Visual `go`).
+---@return boolean imported Whether extra cursors existed (and were consumed).
+local function import_cursors(occurrence, count, scope)
+  local mcursor = require("occurrence.mcursor")
+  if mcursor.count(occurrence.buffer) == 0 then
+    return false
+  end
+
+  local locations = mcursor.locations(occurrence.buffer, scope)
+
+  ---@type table<string, boolean>
+  local seen = {}
+  local skipped = 0
+
+  for _, loc in ipairs(locations) do
+    local word = keyword_at(occurrence.buffer, loc)
+    if word == "" then
+      skipped = skipped + 1
+    else
+      local escaped = vim.fn.escape(word, [[\/]])
+      if count == nil then
+        if not seen[escaped] then
+          seen[escaped] = true
+          occurrence:of_word(true, escaped)
+        end
+      else
+        if not seen[escaped] then
+          seen[escaped] = true
+          occurrence:of_word(false, escaped)
+        end
+        local pattern = ([[\V\C\<%s\>]]):format(escaped)
+        for range in occurrence:matches(loc, count, pattern) do
+          occurrence:mark(range)
+        end
+      end
+    end
+  end
+
+  mcursor.clear(occurrence.buffer)
+
+  if skipped > 0 then
+    log.warn(("Skipped %d cursor(s) not on a word"):format(skipped))
+  end
+
+  return true
+end
+
 -- Modify a pending operator to operate on occurrences within a motion.
 --
 -- When used in operator-pending mode (e.g., `doip`), this modifies
@@ -17,7 +108,7 @@ local modify_operator = {
   desc = "Occurrences",
   type = "operator-modifier",
   callback = function(occurrence)
-    if not occurrence:has_matches() then
+    if not import_cursors(occurrence, nil) and not occurrence:has_matches() then
       occurrence:of_word(true)
     end
     if not occurrence.extmarks:has_any_marks() then
@@ -45,15 +136,19 @@ local mark = {
   plug = "<Plug>(OccurrenceMark)",
   desc = "Mark occurrence",
   callback = function(occurrence, args)
-    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local visual = (args and args.range ~= nil) or in_visual_mode()
     local hlsearch = (args and args[1] ~= nil) or (vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "")
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
     local cursor = require("occurrence.Cursor").save()
     local new_pattern = nil
+    local selection_range = visual and (args and args.range or require("occurrence.Range").of_selection()) or nil
 
-    if occurrence:has_matches() then
+    -- An explicit pattern argument is a stronger signal than ambient native
+    -- cursors, so it skips the import and falls through to the usual chain.
+    if not (args and args[1] ~= nil) and import_cursors(occurrence, count, selection_range) then
+      -- Cursors were consumed and their words marked; nothing else to do.
+    elseif occurrence:has_matches() then
       if visual then
-        local selection_range = args and args.range or require("occurrence.Range").of_selection()
         if selection_range and occurrence:has_matches(selection_range) then
           for range in occurrence:matches(selection_range, count) do
             occurrence:mark(range)
@@ -114,7 +209,7 @@ local unmark = {
   plug = "<Plug>(OccurrenceUnmark)",
   desc = "Unmark occurrence",
   callback = function(occurrence, args)
-    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local visual = (args and args.range ~= nil) or in_visual_mode()
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
 
     if occurrence:has_matches() then
@@ -152,7 +247,7 @@ local toggle = {
   plug = "<Plug>(OccurrenceToggle)",
   desc = "Add/Toggle occurrence mark(s)",
   callback = function(occurrence, args)
-    local visual = (args and args.range ~= nil) or (vim.fn.mode():match("[vV]") ~= nil)
+    local visual = (args and args.range ~= nil) or in_visual_mode()
     local hlsearch = (args and args[1] ~= nil) or (vim.v.hlsearch == 1 and vim.fn.getreg("/") ~= "")
     local count = args and args.count or (vim.v.count > 0 and vim.v.count or nil)
     local cursor = require("occurrence.Cursor").save()
@@ -340,6 +435,149 @@ local toggle_dispose = {
   end,
 }
 
+-- Compute cursor positions for `marks` and schedule `mcursor.add` once the
+-- current event loop tick finishes, so it runs after occurrence's own
+-- opfunc/dispose machinery (including the `g@$` restore feed) has settled.
+-- Shared by the `cursors` action and the `cursors_start`/`cursors_end`/
+-- `change_cursors` operators (`make_cursor_operator` below).
+--
+-- `where == "end"` takes the last character of each mark (so `a` appends
+-- after every occurrence, and marks ending at EOL behave like any other);
+-- otherwise `range.start` (used as-is for `"start"` and for `"change"`,
+-- where the mark's range has already collapsed to the insertion point).
+--
+-- The primary cursor is the mark whose range contains the window cursor,
+-- if any; `mcursor.add` falls back to the nearest location otherwise.
+-- The buffer is captured now (not read back from the scheduled closure),
+-- since occurrence mode -- and the marks tracking it -- may be disposed by
+-- the time the closure runs.
+---@param occurrence occurrence.Occurrence
+---@param marks [integer, occurrence.Range][]
+---@param where "start" | "end" | "change"
+---@param on_placed? fun() Called only after the cursors were actually placed; skipped when the handoff is skipped or fails.
+local function schedule_cursors(occurrence, marks, where, on_placed)
+  if #marks == 0 then
+    return
+  end
+
+  local Location = require("occurrence.Location")
+  local buffer = occurrence.buffer
+  local cursor = Location.of_cursor()
+
+  -- `range.stop` is end-exclusive, so the last character of the mark is the
+  -- codepoint that ends at `stop.col`. A Normal-mode cursor cannot sit past
+  -- EOL, but `nvim_mcursor` accepts that column, so using `stop` directly
+  -- would put the primary and the extras on different columns for a mark
+  -- ending at EOL. Landing on the last character avoids that entirely.
+  ---@param range occurrence.Range
+  ---@return occurrence.Location
+  local function last_char(range)
+    local stop = range.stop
+    if stop.col == 0 then
+      return stop
+    end
+    local line = vim.api.nvim_buf_get_lines(buffer, stop.line, stop.line + 1, false)[1] or ""
+    -- str_utf_start takes a 1-based byte index and returns the (non-positive)
+    -- offset to the start of the codepoint containing that byte.
+    local col = stop.col - 1
+    if col < #line then
+      col = col + vim.str_utf_start(line, col + 1)
+    end
+    return Location.new(stop.line, math.max(col, 0))
+  end
+
+  ---@type occurrence.Location[]
+  local positions = {}
+  ---@type integer?
+  local primary_index = nil
+  for i, entry in ipairs(marks) do
+    local _, range = unpack(entry)
+    table.insert(positions, where == "end" and last_char(range) or range.start)
+    if primary_index == nil and cursor and range:contains(cursor) then
+      primary_index = i
+    end
+  end
+
+  vim.schedule(function()
+    if not vim.api.nvim_buf_is_valid(buffer) or buffer ~= vim.api.nvim_get_current_buf() then
+      log.debug("Skipping deferred mcursor.add: buffer", buffer, "is no longer current")
+      return
+    end
+    local ok, err = pcall(
+      require("occurrence.mcursor").add,
+      positions,
+      { primary = primary_index, buf = buffer, follow = require("occurrence.Config").get().follow_cursors }
+    )
+    if not ok then
+      -- Not debug: for `change_cursors` the mark text is already gone, so a
+      -- failed handoff leaves the user with edits and no cursors.
+      log.warn("Failed to convert occurrences to cursors:", err)
+      return
+    end
+    if on_placed then
+      on_placed()
+    end
+  end)
+end
+
+-- Convert marked occurrences to native `:h multicursor` cursors and hand
+-- the buffer over to Neovim.
+--
+-- Occurrence mode has no way to observe a native multicursor session
+-- (it fires no autocmd and has no mode of its own), so this always
+-- disposes occurrence mode once cursors are placed. That also drops the
+-- buffer-local keymaps (`<Esc>`, `n`, `N`, `c`, `d`, ...) that would
+-- otherwise shadow native multicursor workflows.
+--
+-- In visual mode, only marks within the selection are converted.
+-- Otherwise, all marks are converted.
+--
+-- If occurrence has no matches yet, marks the word under the cursor
+-- first (like `next`), then converts.
+--
+-- Requires Neovim 0.13+ with `vim.api.nvim_mcursor`.
+---@type occurrence.OccurrenceModeConfig
+local cursors = {
+  mode = { "n", "v" },
+  type = "occurrence-mode",
+  plug = "<Plug>(OccurrenceCursors)",
+  desc = "Convert marked occurrences to cursors",
+  callback = function(occurrence, args)
+    local mcursor = require("occurrence.mcursor")
+    if not mcursor.is_supported() then
+      log.error(mcursor.unsupported_message())
+      return false
+    end
+
+    if not occurrence:has_matches() then
+      mark.callback(occurrence, args)
+    end
+
+    local visual = (args and args.range ~= nil) or in_visual_mode()
+    local scope = visual and (args and args.range or require("occurrence.Range").of_selection()) or nil
+
+    -- The selection has been consumed. Leave Visual mode now, before the
+    -- scheduled `Cursor.move(primary)` runs, or that move would extend the
+    -- selection instead of placing the primary cursor.
+    if in_visual_mode() then
+      require("occurrence.feedkeys").change_mode("n", { noflush = true, silent = true })
+    end
+
+    local marks = occurrence.extmarks:collect(scope)
+    if #marks == 0 then
+      log.warn("No marked occurrences to convert to cursors")
+      return false
+    end
+
+    -- Cursors must be created after occurrence mode has fully torn down
+    -- (including the buffer-local keymaps disposed below), since
+    -- `nvim_mcursor` is a silent no-op while any cascade is running.
+    schedule_cursors(occurrence, marks, "start")
+
+    return false
+  end,
+}
+
 ---@enum (key) occurrence.KeymapAction
 local api = {
   mark = mark,
@@ -351,6 +589,7 @@ local api = {
   match_previous = match_previous,
   deactivate = deactivate,
   toggle_dispose = toggle_dispose,
+  cursors = cursors,
   modify_operator = modify_operator,
 }
 
@@ -465,6 +704,95 @@ local swap_case = {
   operator = "~",
 }
 
+-- Build one of the `cursors_start` / `cursors_end` / `change_cursors`
+-- operators. `where` is `"start"` (cursor on the first character) or
+-- `"end"` (cursor on the last character, so `a` appends after the mark);
+-- both are side effect only, the mark text is untouched. Or it is
+-- or `"change"` to delete the mark text and place a cursor at the
+-- resulting insertion point, then enter insert mode.
+--
+-- These are motion-scoped siblings of the `cursors` action: `Iip`/`Aip`
+-- convert only marks within `ip`, rather than every mark. `change_cursors`
+-- is the default `c` when native multicursor is available, in occurrence
+-- mode (`go` then `cip`) and operator-pending mode (`coip`).
+--
+-- `dispose_after_operator` is forced `true` regardless of the global
+-- `dispose_after_operator` option, since occurrence mode cannot coexist
+-- with a native multicursor session (see `cursors` above).
+---@param where "start" | "end" | "change"
+---@return occurrence.OperatorConfig
+local function make_cursor_operator(where)
+  return {
+    desc = where == "start" and "Convert marked occurrences to cursors at their start"
+      or where == "end" and "Convert marked occurrences to cursors on their last character"
+      or "Delete marked occurrences, convert to cursors, and insert",
+    -- `c` is a real Vim operator, so `change_cursors` is also reachable from
+    -- operator-pending mode (`coip`) via `modify_operator`: it cancels the
+    -- pending `c` and re-runs this same opfunc over the marks in the motion,
+    -- exactly like `cip` in occurrence mode. `I`/`A` are not operators, so
+    -- `"o"` never triggers for the other two.
+    mode = where == "change" and { "n", "v", "o" } or { "n", "v" },
+    dispose_after_operator = true,
+    before = function(_, _ctx)
+      local mcursor = require("occurrence.mcursor")
+      if not mcursor.is_supported() then
+        log.error(mcursor.unsupported_message())
+        return false
+      end
+    end,
+    operator = function()
+      if where == "change" then
+        -- Delete the mark text; `after` reads the collapsed insertion
+        -- point from the updated (post-edit) mark position.
+        return {}
+      end
+      -- Side effect only: unmark without editing, so the mark's range
+      -- is unchanged when `after` reads it back. `nil` (not `true`):
+      -- `true` is treated the same for unmarking, but also gets read as
+      -- "yanked" and saved to the register, which we don't want here.
+      return nil
+    end,
+    after = function(marks, ctx)
+      if #marks == 0 then
+        return
+      end
+
+      -- Entering insert rides on the same deferred closure as the cursor
+      -- handoff, so it happens only after occurrence's opfunc/dispose
+      -- machinery (including the `g@$` restore feed) has fully finished,
+      -- and only if cursors were actually placed. Otherwise `cip` would
+      -- drop the user into Insert mode with the text deleted at every
+      -- occurrence but a single cursor, or in a different buffer.
+      schedule_cursors(ctx.occurrence, marks, where, where == "change" and function()
+        -- Enter insert via `nvim_input`, not `feedkeys`/`startinsert`.
+        -- `startinsert` only sets `restart_edit` for a Normal() loop to
+        -- notice, and there is none in this deferred context. A queued
+        -- `feedkeys("i")` does enter insert, but the multicursor cascade
+        -- arms its *live* per-cursor preview only for insert entered by a
+        -- clean top-level command; a typeahead `i` consumed alongside the
+        -- user's first keystroke does not qualify, so cursors would only
+        -- commit the text on `<Esc>`, not mirror it as typed. `nvim_input`
+        -- injects `i` into the low-level input queue exactly as a real
+        -- keypress, which is that clean insert-entry edge.
+        --
+        -- It is inert under a headless/no-UI harness (the input queue is
+        -- not pumped), so tests cannot exercise the insert entry; the
+        -- cascade needs interactive verification either way.
+        vim.api.nvim_input("i")
+      end or nil)
+    end,
+  }
+end
+
+---@type occurrence.OperatorConfig
+local cursors_start = make_cursor_operator("start")
+
+---@type occurrence.OperatorConfig
+local cursors_end = make_cursor_operator("end")
+
+---@type occurrence.OperatorConfig
+local change_cursors = make_cursor_operator("change")
+
 -- Supported operators
 ---@enum (key) occurrence.BuiltinOperator
 local operators = {
@@ -479,6 +807,9 @@ local operators = {
   uppercase = uppercase,
   lowercase = lowercase,
   swap_case = swap_case,
+  cursors_start = cursors_start,
+  cursors_end = cursors_end,
+  change_cursors = change_cursors,
 }
 
 return vim.tbl_extend("error", api, operators, {

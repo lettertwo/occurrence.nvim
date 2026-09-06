@@ -205,5 +205,4 @@ describe("undo restoration", function()
 
     -- No error should occur; state should be clean
   end)
-
 end)

@@ -186,7 +186,8 @@ local _global_config = nil
 -- Defaults to `true`.
 ---@field default_keymaps? boolean
 -- Whether to include default operator support.
--- (c, d, y, p, gp, <, >, =, gu, gU, g~)
+-- (c, d, y, p, gp, <, >, =, gu, gU, g~; on Neovim 0.13+ with `nvim_mcursor`,
+-- `c` maps to change_cursors and I/A to cursors_start/cursors_end)
 --
 -- If `false`, only operators explicitly defined in `operators`
 -- will be supported.
@@ -210,6 +211,11 @@ local _global_config = nil
 -- Can be overridden per-operator via `OperatorConfig.dispose_after_operator`.
 -- Defaults to `true`.
 ---@field dispose_after_operator? boolean
+-- Whether native multicursors created by `cursors`, `cursors_start`,
+-- `cursors_end`, and `change_cursors` start in follow-mode (`:h q=`), so
+-- motions replay at every cursor, not just the primary. Toggle at runtime
+-- with the native `q=` command. Defaults to `true`.
+---@field follow_cursors? boolean
 
 ---@type { [string]: occurrence.KeymapAction }
 local DEFAULT_OCCURRENCE_KEYMAPS = {
@@ -246,6 +252,7 @@ local DEFAULT_CONFIG = {
   default_keymaps = true,
   default_operators = true,
   dispose_after_operator = true,
+  follow_cursors = true,
 }
 
 ---@param value occurrence.OperatorConfig
@@ -274,6 +281,7 @@ end
 ---@field default_keymaps boolean
 ---@field default_operators boolean
 ---@field dispose_after_operator boolean
+---@field follow_cursors boolean
 ---@field keymaps occurrence.OccurrenceModeKeymapConfig
 ---@field operators occurrence.OperatorKeymapConfig
 local Config = {}
@@ -423,6 +431,7 @@ function config.validate(opts)
       default_keymaps = { "boolean", true },
       default_operators = { "boolean", true },
       dispose_after_operator = { "boolean", true },
+      follow_cursors = { "boolean", true },
     }
 
     for key, validator in pairs(valid_keys) do
@@ -464,7 +473,24 @@ end
 
 ---Get a copy of the default configuration.
 function config.default()
-  return vim.deepcopy(DEFAULT_CONFIG)
+  local default = vim.deepcopy(DEFAULT_CONFIG)
+
+  -- The native multicursor surface is only wired up when the running Neovim
+  -- exposes `vim.api.nvim_mcursor`, so stable users never get a dead `Q`
+  -- shadowing occurrence mode. `Q` mirrors native `Q`/`gQ`; `I`/`A` (cursors
+  -- at mark start/end) follow the wiki's multicursor.nvim integration recipe;
+  -- and `c` hands off to native cursors instead of prompting for a
+  -- replacement (`operators = { c = "change" }` restores the prompt).
+  -- Resolved here, per call, rather than at module load, so the gate follows
+  -- the API that is actually present when the config is built.
+  if require("occurrence.mcursor").is_supported() then
+    default.keymaps["Q"] = "cursors"
+    default.operators["c"] = "change_cursors"
+    default.operators["I"] = "cursors_start"
+    default.operators["A"] = "cursors_end"
+  end
+
+  return default
 end
 
 ---Validate and parse the given options.
@@ -491,7 +517,7 @@ function config.new(opts, ...)
     end
   end
 
-  local self = vim.tbl_deep_extend("force", {}, DEFAULT_CONFIG, opts or {})
+  local self = vim.tbl_deep_extend("force", config.default(), opts or {})
 
   if not self.default_keymaps then
     self.keymaps = (opts and opts.keymaps) or {}

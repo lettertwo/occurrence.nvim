@@ -176,7 +176,7 @@ describe("User event tests", function()
       vim.keymap.set("n", "q", "<Plug>(OccurrenceMark)", { buffer = bufnr })
       vim.keymap.set("n", "n", "<Plug>(OccurrenceNext)", { buffer = bufnr })
       vim.keymap.set("n", "t", "<Plug>(OccurrenceToggle)", { buffer = bufnr })
-      vim.keymap.set("n", "Q", "<Plug>(OccurrenceUnmark)", { buffer = bufnr })
+      vim.keymap.set("n", "X", "<Plug>(OccurrenceUnmark)", { buffer = bufnr })
 
       local callback = spy.new()
 
@@ -201,7 +201,7 @@ describe("User event tests", function()
       feedkeys("n") -- move to next occurrence
       assert.spy(callback).was_called(1)
 
-      feedkeys("Q") -- unmark
+      feedkeys("X") -- unmark
       assert.spy(callback).was_called(2)
       assert.spy(callback).was_called_with(match.same({
         event = "User",

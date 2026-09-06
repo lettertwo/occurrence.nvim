@@ -4,6 +4,10 @@
 -- under the cursor. Only useful in operator-pending mode
 -- (e.g., `c`, `d`, etc.)
 --
+-- On Neovim >= 0.13, if native multicursors exist in the buffer,
+-- imports the keyword under each cursor as a pattern and clears
+-- the cursors instead of using the word under the window cursor.
+--
 -- Once a pending operator is modified, the operator will act
 -- on occurrences within the range specified by the subsequent motion.
 --
@@ -13,6 +17,12 @@
 ---@field modify_operator fun(args?: occurrence.SubcommandArgs): nil
 --
 -- Mark one or more occurrences and activate occurrence mode.
+--
+-- On Neovim >= 0.13, if native multicursors exist in the buffer,
+-- imports the keyword under each cursor as a pattern and marks it,
+-- then clears the cursors. Every occurrence is marked; with a count,
+-- only `count` matches from each cursor. Cursors not on a keyword
+-- are skipped, with a warning.
 --
 -- If occurrence already has matches, mark matches based on:
 -- - In visual mode, if matches exist in the range of the visual
@@ -83,6 +93,16 @@
 -- mode exit after the next operator. Press again to cancel the inversion.
 ---@field toggle_dispose fun(args?: occurrence.SubcommandArgs): nil
 --
+-- Convert marked occurrences to native `:h multicursor` cursors and
+-- dispose occurrence mode, handing the buffer over to Neovim.
+--
+-- In visual mode, only marks within the selection are converted;
+-- otherwise all marks are converted. If occurrence has no matches yet,
+-- marks the word under the cursor first (like `next`), then converts.
+--
+-- Requires Neovim 0.13+ with `vim.api.nvim_mcursor`.
+---@field cursors fun(args?: occurrence.SubcommandArgs): nil
+--
 -- Table of all built-in operators (indexed by operator name).
 -- Useful for enumerating available operators without filtering the flat api table.
 ---@field operators { [occurrence.BuiltinOperator]: occurrence.OperatorConfig }
@@ -93,6 +113,20 @@
 --
 -- Change marked occurrences (may prompt for replacement)
 ---@field change fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Delete marked occurrences, convert them to cursors at the resulting
+-- insertion points, and enter insert mode.
+-- Requires Neovim 0.13+ with `vim.api.nvim_mcursor`.
+---@field change_cursors fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Convert marked occurrences to cursors on their last character, without
+-- editing them (press `a` to append after each occurrence).
+-- Requires Neovim 0.13+ with `vim.api.nvim_mcursor`.
+---@field cursors_end fun(args?: occurrence.SubcommandArgs):nil
+--
+-- Convert marked occurrences to cursors at their start, without editing them.
+-- Requires Neovim 0.13+ with `vim.api.nvim_mcursor`.
+---@field cursors_start fun(args?: occurrence.SubcommandArgs):nil
 --
 -- Delete marked occurrence
 ---@field delete fun(args?: occurrence.SubcommandArgs):nil

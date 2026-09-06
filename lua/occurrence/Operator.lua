@@ -384,9 +384,12 @@ local function create_edit_list(occurrence, ctx)
 end
 
 -- Apply an operator string (e.g. `"d"`, `"y"`, etc) to a visual selection of each mark.
+--
+-- Every mark reaching `done` here went through a real Vim operator on its
+-- text, so `edited` and `text_edited` are the same list.
 ---@param operator string The operator string (e.g. "d", "y", etc).
 ---@param ctx occurrence.OperatorContext The operator context.
----@param done fun(edited: number[]) Callback when operations are complete.
+---@param done fun(edited: number[], result?: boolean, text_edited?: number[]) Callback when operations are complete. `result` is always `nil` (never cancelled).
 local function apply_operator_string(operator, ctx, done)
   local marks = ctx.marks
   local original_cursor = Cursor.save()
@@ -422,13 +425,13 @@ local function apply_operator_string(operator, ctx, done)
     original_cursor:restore()
   end
 
-  done(edited)
+  done(edited, nil, edited)
 end
 
 ---@param operator occurrence.OperatorFn
 ---@param ctx occurrence.OperatorContext The operator context.
 ---@param batch_size number Maximum concurrent operations.
----@param done fun(edited: number[], result?: boolean) Callback when all operations are complete or cancelled.
+---@param done fun(edited: number[], result?: boolean, text_edited?: number[]) Callback when all operations are complete or cancelled. `text_edited` is the subset of `edited` whose text was actually replaced (excludes side-effect-only `nil`/`true` results).
 local function apply_operator_fn(operator, ctx, batch_size, done)
   local occurrence = ctx.occurrence
   local marks = ctx.marks
@@ -487,7 +490,7 @@ local function apply_operator_fn(operator, ctx, batch_size, done)
           if remaining <= 0 then
             if cancelled then
               log.trace("Operation cancelled")
-              done(edited, false)
+              done(edited, false, {})
             else
               execute_next_batch()
             end
@@ -495,8 +498,9 @@ local function apply_operator_fn(operator, ctx, batch_size, done)
         end)
       end
     else
-      vim.list_extend(edited, edits:apply())
-      done(edited)
+      local text_edited = edits:apply()
+      vim.list_extend(edited, text_edited)
+      done(edited, nil, text_edited)
     end
   end
 
@@ -624,7 +628,9 @@ local function create_opfunc(occurrence, operator, ctx)
 
     ---@param edited integer[]
     ---@param result boolean?
-    local function on_done(edited, result)
+    ---@param text_edited? integer[] Subset of `edited` whose text was actually replaced; defaults to `edited` for callers that don't distinguish (string operators, where every mark is text-modifying).
+    local function on_done(edited, result, text_edited)
+      text_edited = text_edited or edited
       log.debug("Operator operation done with", #edited, "edited marks and result:", result)
       ---@type integer[]
       local updated_marks = {}
@@ -653,9 +659,12 @@ local function create_opfunc(occurrence, operator, ctx)
 
         if occurrence then
           if #edited > 0 then
-            -- Capture undo info before clearing marks so they can be restored on undo
+            -- Capture undo info before clearing marks so they can be restored on undo.
+            -- Only marks that actually had their text replaced need restoring;
+            -- side-effect-only results (`nil`/`true`, e.g. yank, or the cursor
+            -- operators) are unmarked below but leave nothing for undo to redo.
             local mark_keys = {}
-            for _, id in ipairs(edited) do
+            for _, id in ipairs(text_edited) do
               local key = occurrence.extmarks:get_mark_key(id)
               if key then
                 table.insert(mark_keys, key)
@@ -711,9 +720,15 @@ local function create_opfunc(occurrence, operator, ctx)
         effective_dispose = Config.get().dispose_after_operator
       end
 
-      -- Apply one-shot transient inversion from toggle_dispose action (XOR)
-      local invert = occurrence and occurrence._invert_next_dispose or false
-      effective_dispose = effective_dispose ~= invert
+      -- Apply the one-shot transient inversion from toggle_dispose (XOR), but
+      -- only when this operator has no explicit per-op override: an operator
+      -- that forces dispose (or forces persistence) must not be defeated by
+      -- a stale toggle. The flag is always consumed either way, so a forced
+      -- operator doesn't leave it to leak into a later, unforced one.
+      if dispose_after_op == nil then
+        local invert = occurrence and occurrence._invert_next_dispose or false
+        effective_dispose = effective_dispose ~= invert
+      end
       if occurrence then
         occurrence._invert_next_dispose = nil
       end

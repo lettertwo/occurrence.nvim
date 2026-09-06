@@ -1,4 +1,6 @@
 local assert = require("luassert")
+local match = require("luassert.match")
+local stub = require("luassert.stub")
 local util = require("tests.util")
 
 local api = require("occurrence.api")
@@ -256,6 +258,152 @@ describe("api", function()
       api.toggle.callback(occurrence, Config.new())
       marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
       assert.equals(2, marked_count, "Should mark 1 'bar' occurrence")
+    end)
+  end)
+
+  describe("cursors", function()
+    local mcursor = require("occurrence.mcursor")
+
+    if not mcursor.is_supported() then
+      it("requires nvim_mcursor", function()
+        pending("requires nvim_mcursor")
+      end)
+      return
+    end
+
+    before_each(function()
+      mcursor.clear()
+    end)
+
+    it("converts only marks within args.range", function()
+      bufnr = util.buffer({ "foo bar", "foo baz" })
+      local Range = require("occurrence.Range")
+      local occurrence = Occurrence.get(bufnr)
+      occurrence:of_word(true, "foo")
+      assert.equals(2, #vim.iter(occurrence.extmarks:iter()):totable(), "Both 'foo' occurrences should be marked")
+
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+      local result = api.cursors.callback(occurrence, { range = Range.of_line(0) })
+      vim.wait(0) -- cursor creation is deferred
+
+      -- `cursors` always disposes (returns `false`), regardless of scope.
+      assert.is_false(result)
+      -- Only the first line's mark was in scope, so it became the sole
+      -- (primary) cursor; the second line's mark was discarded by dispose.
+      assert.equals(0, mcursor.count(), "Only the in-scope mark should convert")
+      assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
+    end)
+  end)
+
+  describe("import native cursors", function()
+    local mcursor = require("occurrence.mcursor")
+    local Location = require("occurrence.Location")
+
+    if not mcursor.is_supported() then
+      it("requires nvim_mcursor", function()
+        pending("requires nvim_mcursor")
+      end)
+      return
+    end
+
+    before_each(function()
+      mcursor.clear()
+    end)
+
+    describe("mark", function()
+      it("marks every occurrence of each cursor's word", function()
+        bufnr = util.buffer("foo bar foo bar")
+        vim.api.nvim_win_set_cursor(0, { 1, 0 }) -- primary on the first 'foo'
+        mcursor.add({ Location.new(0, 0), Location.new(0, 4) }) -- 'foo' and 'bar'
+
+        local occurrence = Occurrence.get(bufnr)
+        api.mark.callback(occurrence, Config.new())
+
+        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(4, marked_count, "Should mark both 'foo' occurrences and both 'bar' occurrences")
+        assert.equals(0, mcursor.count(), "Cursors should be consumed")
+      end)
+
+      it("with a count, marks count matches starting from each cursor", function()
+        bufnr = util.buffer({ "foo x foo x foo", "bar bar bar" })
+        vim.api.nvim_win_set_cursor(0, { 1, 0 }) -- primary on the first 'foo'
+        mcursor.add({ Location.new(0, 0), Location.new(1, 0) }) -- first 'foo', first 'bar'
+
+        local occurrence = Occurrence.get(bufnr)
+        api.mark.callback(occurrence, { count = 2 })
+
+        local marked = vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(4, #marked, "Should mark 2 'foo' and 2 'bar' occurrences")
+
+        local total_matches = #vim.iter(occurrence:matches()):totable()
+        assert.equals(6, total_matches, "Both words should be tracked as patterns (3 'foo' + 3 'bar')")
+        assert.equals(0, mcursor.count(), "Cursors should be consumed")
+      end)
+
+      it("skips cursors not on a word, warns once, and still imports the rest", function()
+        bufnr = util.buffer({ "foo   ", "", "bar baz" })
+        local notify_stub = stub(vim, "notify")
+
+        vim.api.nvim_win_set_cursor(0, { 1, 4 }) -- primary on whitespace after 'foo'
+        mcursor.add({ Location.new(0, 4), Location.new(1, 0), Location.new(2, 0) }) -- whitespace, empty line, 'bar'
+
+        local occurrence = Occurrence.get(bufnr)
+        api.mark.callback(occurrence, Config.new())
+
+        assert.spy(notify_stub).was_called(1)
+        assert
+          .spy(notify_stub)
+          .was_called_with(match.is_match("Skipped 2 cursor"), vim.log.levels.WARN, { title = "Occurrence" })
+
+        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(1, marked_count, "Only the 'bar' cursor was on a word")
+        assert.equals(0, mcursor.count(), "Cursors should be consumed even though most were skipped")
+
+        notify_stub:revert()
+      end)
+
+      it("in visual mode, only imports cursors within the selection", function()
+        bufnr = util.buffer({ "foo bar", "baz qux" })
+        local Range = require("occurrence.Range")
+        vim.api.nvim_win_set_cursor(0, { 1, 0 }) -- line 1's 'foo'
+        mcursor.add({ Location.new(0, 0), Location.new(1, 0) }) -- line 1's 'foo', line 2's 'baz'
+
+        local occurrence = Occurrence.get(bufnr)
+        api.mark.callback(occurrence, { range = Range.of_line(0) })
+
+        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(1, marked_count, "Only line 1's 'foo' cursor was in scope; line 2's 'baz' was skipped")
+        assert.equals(0, mcursor.count(), "All cursors should be consumed, even out-of-scope ones")
+      end)
+
+      it("ignores cursors when an explicit pattern argument is given", function()
+        bufnr = util.buffer("foo bar foo bar")
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        mcursor.add({ Location.new(0, 0), Location.new(0, 4) })
+
+        local occurrence = Occurrence.get(bufnr)
+        api.mark.callback(occurrence, { "foo" })
+
+        assert.is_same({ "foo" }, occurrence.patterns, "Explicit pattern wins over cursor import")
+        assert.equals(1, mcursor.count(), "Cursors should be left untouched (one location became the primary)")
+      end)
+    end)
+
+    describe("modify_operator", function()
+      it("marks both cursor words and does not return false", function()
+        bufnr = util.buffer("foo bar foo bar")
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        mcursor.add({ Location.new(0, 0), Location.new(0, 4) })
+
+        local occurrence = Occurrence.get(bufnr)
+        local result = api.modify_operator.callback(occurrence)
+
+        assert.is_not.same(false, result)
+        local marked_count = #vim.iter(occurrence.extmarks:iter()):totable()
+        assert.equals(4, marked_count, "Should mark both 'foo' and 'bar' occurrences")
+        assert.equals(0, mcursor.count(), "Cursors should be consumed")
+      end)
     end)
   end)
 

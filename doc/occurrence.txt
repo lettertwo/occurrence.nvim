@@ -1,5 +1,5 @@
 *occurrence.txt*
-                          For NVIM >= 0.10.0    Last change: 2026 September 03
+                          For NVIM >= 0.10.0    Last change: 2026 September 05
 
 ==============================================================================
 Table of Contents                               *occurrence-table-of-contents*
@@ -29,6 +29,7 @@ Table of Contents                               *occurrence-table-of-contents*
   - OccurrenceDispose                    |occurrence-events-occurrencedispose|
 11. Command Usage                                   |occurrence-command-usage|
 12. Custom Integrations                       |occurrence-custom-integrations|
+  - Native multicursor     |occurrence-custom-integrations-native-multicursor|
   - Building Your Own       |occurrence-custom-integrations-building-your-own|
 
 ==============================================================================
@@ -45,6 +46,7 @@ and perform operations on them.
 REQUIREMENTS ~
 
 - Neovim >= 0.10.0
+- Neovim >= 0.13.0 for native multicursor features (`cursors`, `cursors_start`, `cursors_end`, `change_cursors`; see |occurrence-custom-integrations|)
 
 
 USING LAZY.NVIM ~
@@ -207,7 +209,8 @@ The plugin works with zero configuration but can be customized through
       default_keymaps = true,
     
       -- Whether to include default operator support.
-      -- (c, d, y, p, gp, <, >, =, gu, gU, g~)
+      -- (c, d, y, p, gp, <, >, =, gu, gU, g~; on Neovim >= 0.13 with
+      -- `nvim_mcursor`, `c` maps to `change_cursors` and I, A are added)
       --
       -- If `false`, only operators explicitly defined in `operators`
       -- will be supported.
@@ -227,10 +230,19 @@ The plugin works with zero configuration but can be customized through
       --
       -- Can be overridden per-operator via the operator's own
       -- `dispose_after_operator` field, and inverted for a single operator at
-      -- runtime via the `toggle_dispose` action.
+      -- runtime via the `toggle_dispose` action (which only applies to operators
+      -- without their own value).
       --
       -- Defaults to `true`.
       dispose_after_operator = true,
+    
+      -- Whether native multicursors created by `cursors`, `cursors_start`,
+      -- `cursors_end`, and `change_cursors` start in follow-mode (`:h q=`), so
+      -- motions replay at every cursor and not just the primary. Toggle at
+      -- runtime with the native `q=` command. Neovim >= 0.13 only.
+      --
+      -- Defaults to `true`.
+      follow_cursors = true,
     
       -- A table defining keymaps that will be active in occurrence mode.
       -- Each key is a string representing the keymap, and each value is either:
@@ -248,6 +260,7 @@ The plugin works with zero configuration but can be customized through
         ["<Esc>"] = "deactivate",           -- Exit occurrence mode
         ["<C-c>"] = "deactivate",           -- Exit occurrence mode
         ["<C-[>"] = "deactivate",           -- Exit occurrence mode
+        ["Q"] = "cursors",                  -- Convert marks to native cursors (Neovim >= 0.13 only)
       },
     
       -- A table defining operators that can be modified to operate on occurrences.
@@ -258,7 +271,7 @@ The plugin works with zero configuration but can be customized through
       --   - a table defining a custom operator configuration,
       --   - or `false` to disable the operator.
       operators = {
-        ["c"] = "change",             -- Change marked occurrences
+        ["c"] = "change",             -- Change marked occurrences ("change_cursors" on Neovim >= 0.13)
         ["d"] = "delete",             -- Delete marked occurrences
         ["y"] = "yank",               -- Yank marked occurrences
         ["p"] = "put",                -- Put register at marked occurrences
@@ -269,6 +282,8 @@ The plugin works with zero configuration but can be customized through
         ["gu"] = "lowercase",         -- Convert to lowercase
         ["gU"] = "uppercase",         -- Convert to uppercase
         ["g~"] = "swap_case",         -- Swap case
+        ["I"] = "cursors_start",      -- Convert marks in motion to cursors at their start (Neovim >= 0.13 only)
+        ["A"] = "cursors_end",        -- Convert marks in motion to cursors on their last char (Neovim >= 0.13 only)
       },
     })
 <
@@ -294,7 +309,8 @@ Occurrence mode (after marking occurrences from normal/visual mode):
 - `ga` - Mark or current occurrence or add word
 - `gx` - Unmark current occurrence
 - `<Esc>`, `<C-c>`, `<C-[>` - Exit occurrence mode
-- All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`)
+- `Q` - Convert marks to native cursors and exit occurrence mode (Neovim >= 0.13 only; see |occurrence-custom-integrations|)
+- All configured operators (`c`, `d`, `y`, `p`, `gp`, `<`, `>`, `=`, `gu`, `gU`, `g~`, and on Neovim >= 0.13: `I`, `A`, with `c` handing off to native cursors)
 
 
 KEYMAPS                                     *occurrence-configuration-keymaps*
@@ -413,8 +429,12 @@ Resolution order is: per-operator value, then the global option, then the
 default of `true`.
 
 To flip the decision for just the next operator at runtime, use the
-`toggle_dispose` action (see |occurrence-actions|). It has no default keymap;
-bind it via `<Plug>(OccurrenceToggleDispose)` if you want it:
+`toggle_dispose` action (see |occurrence-actions|). It only applies to
+operators that resolve through the global option: an operator with its own
+`dispose_after_operator` keeps that value, and a pending toggle is consumed
+without effect. The built-in cursor operators force `true` this way, since
+occurrence mode cannot outlive a native multicursor session. The action has no
+default keymap; bind it via `<Plug>(OccurrenceToggleDispose)` if you want it:
 
 >lua
     vim.keymap.set({ "n", "v" }, "<leader>od", "<Plug>(OccurrenceToggleDispose)")
@@ -486,6 +506,10 @@ EXAMPLE: SELECTIVE EDITING ~
 
 Change only some occurrences of a word:
 
+
+  On Neovim 0.13+, `c` defaults to `change_cursors` (a native multicursor
+  handoff). This example uses the prompt-based `change`; add `operators = { c =
+  "change" }` to your setup to follow it verbatim.
 >vim
     " Buffer: The quick brown fox jumps over the lazy dog.
     "         The fox is quick and the dog is lazy.
@@ -526,6 +550,10 @@ EXAMPLE: WORKING WITH MULTIPLE PATTERNS ~
 
 Mark different words and edit them together:
 
+
+  On Neovim 0.13+, `c` defaults to `change_cursors` (a native multicursor
+  handoff). This example uses the prompt-based `change`; add `operators = { c =
+  "change" }` to your setup to follow it verbatim.
 >vim
     " Buffer: foo is here and bar is there
     "         foo and bar together
@@ -701,6 +729,10 @@ All actions are available in three ways:
 Modify a pending operator to act on occurrences of the word under the cursor.
 Only useful in operator-pending mode (e.g., `c`, `d`, etc.)
 
+On Neovim >= 0.13, if native multicursors exist in the buffer, import the
+keyword under each cursor as a pattern and clear the cursors instead of using
+the word under the window cursor.
+
 Once a pending operator is modified, the operator will act on occurrences
 within the range specified by the subsequent motion.
 
@@ -719,6 +751,8 @@ occurrences in that mode.
 
 
 Mark one or more occurrences and activate occurrence mode.
+
+- On Neovim >= 0.13, if native multicursors exist in the buffer, import the keyword under each cursor as a pattern and clear the cursors. Every occurrence is marked; with a count, only `count` matches from each cursor. Cursors not on a keyword are skipped with a warning.
 
 If occurrence already has matches, mark matches based on:
 
@@ -863,6 +897,8 @@ Invert the `dispose_after_operator` decision for the next operator only.
     mode from exiting after the next operator, enabling one-off chaining.
 - When `dispose_after_operator` is `false`, this forces occurrence mode to exit
     after the next operator.
+- An operator with its own `dispose_after_operator` is not inverted; its value
+    wins, and the toggle is consumed anyway.
 
 The inversion is one-shot: it is consumed when the next operator completes.
 Press again before running an operator to cancel it.
@@ -871,39 +907,80 @@ This action has no default keymap. Bind it via
 `<Plug>(OccurrenceToggleDispose)` if you want it.
 
 
+                                                    *occurrence-**cursors***
+
+
+**cursors**                            `require('occurrence').cursors()`
+                                       `:Occurrence cursors`
+                                       `<Plug>(OccurrenceCursors)`
+
+
+
+Convert marked occurrences to native |multicursor| cursors and dispose
+occurrence mode, handing the buffer over to Neovim.
+
+In visual mode, only marks within the selection are converted; otherwise all
+marks are converted. If occurrence has no matches yet, marks the word under the
+cursor first (like `next`), then converts.
+
+Requires Neovim >= 0.13 with `vim.api.nvim_mcursor`. Bound to `Q` by default on
+supported Neovim versions; unavailable otherwise. See
+|occurrence-custom-integrations| for details.
+
+
 ==============================================================================
 8. Builtin Operators                            *occurrence-builtin-operators*
 
 The following operators are supported via `modify_operator` or with marked
-occurrences (configured via `operators` table):
+occurrences (configured via `operators` table). Exception: `cursors_start` and
+`cursors_end` are not reachable via `modify_operator` (e.g. `Ioip`), since
+`I`/`A` are not Vim operators and there is no pending operator for `o` to
+rewrite; use them as motion-scoped operator keys instead (e.g. `Iip`, `Aip`).
+`change_cursors` is a real operator, so it works both as `cip` in occurrence
+mode and as `coip` in operator-pending mode.
 
-  ----------------------------------------------------------------------------
-  Operator        Key   Description
-  --------------- ----- ------------------------------------------------------
-  change          c     Change marked occurrences (prompts for replacement)
+  -----------------------------------------------------------------------------
+  Operator         Key   Description
+  ---------------- ----- ------------------------------------------------------
+  change           c     Change marked occurrences (prompts for replacement;
+                         Neovim < 0.13)
 
-  delete          d     Delete marked occurrences
+  delete           d     Delete marked occurrences
 
-  yank            y     Yank marked occurrences to register
+  yank             y     Yank marked occurrences to register
 
-  put             p     Put register content at marked occurrences (replicates
-                        same text)
+  put              p     Put register content at marked occurrences (replicates
+                         same text)
 
-  distribute      gp    Distribute lines from register cyclically across
-                        occurrences
+  distribute       gp    Distribute lines from register cyclically across
+                         occurrences
 
-  indent_left     <     Indent left
+  indent_left      <     Indent left
 
-  indent_right    >     Indent right
+  indent_right     >     Indent right
 
-  indent_format   =     Format through :h equalprg
+  indent_format    =     Format through :h equalprg
 
-  uppercase       gU    Convert to uppercase
+  uppercase        gU    Convert to uppercase
 
-  lowercase       gu    Convert to lowercase
+  lowercase        gu    Convert to lowercase
 
-  swap_case       g~    Swap case
-  ----------------------------------------------------------------------------
+  swap_case        g~    Swap case
+
+  cursors_start    I     Convert marks to cursors at their start (Neovim >=
+                         0.13 only)
+
+  cursors_end      A     Convert marks to cursors on their last character
+                         (Neovim >= 0.13)
+
+  change_cursors   c     Delete marks, convert to cursors, and insert
+                         (Neovim >= 0.13 only)
+  -----------------------------------------------------------------------------
+`cursors_start`, `cursors_end`, and `change_cursors` always dispose occurrence
+mode after running, regardless of the global `dispose_after_operator` option,
+since occurrence mode cannot coexist with a native multicursor session. See
+|occurrence-custom-integrations| for details.
+
 These operators are also available as API methods, e.g.,:
 
 >lua
@@ -1166,10 +1243,60 @@ occurrence.nvim can be integrated with other plugins to create powerful
 workflows through flexible action, operator, and event systems that provide
 easy access to the occurrence API.
 
+
+NATIVE MULTICURSOR         *occurrence-custom-integrations-native-multicursor*
+
+On Neovim >= 0.13, marked occurrences can be handed off directly to Neovim’s
+built-in |multicursor|, no external plugin required:
+
+- **cursors** (`Q` by default) - Convert all (or, in visual mode, selected)
+    marks to cursors and exit occurrence mode.
+- **cursors_start** / **cursors_end** (`I` / `A` by default) - Convert
+    marks within a motion to cursors on their first or last character, e.g.
+    `Iip`, `Aip`. After `Aip`, press `a` to append after every occurrence
+    (cursors sit on the last character rather than past it, so marks that end
+    at end-of-line behave like any other).
+- **change_cursors** (`c` by default, also via `coip`) - Delete marks
+    within a motion, convert them to cursors, and enter insert mode. This
+    replaces the prompt-based `change` as the default `c` when native
+    multicursor is available; restore the prompt with `operators = { c = "change" }`.
+
+These always exit occurrence mode once cursors are placed, since native
+multicursor has no mode of its own for occurrence to observe, and its
+buffer-local keymaps would otherwise shadow native multicursor workflows (`n`,
+`N`, `c`, `d`, …). See |occurrence-actions| and
+|occurrence-builtin-operators| for details.
+
+Cursors start in follow-mode (|q=|), so motions such as `w`, `e`, or `f` replay
+at every cursor. Set `follow_cursors = false` to leave that off, or press the
+native `q=` after the handoff to toggle it for one session.
+
+On Neovim < 0.13, these are unavailable and their default keys are not bound.
+
+
+IMPORTING CURSORS ~
+
+`mark` (`go`) and `modify_operator` (the `o` in `doip`) are the inverse of
+`cursors`: if native cursors already exist in the buffer, they import each
+cursor’s keyword as a pattern, mark it, and clear the cursors, rather than
+acting on the word under the window cursor. This makes a full round trip
+possible: `go`, `Q`, `q=` plus motions to add cursors on other words, `<Esc>`,
+`go` to bring everything back into occurrence mode, then any operator (`d`,
+`y`, `gU`, …) over the combined set. That set can mix words, which native
+`1Q` alone cannot express.
+
+A cursor that lands on whitespace, past end-of-line, or on an empty line has no
+keyword to import; it is skipped and counted, with one warning reporting how
+many were skipped. Plain `go` behaves differently: off a keyword it falls back
+to the word `<cword>` finds nearby. An imported cursor is a deliberate
+position, so it gets no such fallback.
+
+Importing does not read the search register, so |hlsearch| is left as it was.
+
 See the wiki <https://github.com/lettertwo/occurrence.nvim/wiki> for detailed
 examples, including:
 
-- **Multicursor** - Spawn multiple cursors at marked occurrences using multicursor.nvim <https://github.com/jake-stewart/multicursor.nvim>
+- **Multicursor** - Spawn multiple cursors at marked occurrences using the third-party multicursor.nvim <https://github.com/jake-stewart/multicursor.nvim>, for Neovim versions without native multicursor support
 - **Surround** - Surround marked occurrences with quotes, brackets, or tags using mini.surround <https://github.com/echasnovski/mini.surround>
 - **Snacks.picker** - Select and manipulate marked occurrences using snacks.nvim picker <https://github.com/folke/snacks.nvim/blob/main/docs/picker.md>
 
